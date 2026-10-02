@@ -1,11 +1,9 @@
-import { useEffect, useState } from 'react'
 import { driverFor } from '../../datasource/registry.js'
 import type { DashboardSummary } from '../../ops/dashboards.js'
 import type { SourceStatus } from '../../ops/sources.js'
 import { useT } from '../../runtime/i18n.js'
 import { CommandButton } from '../components/command-button.js'
 import { CheckIcon } from '../components/icons.js'
-import { api } from '../lib/api.js'
 import { intervalLabel } from '../lib/refresh.js'
 import { linkProps } from '../lib/router.js'
 
@@ -94,16 +92,14 @@ function Setup({ sources }: { sources: SourceStatus[] | undefined }) {
 
 export function HomeView({
   dashboards,
+  sources,
   error,
 }: {
   dashboards: DashboardSummary[] | undefined
+  sources: SourceStatus[] | undefined
   error: string | undefined
 }) {
   const t = useT()
-  const [sources, setSources] = useState<SourceStatus[]>()
-  useEffect(() => {
-    api.sources().then(setSources, () => setSources([]))
-  }, [])
 
   return (
     <div className="odd-page odd-home">

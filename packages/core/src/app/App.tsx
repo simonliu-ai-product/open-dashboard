@@ -1,6 +1,9 @@
 import { useEffect, useState } from 'react'
+import { driverFor } from '../datasource/registry.js'
 import type { DashboardSummary } from '../ops/dashboards.js'
+import type { SourceStatus } from '../ops/sources.js'
 import { LocaleProvider, useT } from '../runtime/i18n.js'
+import { ChevronIcon } from './components/icons.js'
 import { SettingsMenu } from './components/settings-menu.js'
 import { api } from './lib/api.js'
 import { linkProps, useRoute } from './lib/router.js'
@@ -29,11 +32,52 @@ function useDashboards(): { list: DashboardSummary[] | undefined; error: string 
   return { list, error }
 }
 
+function useSources(): SourceStatus[] | undefined {
+  const [list, setList] = useState<SourceStatus[]>()
+  useEffect(() => {
+    const load = () => api.sources().then(setList, () => setList([]))
+    load()
+    // Config and .env edits arrive as a change with no dashboard id.
+    const reload = (data: unknown) => {
+      if (!(data as { id?: string } | undefined)?.id) load()
+    }
+    import.meta.hot?.on('odd:queries-changed', reload)
+    return () => import.meta.hot?.off?.('odd:queries-changed', reload)
+  }, [])
+  return list
+}
+
+const SOURCES_OPEN = 'odd:nav-sources'
+
+function useSourcesOpen(): [boolean, (open: boolean) => void] {
+  const [open, setOpen] = useState(() => {
+    try {
+      return localStorage.getItem(SOURCES_OPEN) !== 'closed'
+    } catch {
+      return true
+    }
+  })
+  const update = (next: boolean) => {
+    setOpen(next)
+    try {
+      if (next) localStorage.removeItem(SOURCES_OPEN)
+      else localStorage.setItem(SOURCES_OPEN, 'closed')
+    } catch {
+      // the choice just isn't remembered
+    }
+  }
+  return [open, update]
+}
+
 function Shell() {
   const t = useT()
   const route = useRoute()
   const [theme, setTheme] = useTheme()
   const dashboards = useDashboards()
+  const sources = useSources()
+  const [sourcesOpen, setSourcesOpen] = useSourcesOpen()
+  // /data without a name shows the default source, as the page itself does.
+  const shownSource = sources?.find((s) => s.default)?.name ?? sources?.[0]?.name
   const [menuOpen, setMenuOpen] = useState(false)
 
   // biome-ignore lint/correctness/useExhaustiveDependencies: close the menu whenever the route changes
@@ -65,9 +109,56 @@ function Shell() {
           <a {...linkProps('/')} aria-current={route.name === 'home' ? 'page' : undefined}>
             {t('Overview')}
           </a>
-          <a {...linkProps('/data')} aria-current={route.name === 'data' ? 'page' : undefined}>
-            {t('Data sources')}
-          </a>
+          <div className="odd-nav-group">
+            <a
+              {...linkProps('/data')}
+              aria-current={
+                // Collapsed (or with nothing to list), the group stands in for the database shown.
+                route.name === 'data' && (!sourcesOpen || !sources?.length) ? 'page' : undefined
+              }
+            >
+              {t('Data sources')}
+            </a>
+            {sources?.length ? (
+              <button
+                type="button"
+                className="odd-nav-toggle"
+                aria-expanded={sourcesOpen}
+                aria-controls="odd-nav-sources"
+                aria-label={sourcesOpen ? t('Hide databases') : t('Show databases')}
+                onClick={() => setSourcesOpen(!sourcesOpen)}
+              >
+                <ChevronIcon />
+              </button>
+            ) : null}
+          </div>
+          {sourcesOpen && sources?.length ? (
+            <div id="odd-nav-sources" className="odd-nav-sub">
+              {sources.map((s) => (
+                <a
+                  key={s.name}
+                  {...linkProps(`/data/${encodeURIComponent(s.name)}`)}
+                  aria-current={
+                    route.name === 'data' && (route.source ?? shownSource) === s.name
+                      ? 'page'
+                      : undefined
+                  }
+                  title={s.ok ? undefined : s.error}
+                >
+                  <span
+                    className="odd-status"
+                    data-ok={s.ok}
+                    role="img"
+                    aria-label={s.ok ? t('Connected') : t('Not connected')}
+                  >
+                    {s.ok ? '●' : '▲'}
+                  </span>
+                  <span className="odd-nav-sub-name">{s.name}</span>
+                  <span className="odd-nav-sub-type">{driverFor(s.type)?.label ?? s.type}</span>
+                </a>
+              ))}
+            </div>
+          ) : null}
           <h2 className="odd-nav-heading">
             {t('Dashboards')}
             {dashboards.list ? <span className="odd-count">{dashboards.list.length}</span> : null}
@@ -88,9 +179,9 @@ function Shell() {
         {route.name === 'dashboard' ? (
           <DashboardView key={route.id} id={route.id} />
         ) : route.name === 'data' ? (
-          <DataSourcesView {...(route.source ? { source: route.source } : {})} />
+          <DataSourcesView sources={sources} {...(route.source ? { source: route.source } : {})} />
         ) : (
-          <HomeView dashboards={dashboards.list} error={dashboards.error} />
+          <HomeView dashboards={dashboards.list} sources={sources} error={dashboards.error} />
         )}
       </main>
     </div>

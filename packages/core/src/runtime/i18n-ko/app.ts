@@ -80,6 +80,9 @@ export const APP: Record<string, string> = {
   'Saved beside the panel in {file}:{line}. Ask your agent to /apply-comments.':
     '{file}:{line} 의 패널 옆에 저장했습니다. 에이전트에게 /apply-comments 를 요청하세요.',
   'Could not save: {error}': '저장하지 못했습니다: {error}',
+  'Cannot connect': '연결할 수 없음',
+  'Show databases': '데이터베이스 표시',
+  'Hide databases': '데이터베이스 숨기기',
   'Connect a database': '데이터베이스 연결',
   'Create a dashboard': '대시보드 만들기',
   Basics: '기본',

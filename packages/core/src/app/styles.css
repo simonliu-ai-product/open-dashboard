@@ -254,14 +254,100 @@ button {
   box-shadow: 0 0 0 1px var(--odd-border);
 }
 
+.odd-nav-group {
+  position: relative;
+}
+
+.odd-nav-group > a {
+  padding-right: 34px;
+}
+
+.odd-nav-toggle {
+  position: absolute;
+  top: 50%;
+  right: 4px;
+  display: grid;
+  place-items: center;
+  width: 24px;
+  height: 24px;
+  padding: 0;
+  border: 0;
+  border-radius: 5px;
+  background: none;
+  color: var(--odd-muted);
+  cursor: pointer;
+  transform: translateY(-50%);
+}
+
+.odd-nav-toggle:hover {
+  background: var(--odd-hover);
+  color: var(--odd-ink);
+}
+
+.odd-nav-toggle svg {
+  transform: rotate(90deg);
+  transition: transform 140ms ease;
+}
+
+.odd-nav-toggle[aria-expanded="true"] svg {
+  transform: rotate(180deg);
+}
+
+.odd-nav-sub {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  margin: 1px 0 2px 12px;
+  padding-left: 8px;
+  box-shadow: inset 1px 0 0 var(--odd-border);
+}
+
+.odd-nav .odd-nav-sub a {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  padding: 5px 8px;
+  font-size: 13px;
+}
+
+.odd-nav-sub .odd-status {
+  flex: none;
+  font-size: 8px;
+}
+
+.odd-nav-sub-name {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.odd-nav-sub-type {
+  margin-left: auto;
+  flex: none;
+  color: var(--odd-muted);
+  font-size: 11.5px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .odd-nav-toggle svg {
+    transition: none;
+  }
+}
+
 .odd-nav-heading {
   display: flex;
   align-items: center;
+  justify-content: space-between;
   gap: 8px;
-  margin: 18px 10px 6px;
+  /* The count sits in the same right-hand column as the data sources toggle. */
+  margin: 18px 4px 6px 10px;
   font-size: 12.5px;
   font-weight: 600;
   color: var(--odd-ink-2);
+}
+
+.odd-nav-heading .odd-count {
+  min-width: 24px;
 }
 
 .odd-count {
@@ -559,6 +645,52 @@ button {
   white-space: nowrap;
   font-size: 13px;
   font-variant-numeric: tabular-nums;
+}
+
+.odd-source-title {
+  display: flex;
+  align-items: baseline;
+  gap: 12px;
+}
+
+.odd-source-title span {
+  color: var(--odd-muted);
+  font-size: 15px;
+  font-weight: 500;
+  letter-spacing: 0;
+}
+
+.odd-source-error {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 16px;
+  max-width: 560px;
+}
+
+.odd-source-error-body {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding-left: 12px;
+  box-shadow: inset 2px 0 0 var(--odd-critical);
+}
+
+.odd-source-error-body strong {
+  color: var(--odd-critical);
+  font-size: 14px;
+  font-weight: 620;
+}
+
+.odd-source-error-body code {
+  color: var(--odd-ink-2);
+  font-size: 13px;
+  overflow-wrap: anywhere;
+}
+
+.odd-source-error .odd-command {
+  width: auto;
+  min-width: 240px;
 }
 
 .odd-setup {

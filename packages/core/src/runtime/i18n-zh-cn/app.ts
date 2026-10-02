@@ -79,6 +79,9 @@ export const APP: Record<string, string> = {
   'Saved beside the panel in {file}:{line}. Ask your agent to /apply-comments.':
     '已保存到 {file}:{line} 的面板旁。请 Agent 执行 /apply-comments。',
   'Could not save: {error}': '无法保存：{error}',
+  'Cannot connect': '无法连接',
+  'Show databases': '显示数据库',
+  'Hide databases': '隐藏数据库',
   'Connect a database': '连接数据库',
   'Create a dashboard': '创建 Dashboard',
   Basics: '基本',
