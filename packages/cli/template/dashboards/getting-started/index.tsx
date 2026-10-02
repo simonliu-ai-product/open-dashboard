@@ -10,7 +10,7 @@ import {
   Table,
   Text,
   TimeRange,
-} from '@open-database-dashboard/core'
+} from '@open-dashboard/core'
 
 export const meta: DashboardMeta = {
   title: 'Getting started',

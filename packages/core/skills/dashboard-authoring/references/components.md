@@ -1,6 +1,6 @@
 # Components
 
-All from `@open-database-dashboard/core`. Every panel takes the common props:
+All from `@open-dashboard/core`. Every panel takes the common props:
 
 | Prop | Type | |
 | --- | --- | --- |

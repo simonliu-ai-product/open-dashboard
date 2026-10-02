@@ -81,7 +81,6 @@ function Shell() {
               {d.title}
             </a>
           ))}
-          {dashboards.list?.length === 0 ? <p className="odd-nav-empty">{t('None yet')}</p> : null}
         </nav>
         <SettingsMenu theme={theme} onTheme={setTheme} />
       </aside>

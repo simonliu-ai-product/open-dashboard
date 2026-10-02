@@ -8,7 +8,7 @@
     "skipLibCheck": true,
     "noEmit": true,
     "types": [],
-    "jsxImportSource": "@open-database-dashboard/core"
+    "jsxImportSource": "@open-dashboard/core"
   },
   "include": [
     "dashboards/**/*",

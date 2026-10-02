@@ -7,7 +7,7 @@ import { listDashboards, runDashboardQuery, runSql } from './dashboards.js'
 import { type Fixture, makeFixture } from './fixture.test-helper.js'
 import { readSchema, schemaToText } from './sources.js'
 
-const DASHBOARD = `import { Dashboard, Filters, Row, Select, Stat, BarChart, TimeRange, type DashboardMeta } from '@open-database-dashboard/core'
+const DASHBOARD = `import { Dashboard, Filters, Row, Select, Stat, BarChart, TimeRange, type DashboardMeta } from '@open-dashboard/core'
 
 export const meta: DashboardMeta = { title: 'Sales', description: 'Test' }
 

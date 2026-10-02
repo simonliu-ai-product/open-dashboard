@@ -4,7 +4,7 @@ import { init } from './init.js'
 const USAGE = `create-open-dashboard — scaffold an open-dashboard workspace
 
 Usage:
-  npx @open-database-dashboard/cli init [directory] [--sample]
+  npx @open-dashboard/cli init [directory] [--sample]
 
 Arguments:
   directory     Where to create the workspace (default: my-dashboards)

@@ -1,4 +1,4 @@
-# open-database-dashboard — repository guide
+# open-dashboard — repository guide
 
 This file describes the **framework repo**. If you are authoring dashboards in a
 scaffolded workspace, you want the `create-dashboard` / `dashboard-authoring`
@@ -10,8 +10,8 @@ pnpm + Turbo monorepo.
 
 | Path | Package | Role |
 | --- | --- | --- |
-| `packages/core` | `@open-database-dashboard/core` | Datasource drivers, named-query loader, ops layer, Vite plugins + dev API, viewer app, panel components, `open-dashboard` CLI, canonical skills. |
-| `packages/cli` | `@open-database-dashboard/cli` | `npx @open-database-dashboard/cli init` scaffolder + project template. New workspaces start empty (connect a database → create a dashboard); `--sample` adds a generated SQLite shop and a getting-started dashboard. |
+| `packages/core` | `@open-dashboard/core` | Datasource drivers, named-query loader, ops layer, Vite plugins + dev API, viewer app, panel components, `open-dashboard` CLI, canonical skills. |
+| `packages/cli` | `@open-dashboard/cli` | `npx @open-dashboard/cli init` scaffolder + project template. New workspaces start empty (connect a database → create a dashboard); `--sample` adds a generated SQLite shop and a getting-started dashboard. |
 | `apps/demo` | private | Dogfood workspace over a seeded SQLite shop (`scripts/seed.mjs`). |
 | `scripts/` | — | `screenshot.mjs`, `interact.mjs`: Playwright drivers for eyeballing the viewer. |
 
@@ -88,7 +88,7 @@ dashboards/<id>/index.tsx    ──Vite──▶ React tree in the viewer
 - **Rows are normalised once, server side** (`datasource/normalize.ts`): bigint → number (or string if unsafe), Date → ISO string, bytes → placeholder; each column gets a type. A chart written against SQLite renders identically against Postgres.
 - **Optional drivers are resolved from the user's workspace first** (`datasource/peer.ts`): under pnpm's strict layout core cannot see `pg`/`mysql2` it does not depend on. They are optional peers, external in the build, and never imported at module top level.
 - **Config is loaded by Node itself** (`workspace.ts`): native TypeScript type stripping (Node ≥ 22.18) imports `open-dashboard.config.ts` with an mtime query to bust the cache. That is why the template config uses `import type` + `satisfies` — anything that is not erasable syntax breaks it. `.env` fills in what the shell did not set; a reload replaces only what the file set before.
-- **The browser gets core from source, not dist** (`vite/index.ts`). Dashboards and the viewer resolve `@open-database-dashboard/core` to `src/index.ts`, so there is one module graph and one React context. The contexts are also stashed on `globalThis` (`runtime/context.ts`) in case a second copy ever loads. React itself is aliased to core's copy; a workspace has no React dependency.
+- **The browser gets core from source, not dist** (`vite/index.ts`). Dashboards and the viewer resolve `@open-dashboard/core` to `src/index.ts`, so there is one module graph and one React context. The contexts are also stashed on `globalThis` (`runtime/context.ts`) in case a second copy ever loads. React itself is aliased to core's copy; a workspace has no React dependency.
 - **Filters are collected before any panel mounts.** `<Dashboard>` walks its `<Filters>` element tree and calls each filter component's static `filterSpec(props)` to get key, default and param mapping. Registering from a filter's own effect would let every panel fire once without params and fail. Filter values live in the URL (`?time=12m&region=North`); a value equal to the default is omitted, `''` means NULL.
 - **`check` and the dashboard list read TSX statically** (`ops/analyze.ts`, Babel). Only literal props count; that is deliberate — it reports less rather than guesses. It verifies query names, columns panels name against real result columns, and params against filters, by running each query with the defaults the browser would use (`runtime/time-range.ts` is shared by both sides).
 - **Notes from the inspector are source edits** (`ops/comment.ts`). The file is parsed strictly first (a recovered tree has wrong offsets); the marker goes above the panel whose `title` matches, as `{/* @dashboard-comment: … */}` in JSX child position, `/* … */` otherwise. `*/` in the note is defused.

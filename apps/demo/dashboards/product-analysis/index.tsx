@@ -9,7 +9,7 @@ import {
   Table,
   TimeRange,
   Treemap,
-} from '@open-database-dashboard/core'
+} from '@open-dashboard/core'
 
 export const meta: DashboardMeta = {
   title: '商品分析',

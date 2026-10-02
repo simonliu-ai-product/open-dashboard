@@ -2,7 +2,6 @@ export const APP: Record<string, string> = {
   Overview: '總覽',
   'Data sources': '資料來源',
   Dashboards: 'Dashboards',
-  'None yet': '尚無',
   Menu: '選單',
   Main: '主要',
   Settings: '設定',

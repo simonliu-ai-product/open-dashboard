@@ -1,5 +1,5 @@
 {
-  "name": "@open-database-dashboard/core",
+  "name": "@open-dashboard/core",
   "version": "0.1.0",
   "description": "The dashboard framework built for agents — describe the charts you want, get a live dashboard over your database.",
   "license": "MIT",

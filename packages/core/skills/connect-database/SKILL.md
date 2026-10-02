@@ -58,7 +58,7 @@ For production, suggest a replica.
 
 ```ts
 // open-dashboard.config.ts
-import type { OpenDashboardConfig } from '@open-database-dashboard/core'
+import type { OpenDashboardConfig } from '@open-dashboard/core'
 
 export default {
   datasources: {

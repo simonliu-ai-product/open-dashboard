@@ -11,7 +11,7 @@ import {
   Stat,
   Table,
   TimeRange,
-} from '@open-database-dashboard/core'
+} from '@open-dashboard/core'
 
 export const meta: DashboardMeta = {
   title: 'Sales overview',

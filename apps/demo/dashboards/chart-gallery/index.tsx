@@ -33,7 +33,7 @@ import {
   TimeRange,
   UpSetChart,
   Waterfall,
-} from '@open-database-dashboard/core'
+} from '@open-dashboard/core'
 import taiwan from './taiwan-counties.json'
 
 export const meta: DashboardMeta = {

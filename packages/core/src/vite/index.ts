@@ -85,13 +85,13 @@ export function viteConfigFor(
     ],
     resolve: {
       alias: [
-        { find: /^@open-database-dashboard\/core$/, replacement: sourceEntry('index.ts') },
+        { find: /^@open-dashboard\/core$/, replacement: sourceEntry('index.ts') },
         {
-          find: /^@open-database-dashboard\/core\/jsx-runtime$/,
+          find: /^@open-dashboard\/core\/jsx-runtime$/,
           replacement: sourceEntry('jsx-runtime.ts'),
         },
         {
-          find: /^@open-database-dashboard\/core\/jsx-dev-runtime$/,
+          find: /^@open-dashboard\/core\/jsx-dev-runtime$/,
           replacement: sourceEntry('jsx-dev-runtime.ts'),
         },
         ...reactAliases(),
@@ -106,9 +106,9 @@ export function viteConfigFor(
       // Inside the monorepo it is outside node_modules, so only a published
       // install shows this.
       exclude: [
-        '@open-database-dashboard/core',
-        '@open-database-dashboard/core/jsx-runtime',
-        '@open-database-dashboard/core/jsx-dev-runtime',
+        '@open-dashboard/core',
+        '@open-dashboard/core/jsx-runtime',
+        '@open-dashboard/core/jsx-dev-runtime',
       ],
       entries: [],
     },

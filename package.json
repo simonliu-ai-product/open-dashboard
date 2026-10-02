@@ -1,5 +1,5 @@
 {
-  "name": "open-database-dashboard-monorepo",
+  "name": "open-dashboard-monorepo",
   "private": true,
   "type": "module",
   "packageManager": "pnpm@11.9.0",
@@ -7,16 +7,16 @@
     "node": ">=22.18"
   },
   "scripts": {
-    "dev": "turbo run dev --filter=@open-database-dashboard/demo",
+    "dev": "turbo run dev --filter=@open-dashboard/demo",
     "build": "turbo run build",
     "typecheck": "turbo run typecheck",
     "test": "vitest run",
     "test:watch": "vitest",
     "check": "biome check .",
     "check:fix": "biome check --write .",
-    "core": "pnpm --filter @open-database-dashboard/core",
-    "cli": "pnpm --filter @open-database-dashboard/cli",
-    "demo": "pnpm --filter @open-database-dashboard/demo"
+    "core": "pnpm --filter @open-dashboard/core",
+    "cli": "pnpm --filter @open-dashboard/cli",
+    "demo": "pnpm --filter @open-dashboard/demo"
   },
   "devDependencies": {
     "@biomejs/biome": "^2.3.0",

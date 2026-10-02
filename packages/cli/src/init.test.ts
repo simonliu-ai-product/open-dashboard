@@ -19,7 +19,7 @@ describe('init', () => {
 
     const pkg = JSON.parse(readFileSync(join(root, 'package.json'), 'utf8'))
     expect(pkg.name).toBe('board')
-    expect(pkg.dependencies['@open-database-dashboard/core']).toBe('^9.9.9')
+    expect(pkg.dependencies['@open-dashboard/core']).toBe('^9.9.9')
 
     for (const file of [
       '.gitignore',

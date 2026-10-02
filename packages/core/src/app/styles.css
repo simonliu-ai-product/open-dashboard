@@ -211,6 +211,7 @@ button {
   gap: 8px;
   font-weight: 650;
   letter-spacing: -0.01em;
+  white-space: nowrap;
   text-decoration: none;
 }
 
@@ -274,11 +275,6 @@ button {
   line-height: 18px;
   text-align: center;
   font-variant-numeric: tabular-nums;
-}
-
-.odd-nav-empty {
-  margin: 4px 10px;
-  color: var(--odd-muted);
 }
 
 /* Settings: theme + language, opening upward from the sidebar foot */
@@ -459,31 +455,25 @@ button {
 
 /* Pages */
 
+/* Every page outside a dashboard: the same width and the same inset from the sidebar. */
 .odd-page {
-  max-width: 1120px;
-  margin-inline: auto;
+  max-width: 1320px;
   padding: 32px 32px 64px;
 }
 
+.odd-page-head {
+  margin-bottom: 28px;
+}
+
 .odd-page-head h1 {
-  margin: 0 0 6px;
+  margin: 0;
   font-size: 26px;
   font-weight: 650;
   letter-spacing: -0.018em;
   line-height: 1.2;
 }
 
-.odd-page-head p {
-  margin: 0 0 28px;
-  color: var(--odd-ink-2);
-  max-width: 62ch;
-}
-
 /* Home */
-
-.odd-home {
-  max-width: 1320px;
-}
 
 .odd-home-grid {
   display: grid;
@@ -575,7 +565,7 @@ button {
   display: flex;
   flex-direction: column;
   max-width: 440px;
-  margin: 28px 0 0;
+  margin: 0;
   padding: 0;
   list-style: none;
 }

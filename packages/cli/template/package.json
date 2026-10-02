@@ -9,7 +9,7 @@
     "sources": "open-dashboard sources"
   },
   "dependencies": {
-    "@open-database-dashboard/core": "__VERSION__"
+    "@open-dashboard/core": "__VERSION__"
   },
   "devDependencies": {
     "typescript": "^5.7.0"

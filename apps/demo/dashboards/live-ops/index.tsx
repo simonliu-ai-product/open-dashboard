@@ -8,7 +8,7 @@ import {
   Select,
   Stat,
   Table,
-} from '@open-database-dashboard/core'
+} from '@open-dashboard/core'
 
 export const meta: DashboardMeta = {
   title: '即時營運看板',

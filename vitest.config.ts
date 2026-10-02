@@ -6,8 +6,8 @@ const core = fileURLToPath(new URL('./packages/core/src', import.meta.url))
 export default defineConfig({
   resolve: {
     alias: [
-      { find: /^@open-database-dashboard\/core\/node$/, replacement: `${core}/node.ts` },
-      { find: /^@open-database-dashboard\/core$/, replacement: `${core}/index.ts` },
+      { find: /^@open-dashboard\/core\/node$/, replacement: `${core}/node.ts` },
+      { find: /^@open-dashboard\/core$/, replacement: `${core}/index.ts` },
     ],
   },
   esbuild: {

@@ -1,5 +1,5 @@
 {
-  "name": "@open-database-dashboard/cli",
+  "name": "@open-dashboard/cli",
   "version": "0.1.0",
   "description": "Scaffolder for open-dashboard — describe a dashboard to your agent, get a live one over your database.",
   "license": "MIT",

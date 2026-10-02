@@ -91,7 +91,7 @@ between SQLite, Postgres and MySQL: [references/sql-dialects.md](references/sql-
 ```tsx
 import {
   BarChart, Dashboard, type DashboardMeta, Filters, LineChart, Row, Select, Stat, Table, TimeRange,
-} from '@open-database-dashboard/core'
+} from '@open-dashboard/core'
 
 export const meta: DashboardMeta = {
   title: 'Sales overview',

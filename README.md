@@ -1,4 +1,4 @@
-# open-database-dashboard
+# open-dashboard
 
 **Describe the dashboard you want. Your coding agent builds it — live, over your own database.**
 
@@ -19,7 +19,7 @@ workflow.
 ## Quick start
 
 ```bash
-npx @open-database-dashboard/cli init my-dashboards
+npx @open-dashboard/cli init my-dashboards
 cd my-dashboards
 pnpm install
 pnpm dev                     # http://localhost:5473

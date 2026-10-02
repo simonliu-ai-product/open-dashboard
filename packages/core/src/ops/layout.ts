@@ -353,15 +353,12 @@ function ensureImport(code: string, name: string): string {
   let declaration: Node | undefined
   walk(ast, (node) => {
     if (declaration || node.type !== 'ImportDeclaration') return
-    if (
-      (node.source as Node).value === '@open-database-dashboard/core' &&
-      node.importKind !== 'type'
-    )
+    if ((node.source as Node).value === '@open-dashboard/core' && node.importKind !== 'type')
       declaration = node
   })
   if (!declaration)
     throw new OpsError(
-      'cannot find the import from @open-database-dashboard/core to add a component to',
+      'cannot find the import from @open-dashboard/core to add a component to',
       409,
     )
   const specifiers = (declaration.specifiers as Node[]).filter((s) => s.type === 'ImportSpecifier')

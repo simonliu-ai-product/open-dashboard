@@ -1,4 +1,4 @@
-import type { OpenDashboardConfig } from '@open-database-dashboard/core'
+import type { OpenDashboardConfig } from '@open-dashboard/core'
 
 export default {
   datasources: {

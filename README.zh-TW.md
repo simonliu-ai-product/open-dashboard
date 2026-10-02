@@ -1,4 +1,4 @@
-# open-database-dashboard
+# open-dashboard
 
 **說出你想看的 Dashboard，Coding Agent 就幫你在自己的資料庫上把它做出來，而且是即時的。**
 
@@ -16,7 +16,7 @@ Claude Code（或任何 Coding Agent）說「我要看每月營收、前十名�
 ## 快速開始
 
 ```bash
-npx @open-database-dashboard/cli init my-dashboards
+npx @open-dashboard/cli init my-dashboards
 cd my-dashboards
 pnpm install
 pnpm dev                     # http://localhost:5473

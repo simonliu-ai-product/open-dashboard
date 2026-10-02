@@ -11,7 +11,7 @@ const SOURCE = `import {
   Row,
   Stat,
   Table,
-} from '@open-database-dashboard/core'
+} from '@open-dashboard/core'
 
 const cols = 6
 

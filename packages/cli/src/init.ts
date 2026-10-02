@@ -48,9 +48,7 @@ function skillsDir(root: string): string | undefined {
   const staged = join(root, 'skills')
   if (existsSync(join(staged, 'create-dashboard', 'SKILL.md'))) return staged
   try {
-    const core = createRequire(import.meta.url).resolve(
-      '@open-database-dashboard/core/package.json',
-    )
+    const core = createRequire(import.meta.url).resolve('@open-dashboard/core/package.json')
     const candidate = join(dirname(core), 'skills')
     if (existsSync(candidate)) return candidate
   } catch {
@@ -76,7 +74,7 @@ function frameworkVersion(): string {
   ]) {
     try {
       const own = JSON.parse(readFileSync(candidate, 'utf8')) as { name?: string; version?: string }
-      if (own.name === '@open-database-dashboard/cli' && own.version) return `^${own.version}`
+      if (own.name === '@open-dashboard/cli' && own.version) return `^${own.version}`
     } catch {
       // keep looking
     }
