@@ -3,6 +3,13 @@ export interface NamedQuery {
   sql: string
   source?: string
   description?: string
+  /**
+   * Other queries in this dashboard whose results this one reads as tables:
+   * it runs in SQLite over those results instead of on a datasource.
+   */
+  uses?: string[]
+  /** How long its result is reused: '5m', '30s', 'off'. Default: the config's `cache`. */
+  cache?: string
   file: string
   /** 1-based line of the `-- name:` header. */
   line: number
@@ -12,7 +19,7 @@ export class QueryFileError extends Error {
   status = 500
 }
 
-const HEADER = /^\s*--\s*(name|source|description)\s*:\s*(.*?)\s*$/i
+const HEADER = /^\s*--\s*(name|source|description|uses|cache)\s*:\s*(.*?)\s*$/i
 const VALID_NAME = /^[A-Za-z_][A-Za-z0-9_-]*$/
 
 /**
@@ -33,6 +40,11 @@ export function parseQueryFile(text: string, file: string): NamedQuery[] {
     const sql = body.join('\n').trim().replace(/;\s*$/, '').trim()
     if (!sql)
       throw new QueryFileError(`${file}:${current.line}: query "${current.name}" has no SQL`)
+    if (current.uses && current.source) {
+      throw new QueryFileError(
+        `${file}:${current.line}: query "${current.name}" has both "-- source:" and "-- uses:" — a query that uses others runs over their results, not on a datasource`,
+      )
+    }
     queries.push({ ...current, sql })
   }
 
@@ -52,8 +64,20 @@ export function parseQueryFile(text: string, file: string): NamedQuery[] {
       inHeader = true
       return
     }
-    if (header && inHeader && current && (key === 'source' || key === 'description')) {
+    if (
+      header &&
+      inHeader &&
+      current &&
+      (key === 'source' || key === 'description' || key === 'cache')
+    ) {
       current[key] = header[2] ?? ''
+      return
+    }
+    if (header && inHeader && current && key === 'uses') {
+      current.uses = (header[2] ?? '')
+        .split(',')
+        .map((name) => name.trim())
+        .filter(Boolean)
       return
     }
     inHeader = false

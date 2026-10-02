@@ -181,14 +181,22 @@ export function timeTicks(min: number, max: number, count = 6): number[] {
   const hour = 3600_000
   const day = 24 * hour
   const steps = [hour, 3 * hour, 6 * hour, 12 * hour, day, 2 * day, 7 * day, 14 * day]
-  const step = steps.find((s) => span / s <= count)
-  if (step) {
-    const first = new Date(min)
-    if (step >= day) first.setHours(0, 0, 0, 0)
-    else first.setMinutes(0, 0, 0)
-    const ticks: number[] = []
-    for (let t = first.getTime(); t <= max; t += step) if (t >= min) ticks.push(t)
-    return ticks
+  const fitting = steps.findIndex((s) => span / s <= count)
+  if (fitting >= 0) {
+    const at = (step: number) => {
+      const first = new Date(min)
+      if (step >= day) first.setHours(0, 0, 0, 0)
+      else first.setMinutes(0, 0, 0)
+      const ticks: number[] = []
+      for (let t = first.getTime(); t <= max; t += step) if (t >= min) ticks.push(t)
+      return ticks
+    }
+    // A coarse step can land a single tick in a short span (one midnight in a
+    // four-hour window): step down until there are two, if any step gives two.
+    for (let i = fitting; i >= 0; i -= 1) {
+      const ticks = at(steps[i] as number)
+      if (ticks.length >= 2 || i === 0) return ticks
+    }
   }
   const months = Math.max(1, Math.ceil(span / (30 * day) / count))
   const cursor = new Date(min)

@@ -108,6 +108,13 @@ shareable link. Light and dark themes, a 12-column grid, auto-refresh.
 | `bigquery` | BigQuery | `pnpm add @google-cloud/bigquery` | |
 | `snowflake` | Snowflake | `pnpm add snowflake-sdk` | |
 
+Configure as many as you like; each query names its `-- source:`. To join
+across them, a query can `-- uses:` other queries' results as tables — it runs
+in a scratch SQLite over those results, so Postgres can meet ClickHouse
+without either database seeing the other. Results are cached for 30 s by
+default (`cache` in the config, `-- cache:` per query); the refresh button
+always runs fresh.
+
 `open-dashboard drivers` prints each one with a config example. Secrets live in
 `.env`; config and `.env` reload without restarting. Every engine except
 BigQuery and Snowflake is exercised by the cross-driver test suite against a
@@ -145,6 +152,7 @@ open-dashboard check [id] [--json]
 | Skill | For |
 | --- | --- |
 | `/connect-database` | add a datasource, `.env`, driver; verify with `sources` + `schema` |
+| `/document-database` | write `databases/<source>/database.md`: what tables and columns mean |
 | `/create-dashboard` | explore → pin down metric definitions → queries → panels → `check` |
 | `/dashboard-authoring` | the reference: query files, parameters, every component, formats, SQL per dialect |
 | `/current-dashboard` | resolve "this chart" from what the viewer is showing |

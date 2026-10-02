@@ -23,6 +23,10 @@ Every source should show ✓. If one fails, fix that first.
 
 ## Step 1 — Learn the schema before you ask anything
 
+Read `databases/<source>/database.md` first if it exists: it says what the
+tables mean, which values to filter on, units and time zones. Trust it over
+guesses from column names.
+
 ```bash
 pnpm exec open-dashboard schema            # default source; add a name for another
 ```
@@ -40,6 +44,9 @@ You are looking for: the **time column** of each fact table and its format
 (cents?); **status** values that change what counts (refunded, cancelled,
 test, deleted); how the tables **join**; and the **date range** the data covers —
 a "last 30 days" default on data that ends last year shows nothing.
+
+If you learn something here the file does not say (a status value, a unit),
+add it to `database.md` — see `document-database`.
 
 ## Step 2 — Pin down the metrics (ask before writing code)
 

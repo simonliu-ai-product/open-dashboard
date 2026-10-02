@@ -41,8 +41,46 @@ ORDER BY 1;
 - `-- name:` starts a query. Letters, digits, `_`, `-`. Unique per dashboard.
 - `-- source:` (optional) picks the datasource; omit to use `defaultSource`.
 - `-- description:` (optional) is for humans and shows in the inspector.
+- `-- cache:` (optional) how long the result is reused for everyone viewing:
+  `30s`, `5m`, `1h`, `off`. Default: the config's `cache` (30 s). Use `off` for
+  a "right now" number on a live board, and longer for heavy or billed queries
+  (BigQuery). The refresh button always runs fresh; `check` never uses the cache.
+- `-- uses:` (optional) — see *Across databases* below.
 - Those header lines must come **directly** after `-- name:`.
 - A trailing `;` is fine. One statement per query.
+
+### Across databases — `-- uses:`
+
+A query cannot join tables from two datasources. Instead, write one query per
+database, then a query that **uses** their results as tables:
+
+```sql
+-- name: spend_by_channel
+-- source: marketing
+SELECT channel, SUM(spend) AS spend FROM ad_spend
+WHERE date >= :from AND date < :to GROUP BY channel;
+
+-- name: revenue_by_channel
+-- source: shop
+SELECT acquisition_channel AS channel, SUM(total) AS revenue FROM orders
+WHERE ordered_at >= :from AND ordered_at < :to GROUP BY 1;
+
+-- name: channel_return
+-- uses: spend_by_channel, revenue_by_channel
+SELECT s.channel, s.spend, r.revenue, r.revenue / s.spend AS roas
+FROM spend_by_channel s LEFT JOIN revenue_by_channel r USING (channel)
+ORDER BY roas DESC;
+```
+
+- The `-- uses:` query runs in **SQLite**, in a scratch in-memory database
+  holding each input as a table named after its query. Write it in SQLite
+  dialect whatever the inputs run on. It has no `-- source:`.
+- Inputs get the same parameters; the `-- uses:` query can read them too.
+- **Aggregate in the inputs.** Each input is capped at `maxRows` like any
+  query; a cut-short input makes the combined result truncated (and wrong).
+  Match the join keys' shape in each dialect (same date format, same case).
+- A `-- uses:` query can use another one; loops and unknown names are `check`
+  errors. Inputs count as used, so they need no panel of their own.
 
 ### Parameters
 

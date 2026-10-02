@@ -4,6 +4,7 @@ import { analyzeDashboard } from './analyze.js'
 import { checkDashboard } from './check.js'
 import { addComment, listComments } from './comment.js'
 import { listDashboards, runDashboardQuery, runSql } from './dashboards.js'
+import { docSourceOf, readDatabaseDoc } from './database-doc.js'
 import { type Fixture, makeFixture } from './fixture.test-helper.js'
 import { readSchema, schemaToText } from './sources.js'
 
@@ -259,5 +260,25 @@ describe('drill checks', () => {
       join(fixture.root, 'dashboards/sales/index.tsx'),
     )
     expect(report.findings).toEqual([])
+  })
+})
+
+describe('database.md', () => {
+  it('reads databases/<source>/database.md for a configured source only', () => {
+    expect(readDatabaseDoc(fixture.workspace.config, 'db')).toEqual({
+      source: 'db',
+      file: join('databases', 'db', 'database.md'),
+      markdown: null,
+    })
+    fixture.write('databases/db/database.md', '# db\n')
+    expect(readDatabaseDoc(fixture.workspace.config, 'db').markdown).toBe('# db\n')
+    expect(() => readDatabaseDoc(fixture.workspace.config, '../db')).toThrow(/unknown datasource/)
+  })
+
+  it('names the source a changed file documents', () => {
+    const config = fixture.workspace.config
+    expect(docSourceOf(config, join(config.root, 'databases/db/database.md'))).toBe('db')
+    expect(docSourceOf(config, join(config.root, 'databases/db/other.md'))).toBeUndefined()
+    expect(docSourceOf(config, join(config.root, 'dashboards/db/database.md'))).toBeUndefined()
   })
 })

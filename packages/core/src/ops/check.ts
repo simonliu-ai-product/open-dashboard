@@ -3,6 +3,7 @@ import { relative } from 'node:path'
 import type { ParamValue } from '../config.js'
 import { referencedParams } from '../datasource/params.js'
 import { errorMessage } from '../datasource/types.js'
+import type { NamedQuery } from '../queries/load.js'
 import { isTimePreset, timeRangeParams } from '../runtime/time-range.js'
 import type { Workspace } from '../workspace.js'
 import { analyzeDashboard, type FilterDecl } from './analyze.js'
@@ -71,7 +72,7 @@ async function defaultParams(
       params[filter.name] = null
     } else if (filter.query) {
       try {
-        const run = await runDashboardQuery(workspace, id, filter.query, params)
+        const run = await runDashboardQuery(workspace, id, filter.query, params, { fresh: true })
         const first = run.result.rows[0]
         const column = run.result.columns[0]?.name
         params[filter.name] = first && column ? (first[column] as ParamValue) : null
@@ -83,6 +84,20 @@ async function defaultParams(
     }
   }
   return params
+}
+
+/** The first loop of `-- uses:` reachable from `start`, ending where it began. */
+function usesLoop(
+  queries: Map<string, NamedQuery>,
+  start: string,
+  path: string[] = [],
+): string[] | undefined {
+  if (path.includes(start)) return [...path.slice(path.indexOf(start)), start]
+  for (const input of queries.get(start)?.uses ?? []) {
+    const loop = usesLoop(queries, input, [...path, start])
+    if (loop) return loop
+  }
+  return undefined
 }
 
 export async function checkDashboard(
@@ -150,8 +165,35 @@ export async function checkDashboard(
       })
     }
   }
+  // A query another one reads with `-- uses:` is in use, and so is everything it reads.
+  const reached = new Set<string>()
+  const reach = (name: string): void => {
+    if (reached.has(name)) return
+    reached.add(name)
+    for (const input of queries.get(name)?.uses ?? []) reach(input)
+  }
+  for (const name of used) reach(name)
   for (const [name, query] of queries) {
-    if (!used.has(name)) {
+    for (const input of query.uses ?? []) {
+      if (!queries.has(input)) {
+        findings.push({
+          severity: 'error',
+          message: `query "${name}" uses "${input}", which is not defined in this dashboard`,
+          where: `${query.file}:${query.line}`,
+        })
+      }
+    }
+    const loop = usesLoop(queries, name)
+    if (loop && loop[0] === name) {
+      findings.push({
+        severity: 'error',
+        message: `queries use each other in a loop: ${loop.join(' → ')}`,
+        where: `${query.file}:${query.line}`,
+      })
+    }
+  }
+  for (const [name, query] of queries) {
+    if (!reached.has(name)) {
       findings.push({
         severity: 'warning',
         message: `query "${name}" is defined but no panel uses it`,
@@ -175,7 +217,7 @@ export async function checkDashboard(
       continue
     }
     try {
-      const run = await runDashboardQuery(workspace, id, name, report.params)
+      const run = await runDashboardQuery(workspace, id, name, report.params, { fresh: true })
       entry.source = run.query.source
       entry.rows = run.result.rows.length
       entry.columns = run.result.columns.map((c) => c.name)

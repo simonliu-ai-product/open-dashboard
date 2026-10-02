@@ -8,6 +8,7 @@ import type { Format, QueryRun } from '../runtime/types.js'
 import { useQuery } from '../runtime/use-query.js'
 import { editable } from './editable.js'
 import { PanelFrame, type PanelProps, useFormatContext, useSize } from './panel.js'
+import { textWidth } from './row-chart-kit.js'
 import { ChartTooltip } from './tooltip.js'
 
 export interface CalendarHeatmapProps extends PanelProps {
@@ -49,12 +50,24 @@ function Calendar({ run, props }: { run: QueryRun; props: CalendarHeatmapProps }
     row: offset,
     text: weekday.format(new Date(2024, 0, 1 + offset)),
   }))
-  const left = 30
   const top = 16
-  const cell = Math.max(
-    4,
-    Math.min((size.width - left - 4) / Math.max(1, layout.weeks), (size.height - top - 4) / 7),
-  )
+  // Weekday names need rows at least as tall as the text; on a phone a year of
+  // weeks leaves cells too small, so the names go and the cells get the room.
+  const fit = (gutter: number) =>
+    Math.max(
+      4,
+      Math.min((size.width - gutter - 4) / Math.max(1, layout.weeks), (size.height - top - 4) / 7),
+    )
+  const named = fit(30) >= 10
+  const left = named ? 30 : 4
+  const cell = fit(left)
+  let lastEnd = -Infinity
+  const monthLabels = layout.months.filter((m) => {
+    const x = left + cell * m.col
+    if (x < lastEnd + 6) return false
+    lastEnd = x + textWidth(month.format(parseDate(m.date) as Date))
+    return true
+  })
   const gap = cell > 8 ? 2 : 1
   const active = hover === null ? undefined : layout.cells[hover]
   const scale = tickFormatter([min, max], props.format, ctx)
@@ -69,7 +82,7 @@ function Calendar({ run, props }: { run: QueryRun; props: CalendarHeatmapProps }
             role="img"
             aria-label={`${props.title}: ${t('calendar')}`}
           >
-            {dayNames.map((d) => (
+            {(named ? dayNames : []).map((d) => (
               <text
                 key={d.row}
                 x={left - 6}
@@ -81,7 +94,7 @@ function Calendar({ run, props }: { run: QueryRun; props: CalendarHeatmapProps }
                 {d.text}
               </text>
             ))}
-            {layout.months.map((m) => (
+            {monthLabels.map((m) => (
               <text key={m.date} x={left + cell * m.col} y={top - 5} className="odd-tick">
                 {month.format(parseDate(m.date) as Date)}
               </text>

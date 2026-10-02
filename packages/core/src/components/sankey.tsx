@@ -7,6 +7,7 @@ import type { Format, QueryRun } from '../runtime/types.js'
 import { useQuery } from '../runtime/use-query.js'
 import { editable } from './editable.js'
 import { PanelFrame, type PanelProps, useFormatContext, useSize } from './panel.js'
+import { textWidth } from './row-chart-kit.js'
 import { ChartTooltip } from './tooltip.js'
 
 export interface SankeyProps extends PanelProps {
@@ -21,6 +22,7 @@ export interface SankeyProps extends PanelProps {
 }
 
 const LABEL_ROOM = 120
+const LABEL_GAP = 14
 
 function Flows({ run, props }: { run: QueryRun; props: SankeyProps }) {
   const ctx = useFormatContext()
@@ -58,12 +60,56 @@ function Flows({ run, props }: { run: QueryRun; props: SankeyProps }) {
     throw error
   }
   const lastColumn = Math.max(0, ...layout.nodes.map((n) => n.column))
+  // Small nodes sit close together: move their labels apart so they never print
+  // on top of each other, keeping each as near its node as there is room for.
+  const labelY = new Map<string, number>()
+  const byColumn = new Map<number, typeof layout.nodes>()
+  for (const n of layout.nodes) byColumn.set(n.column, [...(byColumn.get(n.column) ?? []), n])
+  for (const nodes of byColumn.values()) {
+    const sorted = [...nodes].sort((a, b) => a.y0 + a.y1 - (b.y0 + b.y1))
+    let previous = -Infinity
+    for (const n of sorted) {
+      const y = Math.max((n.y0 + n.y1) / 2, previous + LABEL_GAP)
+      labelY.set(n.name, y)
+      previous = y
+    }
+    // Pushed past the bottom: shift the whole run back up.
+    const overflow = previous - (height - 4)
+    if (overflow > 0) {
+      for (const n of sorted) labelY.set(n.name, (labelY.get(n.name) as number) - overflow)
+    }
+  }
   const colour = (slot: number) => (slot >= 0 ? seriesColor(slot) : NEUTRAL)
   const lit = (source: string, target: string) =>
     hoverNode === null || hoverNode === source || hoverNode === target
   const link = hoverLink === null ? undefined : layout.links[hoverLink]
   const node = layout.nodes.find((n) => n.name === hoverNode)
 
+  // A label may run as far as the next column's nodes, less a gap; past that it
+  // loses its value, then letters.
+  const room = (n: (typeof layout.nodes)[number]): number => {
+    const next = byColumn.get(n.column + 1)
+    if (!next) return Number.POSITIVE_INFINITY
+    let edge = Math.min(...next.map((m) => m.x0))
+    // The last column's labels sit to the left of their nodes, in this gap.
+    if (n.column + 1 === lastColumn) {
+      const y = labelY.get(n.name) as number
+      for (const m of next) {
+        if (Math.abs((labelY.get(m.name) as number) - y) >= LABEL_GAP) continue
+        const full = `${m.name} ${formatValue(m.value, props.format ?? 'compact', ctx)}`
+        edge = Math.min(edge, m.x0 - 6 - textWidth(full))
+      }
+    }
+    return edge - n.x1 - 12
+  }
+  const fitLabel = (n: (typeof layout.nodes)[number]): { name: string; value: string } => {
+    const value = ` ${formatValue(n.value, props.format ?? 'compact', ctx)}`
+    const space = n.column === lastColumn && lastColumn > 0 ? Number.POSITIVE_INFINITY : room(n)
+    if (textWidth(n.name + value) <= space) return { name: n.name, value }
+    let name = n.name
+    while (name.length > 1 && textWidth(`${name}…`) > space) name = name.slice(0, -1)
+    return { name: name === n.name ? name : `${name}…`, value: '' }
+  }
   return (
     <div className="odd-chart">
       <div className="odd-plot" ref={ref}>
@@ -114,13 +160,13 @@ function Flows({ run, props }: { run: QueryRun; props: SankeyProps }) {
                     />
                     <text
                       x={right ? n.x0 - 6 : n.x1 + 6}
-                      y={(n.y0 + n.y1) / 2}
+                      y={labelY.get(n.name)}
                       dy="0.35em"
                       textAnchor={right ? 'end' : 'start'}
                       className="odd-sankey-label"
                     >
-                      {n.name}
-                      <tspan className="odd-sankey-value">{` ${formatValue(n.value, props.format ?? 'compact', ctx)}`}</tspan>
+                      {fitLabel(n).name}
+                      <tspan className="odd-sankey-value">{fitLabel(n).value}</tspan>
                     </text>
                   </g>
                 )

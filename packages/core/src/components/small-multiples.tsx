@@ -26,7 +26,7 @@ export interface SmallMultiplesProps extends PanelProps {
 }
 
 const MAX_FACETS = 24
-const MIN_WIDTH = 200
+const MIN_WIDTH = 150
 
 interface Facet {
   name: string
@@ -233,9 +233,15 @@ function Facets({ run, props }: { run: QueryRun; props: SmallMultiplesProps }) {
                     <text x={margin.left} y={fh - 4} className="odd-tick">
                       {formatCategory(categories[0], ctx, 10)}
                     </text>
-                    <text x={margin.left + w} y={fh - 4} textAnchor="end" className="odd-tick">
-                      {formatCategory(categories[n - 1], ctx, 10)}
-                    </text>
+                    {/* The end label only when it clears the start one. */}
+                    {textWidth(formatCategory(categories[0], ctx, 10)) +
+                      textWidth(formatCategory(categories[n - 1], ctx, 10)) +
+                      8 <=
+                    w ? (
+                      <text x={margin.left + w} y={fh - 4} textAnchor="end" className="odd-tick">
+                        {formatCategory(categories[n - 1], ctx, 10)}
+                      </text>
+                    ) : null}
                   </svg>
                   {active !== null ? (
                     <ChartTooltip

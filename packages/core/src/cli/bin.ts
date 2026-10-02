@@ -3,6 +3,7 @@ import { DRIVERS } from '../datasource/registry.js'
 import {
   checkWorkspace,
   listSources,
+  readDatabaseDoc,
   readSchema,
   runDashboardQuery,
   runSql,
@@ -148,8 +149,22 @@ export async function run(argv: string[]): Promise<number> {
     }
 
     if (command === 'schema') {
-      const schema = await readSchema(workspace, positional(argv)[0] ?? flag(argv, 'source'))
-      out(json ? `${JSON.stringify(schema, null, 2)}\n` : schemaToText(schema))
+      const requested = positional(argv)[0] ?? flag(argv, 'source')
+      const schema = await readSchema(workspace, requested)
+      const doc = readDatabaseDoc(workspace.config, workspace.sourceName(requested))
+      if (json) {
+        out(
+          `${JSON.stringify({ ...schema, notes: doc.markdown === null ? null : doc.file }, null, 2)}\n`,
+        )
+        return 0
+      }
+      // The agent reads this first: point it at what the tables mean.
+      out(
+        doc.markdown === null
+          ? `notes: none yet — write ${doc.file} (skill: document-database)\n\n`
+          : `notes: ${doc.file} — read it before writing SQL\n\n`,
+      )
+      out(schemaToText(schema))
       return 0
     }
 
@@ -160,7 +175,7 @@ export async function run(argv: string[]): Promise<number> {
       let result: Awaited<ReturnType<typeof runSql>>
       if (dashboard || name) {
         if (!dashboard || !name) throw new Error('--dashboard and --name go together')
-        const ran = await runDashboardQuery(workspace, dashboard, name, params)
+        const ran = await runDashboardQuery(workspace, dashboard, name, params, { fresh: true })
         if (!json)
           out(`-- ${ran.query.name} on ${ran.query.source} (${ran.query.file}:${ran.query.line})\n`)
         result = ran.result

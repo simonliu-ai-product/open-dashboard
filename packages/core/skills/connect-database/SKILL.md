@@ -102,5 +102,7 @@ The dev server picks up config and `.env` changes without a restart.
 Summarise the schema in a few lines: the main tables, how they join, which
 columns hold time, money and status, and the date range of the data. Name the
 SQL dialect — dashboards for this source must be written in it (see
-`dashboard-authoring` → `references/sql-dialects.md`). Then offer what to build:
-"I can make you a dashboard of X, Y, Z — `/create-dashboard`."
+`dashboard-authoring` → `references/sql-dialects.md`). Then write
+`databases/<name>/database.md` with what you found (the `document-database`
+skill), and offer what to build: "I can make you a dashboard of X, Y, Z —
+`/create-dashboard`."

@@ -13,9 +13,18 @@ export interface DashboardMeta {
 }
 
 export interface QueryRun {
-  query: { name: string; source: string; sql: string; file: string; line: number }
+  query: {
+    name: string
+    source: string
+    sql: string
+    file: string
+    line: number
+    uses?: string[]
+  }
   params: Record<string, ParamValue>
   result: { columns: ColumnInfo[]; rows: Row[]; truncated: boolean; elapsedMs: number }
+  ranAt?: string
+  cached?: boolean
 }
 
 export type NamedFormat =

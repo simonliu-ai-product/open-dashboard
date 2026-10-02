@@ -4,6 +4,8 @@ import { pathToFileURL } from 'node:url'
 import { parseEnv } from 'node:util'
 import type { DatasourceConfig, OpenDashboardConfig } from './config.js'
 import { type Datasource, DatasourceError, openDatasource } from './datasource/index.js'
+import type { QueryRun } from './ops/dashboards.js'
+import { parseDuration, QueryCache } from './ops/query-cache.js'
 
 export const DEFAULT_PORT = 5473
 const CONFIG_NAMES = [
@@ -20,6 +22,8 @@ export interface ResolvedConfig {
   defaultSource: string | undefined
   maxRows: number
   timeoutMs: number
+  /** Default result reuse, in ms. 0: off. */
+  cacheMs: number
   configFile: string | undefined
 }
 
@@ -64,6 +68,18 @@ export function loadEnv(root: string): void {
   }
 }
 
+function resolveCache(cache: string | false | undefined): number {
+  if (cache === false) return 0
+  if (cache === undefined) return 30_000
+  const ms = parseDuration(cache)
+  if (ms === undefined) {
+    throw new DatasourceError(
+      `cache: "${cache}" is not a duration — use '30s', '5m', '1h' or false`,
+    )
+  }
+  return ms
+}
+
 export interface ConfigOverrides {
   port?: number
 }
@@ -93,6 +109,7 @@ export async function loadConfig(
     defaultSource: user.defaultSource ?? (names.length === 1 ? names[0] : undefined),
     maxRows: user.maxRows ?? 5000,
     timeoutMs: user.timeoutMs ?? 15_000,
+    cacheMs: resolveCache(user.cache),
     configFile: file,
   }
 }
@@ -103,6 +120,8 @@ export async function loadConfig(
  */
 export class Workspace {
   private sources = new Map<string, Promise<Datasource>>()
+  /** Dashboard query results, shared by every viewer. */
+  readonly cache = new QueryCache<QueryRun>()
 
   constructor(public config: ResolvedConfig) {}
 
@@ -141,6 +160,7 @@ export class Workspace {
 
   async reconfigure(config: ResolvedConfig): Promise<void> {
     await this.close()
+    this.cache.clear()
     this.config = config
   }
 

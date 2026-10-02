@@ -109,6 +109,12 @@ export interface OpenDashboardConfig {
   maxRows?: number
   /** Per-query timeout, where the driver supports one. Default 15000. */
   timeoutMs?: number
+  /**
+   * How long a query's result is reused for everyone viewing it: '30s', '5m',
+   * '1h'. Default '30s'; `false` or 'off' runs every request. A query can set
+   * its own with `-- cache:`, and the refresh button always runs fresh.
+   */
+  cache?: string | false
 }
 
 export type ColumnType = 'number' | 'string' | 'date' | 'boolean' | 'unknown'

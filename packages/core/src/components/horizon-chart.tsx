@@ -74,7 +74,8 @@ function Horizon({ run, props }: { run: QueryRun; props: HorizonChartProps }) {
   const n = categories.length
   const step = w / Math.max(1, n)
   const height = names.length * (ROW + 2) + 22
-  const shown = thinIndices(n, Math.max(2, Math.floor(w / 80)))
+  const widest = Math.max(...categories.map((c) => textWidth(formatCategory(c, ctx, 12))), 40)
+  const shown = thinIndices(n, Math.max(2, Math.floor(w / (widest + 16))))
 
   return (
     <div className="odd-chart">

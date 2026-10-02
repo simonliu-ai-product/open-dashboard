@@ -3,6 +3,23 @@
   "version": "0.1.0",
   "description": "Scaffolder for open-dashboard — describe a dashboard to your agent, get a live one over your database.",
   "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/simonliu-ai-product/open-dashboard.git",
+    "directory": "packages/cli"
+  },
+  "homepage": "https://github.com/simonliu-ai-product/open-dashboard#readme",
+  "bugs": {
+    "url": "https://github.com/simonliu-ai-product/open-dashboard/issues"
+  },
+  "keywords": [
+    "dashboard",
+    "sql",
+    "agent",
+    "claude-code",
+    "scaffold",
+    "create"
+  ],
   "type": "module",
   "bin": {
     "create-open-dashboard": "./bin.js"
@@ -16,7 +33,8 @@
     "build": "node scripts/sync-skills.mjs && tsdown",
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "test": "vitest run",
-    "sync-skills": "node scripts/sync-skills.mjs"
+    "sync-skills": "node scripts/sync-skills.mjs",
+    "prepublishOnly": "pnpm build"
   },
   "devDependencies": {
     "@types/node": "^26.2.0",
@@ -24,5 +42,8 @@
   },
   "engines": {
     "node": ">=22.18"
+  },
+  "publishConfig": {
+    "access": "public"
   }
 }

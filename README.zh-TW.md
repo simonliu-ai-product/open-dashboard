@@ -72,6 +72,11 @@ dashboards/sales-overview/
 | `bigquery` | BigQuery | `pnpm add @google-cloud/bigquery` | |
 | `snowflake` | Snowflake | `pnpm add snowflake-sdk` | |
 
+可以同時設定多個資料來源，每支查詢用 `-- source:` 指定。要跨資料庫 JOIN，查詢可以用
+`-- uses:` 把其他查詢的結果當成資料表：它在一個暫時的 SQLite 裡執行，只碰得到那些結果，
+所以 Postgres 可以和 ClickHouse 合併，兩個資料庫彼此都看不到對方。查詢結果預設快取 30 秒
+（設定檔的 `cache`，或每支查詢的 `-- cache:`），按重新整理一律重新查詢。
+
 `open-dashboard drivers` 會列出每一種的設定範例。連線密碼放在 `.env`（已列入 `.gitignore`），
 修改設定檔或 `.env` 不需要重啟 dev server。除了 BigQuery 與 Snowflake 之外，每個引擎都有
 跨資料庫一致性測試對真實伺服器驗證；這兩個雲端服務則以模擬的 SDK 測試。
@@ -95,6 +100,7 @@ dashboards/sales-overview/
 | Skill | 用途 |
 | --- | --- |
 | `/connect-database` | 新增資料來源、`.env`、安裝驅動，並用 `sources`＋`schema` 驗證 |
+| `/document-database` | 撰寫 `databases/<source>/database.md`：資料表與欄位的意義、注意事項 |
 | `/create-dashboard` | 探索資料 → 確認指標定義 → 寫查詢 → 組面板 → `check` |
 | `/dashboard-authoring` | 技術參考：查詢檔格式、參數、所有元件、格式、各資料庫 SQL 方言 |
 | `/current-dashboard` | 從 viewer 目前畫面判斷「這張圖」指的是哪個面板 |

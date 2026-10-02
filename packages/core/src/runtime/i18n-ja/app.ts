@@ -80,6 +80,11 @@ export const APP: Record<string, string> = {
   'Saved beside the panel in {file}:{line}. Ask your agent to /apply-comments.':
     '{file}:{line} のパネルの隣に保存しました。エージェントに /apply-comments を頼んでください。',
   'Could not save: {error}': '保存できませんでした：{error}',
+  'Show as': '表示方法',
+  Docs: '説明',
+  Schema: 'スキーマ',
+  nullable: 'NULL 可',
+  Tables: 'テーブル',
   'Cannot connect': '接続できません',
   'Show databases': 'データベースを表示',
   'Hide databases': 'データベースを隠す',

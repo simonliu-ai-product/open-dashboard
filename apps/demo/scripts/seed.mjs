@@ -1,5 +1,7 @@
 #!/usr/bin/env node
-// Builds data/shop.db: a fictional online coffee-gear store, ending today.
+// Builds data/shop.db: a fictional online coffee-gear store, ending today, and
+// data/marketing.db: what the same fictional store spent on ads, a second
+// database for the cross-database example.
 // Deterministic for a given end date, so screenshots and checks are repeatable.
 import { existsSync, mkdirSync, rmSync } from 'node:fs'
 import { dirname, join } from 'node:path'
@@ -8,16 +10,18 @@ import { fileURLToPath } from 'node:url'
 
 const here = dirname(fileURLToPath(import.meta.url))
 const file = join(here, '..', 'data', 'shop.db')
+const marketingFile = join(here, '..', 'data', 'marketing.db')
 
 const pad = (n) => String(n).padStart(2, '0')
 const day = (d) => `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`
 const stamp = (d) => `${day(d)} ${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`
 
-if (process.argv.includes('--if-missing') && existsSync(file)) process.exit(0)
+if (process.argv.includes('--if-missing') && existsSync(file) && existsSync(marketingFile))
+  process.exit(0)
 
 // The data ends on the day it was generated; a live board over yesterday's
 // file would show an empty "today". Regenerate once the day has moved on.
-if (process.argv.includes('--if-stale') && existsSync(file)) {
+if (process.argv.includes('--if-stale') && existsSync(file) && existsSync(marketingFile)) {
   const existing = new DatabaseSync(file, { readOnly: true })
   const last = existing.prepare('SELECT max(ordered_at) AS last FROM orders').get()?.last
   existing.close()
@@ -382,6 +386,42 @@ for (let k = 0; k < 3 * 24 * 6; k += 1) {
 }
 db.exec('COMMIT')
 
+// Ad spend, in its own database: paid channels only, priced per sign-up with
+// some day-to-day noise, so return on spend differs by channel.
+const COST_PER_SIGNUP = { paid_search: 38, social: 29, email: 6 }
+const traffic = db
+  .prepare(
+    `SELECT date, source, sessions, signups FROM daily_traffic WHERE source IN (${Object.keys(
+      COST_PER_SIGNUP,
+    )
+      .map((s) => `'${s}'`)
+      .join(', ')}) ORDER BY date, source`,
+  )
+  .all()
+rmSync(marketingFile, { force: true })
+const marketing = new DatabaseSync(marketingFile)
+marketing.exec(`
+  PRAGMA journal_mode = DELETE;
+  CREATE TABLE ad_spend (
+    date TEXT NOT NULL,
+    channel TEXT NOT NULL,
+    spend REAL NOT NULL,
+    clicks INTEGER NOT NULL,
+    PRIMARY KEY (date, channel)
+  );
+`)
+const insertSpend = marketing.prepare(
+  'INSERT INTO ad_spend (date, channel, spend, clicks) VALUES (?, ?, ?, ?)',
+)
+marketing.exec('BEGIN')
+for (const row of traffic) {
+  const cost = COST_PER_SIGNUP[row.source] * (0.75 + random() * 0.5)
+  const spend = Math.round(Math.max(1, row.signups) * cost * 100) / 100
+  insertSpend.run(row.date, row.source, spend, Math.round(row.sessions * (0.55 + random() * 0.2)))
+}
+marketing.exec('COMMIT')
+marketing.close()
+
 const counts = db
   .prepare(
     'SELECT (SELECT count(*) FROM customers) AS customers, (SELECT count(*) FROM orders) AS orders, (SELECT count(*) FROM order_items) AS items',
@@ -391,3 +431,4 @@ db.close()
 process.stdout.write(
   `seeded ${file}: ${counts.customers} customers, ${counts.orders} orders, ${counts.items} order items (${day(start)} → ${day(end)})\n`,
 )
+process.stdout.write(`seeded ${marketingFile}: ${traffic.length} days × channels of ad spend\n`)

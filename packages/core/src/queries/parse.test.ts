@@ -38,4 +38,16 @@ SELECT 2
       /not a valid query name/,
     )
   })
+
+  it('reads -- uses: and -- cache:, and refuses uses together with source', () => {
+    const [query] = parseQueryFile(
+      '-- name: both\n-- uses: a, b ,c\n-- cache: 5m\nSELECT 1\n',
+      'q.sql',
+    )
+    expect(query?.uses).toEqual(['a', 'b', 'c'])
+    expect(query?.cache).toBe('5m')
+    expect(() =>
+      parseQueryFile('-- name: x\n-- source: db\n-- uses: a\nSELECT 1\n', 'q.sql'),
+    ).toThrow(/both "-- source:" and "-- uses:"/)
+  })
 })

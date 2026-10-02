@@ -1,5 +1,6 @@
 import type { ParamValue, SchemaInfo } from '../../config.js'
 import type { DashboardSummary } from '../../ops/dashboards.js'
+import type { DatabaseDoc } from '../../ops/database-doc.js'
 import type { DashboardLayout, LayoutEdit } from '../../ops/layout.js'
 import type { SourceStatus } from '../../ops/sources.js'
 import type { QueryRun } from '../../runtime/types.js'
@@ -25,10 +26,12 @@ export const api = {
   dashboards: () =>
     request<{ dashboards: DashboardSummary[] }>('dashboards').then((r) => r.dashboards),
   sources: () => request<{ sources: SourceStatus[] }>('sources').then((r) => r.sources),
+  databaseDoc: (source: string) =>
+    request<DatabaseDoc>(`database-doc?source=${encodeURIComponent(source)}`),
   schema: (source: string) => request<SchemaInfo>(`schema?source=${encodeURIComponent(source)}`),
-  query: (id: string, name: string, params: Record<string, ParamValue>) =>
+  query: (id: string, name: string, params: Record<string, ParamValue>, fresh = false) =>
     request<QueryRun>(
-      `query?id=${encodeURIComponent(id)}&name=${encodeURIComponent(name)}&params=${encodeURIComponent(JSON.stringify(params))}`,
+      `query?id=${encodeURIComponent(id)}&name=${encodeURIComponent(name)}&params=${encodeURIComponent(JSON.stringify(params))}${fresh ? '&fresh=1' : ''}`,
     ),
   comments: (id: string) =>
     request<{ comments: { line: number; text: string }[] }>(

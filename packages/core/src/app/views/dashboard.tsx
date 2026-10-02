@@ -173,9 +173,20 @@ export function DashboardView({ id }: { id: string }) {
   const inflight = useRef(new Map<string, Promise<QueryRun>>())
   const meta = loaded?.meta
 
+  // The tick a reader asked for with the refresh button: it skips the server's
+  // cache. Auto-refresh and live reload may be served from it.
+  const freshTick = useRef(-1)
   const refresh = useCallback(() => {
     inflight.current.clear()
     setTick((t) => t + 1)
+    setUpdatedAt(new Date())
+  }, [])
+  const refreshNow = useCallback(() => {
+    inflight.current.clear()
+    setTick((t) => {
+      freshTick.current = t + 1
+      return t + 1
+    })
     setUpdatedAt(new Date())
   }, [])
 
@@ -255,7 +266,7 @@ export function DashboardView({ id }: { id: string }) {
         const key = `${tick}|${name}|${JSON.stringify(values)}`
         let pending = inflight.current.get(key)
         if (!pending) {
-          pending = api.query(id, name, values)
+          pending = api.query(id, name, values, tick === freshTick.current)
           inflight.current.set(key, pending)
           // Results are kept until the next refresh: a panel re-mounted by a
           // move into another row reads them again instead of re-querying.
@@ -284,7 +295,7 @@ export function DashboardView({ id }: { id: string }) {
           refreshSetting={refreshSetting ?? 'off'}
           refreshChoices={refreshChoices}
           onRefreshSetting={chooseRefresh}
-          onRefresh={refresh}
+          onRefresh={refreshNow}
           notes={notes}
           mode={mode}
           onMode={editor.setMode}

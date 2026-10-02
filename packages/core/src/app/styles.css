@@ -1103,6 +1103,223 @@ button {
   font-family: var(--odd-mono);
 }
 
+.odd-schema-table tr td + td {
+  white-space: nowrap;
+}
+
+.odd-data-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.odd-db {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 32px;
+}
+
+/* Wide: the tables of contents stays in view beside the document. */
+@media (min-width: 1100px) {
+  .odd-db {
+    grid-template-columns: minmax(0, 820px) 220px;
+    align-items: start;
+  }
+
+  .odd-db-toc {
+    position: sticky;
+    top: 24px;
+    max-height: calc(100vh - 48px);
+    overflow-y: auto;
+  }
+}
+
+@media (max-width: 1099px) {
+  .odd-db-toc {
+    order: -1;
+  }
+
+  .odd-db-toc ul {
+    display: none;
+  }
+}
+
+.odd-db-main {
+  min-width: 0;
+}
+
+.odd-db-intro {
+  max-width: 68ch;
+  margin-bottom: 40px;
+  font-size: 14px;
+}
+
+.odd-db-section {
+  margin-top: 20px;
+  padding-left: 14px;
+  box-shadow: inset 2px 0 0 var(--odd-accent);
+}
+
+.odd-db-section h2 {
+  margin: 0 0 6px;
+  color: var(--odd-ink);
+  font-size: 14px;
+  font-weight: 620;
+}
+
+.odd-db-table {
+  padding: 28px 0 8px;
+  border-top: 1px solid var(--odd-border);
+  scroll-margin-top: 16px;
+}
+
+.odd-db-table header {
+  display: flex;
+  align-items: baseline;
+  gap: 12px;
+  margin-bottom: 6px;
+}
+
+.odd-db-table h2 {
+  margin: 0;
+  font-family: var(--odd-mono);
+  font-size: 16px;
+  font-weight: 600;
+}
+
+.odd-db-table header span {
+  color: var(--odd-muted);
+  font-size: 12.5px;
+  font-variant-numeric: tabular-nums;
+}
+
+.odd-db-table > .odd-prose {
+  max-width: 68ch;
+  margin-bottom: 12px;
+  font-size: 13.5px;
+}
+
+.odd-db-columns {
+  margin: 0;
+}
+
+.odd-db-column {
+  display: grid;
+  grid-template-columns: minmax(120px, 200px) 150px minmax(0, 1fr);
+  column-gap: 16px;
+  padding: 5px 0;
+  border-top: 1px solid var(--odd-grid);
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+.odd-db-column dt,
+.odd-db-column dd {
+  margin: 0;
+  min-width: 0;
+}
+
+.odd-db-column dt code {
+  color: var(--odd-ink);
+  font-family: var(--odd-mono);
+  font-size: 12.5px;
+  overflow-wrap: anywhere;
+}
+
+.odd-db-type {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 6px;
+  color: var(--odd-muted);
+  font-size: 12px;
+}
+
+.odd-db-nullable {
+  color: var(--odd-muted);
+  font-size: 11px;
+}
+
+.odd-db-note {
+  color: var(--odd-ink-2);
+}
+
+.odd-db-note code {
+  padding: 0 3px;
+  border-radius: 3px;
+  background: var(--odd-hover);
+  font-family: var(--odd-mono);
+  font-size: 0.92em;
+}
+
+.odd-db-fk {
+  margin-right: 8px;
+  color: var(--odd-accent-ink);
+  font-size: 12px;
+  text-decoration: none;
+}
+
+.odd-db-fk:hover {
+  text-decoration: underline;
+}
+
+/* Phone: name and type on one line, the note under them. */
+@media (max-width: 640px) {
+  .odd-db-column {
+    grid-template-columns: minmax(0, 1fr) auto;
+  }
+
+  .odd-db-note {
+    grid-column: 1 / -1;
+  }
+
+  .odd-db-note:empty {
+    display: none;
+  }
+}
+
+.odd-db-toc .odd-search {
+  width: 100%;
+  margin: 0 0 8px;
+}
+
+.odd-db-toc ul {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.odd-db-toc a {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 4px 8px;
+  border-radius: 6px;
+  color: var(--odd-ink-2);
+  font-family: var(--odd-mono);
+  font-size: 12.5px;
+  text-decoration: none;
+}
+
+.odd-db-toc a:hover {
+  background: var(--odd-hover);
+  color: var(--odd-ink);
+}
+
+.odd-db-toc a[aria-current="location"] {
+  background: var(--odd-hover);
+  color: var(--odd-ink);
+  font-weight: 600;
+}
+
+.odd-db-count {
+  color: var(--odd-muted);
+  font-family: var(--odd-sans, inherit);
+  font-size: 11.5px;
+  font-variant-numeric: tabular-nums;
+}
+
 /* Dashboard */
 
 .odd-dashboard-page {
@@ -2148,6 +2365,8 @@ body.odd-dragging * {
 }
 
 .odd-stat-value {
+  overflow: hidden;
+  white-space: nowrap;
   font-size: 30px;
   font-weight: 620;
   letter-spacing: -0.02em;
@@ -2682,6 +2901,27 @@ body.odd-dragging * {
 }
 
 /* Small screens */
+
+/* On a phone a wide table scrolls sideways; its first column stays in place
+   so every row still says what it is. */
+@media (max-width: 860px) {
+  .odd-table th:first-child,
+  .odd-table td:first-child {
+    position: sticky;
+    left: 0;
+    z-index: 1;
+    background: var(--odd-surface);
+    box-shadow: inset -1px 0 0 var(--odd-grid);
+  }
+
+  .odd-table th:first-child {
+    z-index: 2;
+  }
+
+  .odd-table tbody tr:hover td:first-child {
+    background: linear-gradient(var(--odd-hover), var(--odd-hover)), var(--odd-surface);
+  }
+}
 
 @media (max-width: 860px) {
   .odd-shell {

@@ -40,6 +40,7 @@ describe('init', () => {
         'connect-database',
         'current-dashboard',
         'apply-comments',
+        'document-database',
       ]) {
         expect(existsSync(join(root, dir, skill, 'SKILL.md'))).toBe(true)
       }

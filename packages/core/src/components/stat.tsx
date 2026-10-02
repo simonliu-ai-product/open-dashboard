@@ -1,3 +1,4 @@
+import { type ReactNode, useLayoutEffect, useRef } from 'react'
 import { formatValue } from '../runtime/format.js'
 import { useT } from '../runtime/i18n.js'
 import { pickY } from '../runtime/shape.js'
@@ -5,6 +6,36 @@ import type { Format } from '../runtime/types.js'
 import { useQuery } from '../runtime/use-query.js'
 import { editable } from './editable.js'
 import { PanelFrame, type PanelProps, useFormatContext, useSize } from './panel.js'
+
+/**
+ * The value shrinks only when it would not fit: a narrow card (two per row on
+ * a phone) gets a smaller "US$191,666" instead of a cut one, and "4%" keeps
+ * its full size.
+ */
+function FitValue({ children }: { children: ReactNode }) {
+  const ref = useRef<HTMLDivElement>(null)
+  // biome-ignore lint/correctness/useExhaustiveDependencies: re-fit when the text changes, not just the size
+  useLayoutEffect(() => {
+    const el = ref.current
+    if (!el) return
+    const fit = () => {
+      el.style.fontSize = ''
+      const full = Number.parseFloat(getComputedStyle(el).fontSize)
+      if (el.scrollWidth > el.clientWidth && el.scrollWidth > 0) {
+        el.style.fontSize = `${Math.max(16, Math.floor((full * el.clientWidth) / el.scrollWidth))}px`
+      }
+    }
+    fit()
+    const observer = new ResizeObserver(fit)
+    observer.observe(el)
+    return () => observer.disconnect()
+  }, [children])
+  return (
+    <div ref={ref} className="odd-stat-value">
+      {children}
+    </div>
+  )
+}
 
 export interface StatProps extends PanelProps {
   query: string
@@ -72,7 +103,7 @@ function StatPanel(props: StatProps) {
           delta === undefined || delta === 0 ? undefined : delta > 0 !== Boolean(props.invert)
         return (
           <div className="odd-stat">
-            <div className="odd-stat-value">{formatValue(value, props.format, ctx)}</div>
+            <FitValue>{formatValue(value, props.format, ctx)}</FitValue>
             {delta !== undefined ? (
               <div
                 className="odd-stat-delta"

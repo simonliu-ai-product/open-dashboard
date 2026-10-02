@@ -79,6 +79,11 @@ export const APP: Record<string, string> = {
   'Saved beside the panel in {file}:{line}. Ask your agent to /apply-comments.':
     '已存到 {file}:{line} 的面板旁。請 Agent 執行 /apply-comments。',
   'Could not save: {error}': '無法儲存：{error}',
+  'Show as': '顯示方式',
+  Docs: '說明',
+  Schema: '欄位',
+  nullable: '可為空',
+  Tables: '資料表',
   'Cannot connect': '無法連線',
   'Show databases': '顯示資料庫',
   'Hide databases': '隱藏資料庫',

@@ -2,12 +2,14 @@
 
 The user describes the dashboard they want; you write it. Each dashboard is a
 folder `dashboards/<id>/` with named SQL queries in `*.sql` and a layout in
-`index.tsx`. The dev server (`pnpm dev`, http://localhost:5473) shows it live and
+`index.tsx`. Each database has notes in `databases/<source>/database.md` —
+what its tables and columns mean; read them before writing SQL. The dev server (`pnpm dev`, http://localhost:5473) shows it live and
 hot-reloads as you edit.
 
 ## Skills
 
 - `/connect-database` — add a datasource: Postgres, MySQL, SQL Server, Oracle, SQLite, DuckDB/Parquet, ClickHouse, BigQuery, Snowflake
+- `/document-database` — write `databases/<source>/database.md`: what tables and columns mean
 - `/create-dashboard` — draft a dashboard end to end
 - `/dashboard-authoring` — the reference: query files, filters, panels, formats
 - `/current-dashboard` — resolve "this chart" / "this dashboard"

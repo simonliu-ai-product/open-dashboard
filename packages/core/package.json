@@ -3,6 +3,25 @@
   "version": "0.1.0",
   "description": "The dashboard framework built for agents — describe the charts you want, get a live dashboard over your database.",
   "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/simonliu-ai-product/open-dashboard.git",
+    "directory": "packages/core"
+  },
+  "homepage": "https://github.com/simonliu-ai-product/open-dashboard#readme",
+  "bugs": {
+    "url": "https://github.com/simonliu-ai-product/open-dashboard/issues"
+  },
+  "keywords": [
+    "dashboard",
+    "sql",
+    "agent",
+    "claude-code",
+    "grafana",
+    "superset",
+    "react",
+    "vite"
+  ],
   "type": "module",
   "sideEffects": false,
   "exports": {
@@ -35,7 +54,8 @@
   "scripts": {
     "build": "tsdown",
     "typecheck": "tsc -p tsconfig.json --noEmit",
-    "test": "vitest run"
+    "test": "vitest run",
+    "prepublishOnly": "pnpm build"
   },
   "dependencies": {
     "@babel/parser": "^8.0.4",
@@ -104,5 +124,8 @@
   },
   "engines": {
     "node": ">=22.18"
+  },
+  "publishConfig": {
+    "access": "public"
   }
 }

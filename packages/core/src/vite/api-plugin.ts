@@ -5,6 +5,7 @@ import { errorMessage } from '../datasource/types.js'
 import {
   addComment,
   dashboardQueries,
+  docSourceOf,
   editLayout,
   getCurrent,
   type LayoutEdit,
@@ -12,6 +13,7 @@ import {
   listDashboards,
   listSources,
   OpsError,
+  readDatabaseDoc,
   readLayout,
   readSchema,
   runDashboardQuery,
@@ -86,7 +88,17 @@ export function apiPlugin(workspace: Workspace, overrides: ConfigOverrides): Plu
         const dashboards = join(root, workspace.config.dashboardsDir) + sep
         if (path.startsWith(dashboards) && path.endsWith('.sql')) {
           const id = relative(dashboards, dirname(path)).split(sep)[0]
+          workspace.cache.clear(id)
           server.ws.send({ type: 'custom', event: 'odd:queries-changed', data: { id } })
+          return
+        }
+        const documented = docSourceOf(workspace.config, path)
+        if (documented) {
+          server.ws.send({
+            type: 'custom',
+            event: 'odd:database-doc-changed',
+            data: { source: documented },
+          })
           return
         }
         const name = basename(path)
@@ -128,7 +140,9 @@ export function apiPlugin(workspace: Workspace, overrides: ConfigOverrides): Plu
             return json(
               res,
               200,
-              await runDashboardQuery(workspace, id, name, parseParams(q('params'))),
+              await runDashboardQuery(workspace, id, name, parseParams(q('params')), {
+                fresh: q('fresh') === '1',
+              }),
             )
           }
           if (route === 'queries' && req.method === 'GET') {
@@ -158,6 +172,11 @@ export function apiPlugin(workspace: Workspace, overrides: ConfigOverrides): Plu
           }
           if (route === 'sources' && req.method === 'GET') {
             return json(res, 200, { sources: await listSources(workspace) })
+          }
+          if (route === 'database-doc' && req.method === 'GET') {
+            const source = q('source')
+            if (!source) return json(res, 400, { error: 'source is required' })
+            return json(res, 200, readDatabaseDoc(config, source))
           }
           if (route === 'schema' && req.method === 'GET') {
             const schema = await readSchema(workspace, q('source') ?? undefined)
