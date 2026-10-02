@@ -1,0 +1,28 @@
+{
+  "name": "@open-database-dashboard/cli",
+  "version": "0.1.0",
+  "description": "Scaffolder for open-dashboard — describe a dashboard to your agent, get a live one over your database.",
+  "license": "MIT",
+  "type": "module",
+  "bin": {
+    "create-open-dashboard": "./bin.js"
+  },
+  "files": [
+    "dist",
+    "bin.js",
+    "template"
+  ],
+  "scripts": {
+    "build": "node scripts/sync-skills.mjs && tsdown",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "test": "vitest run",
+    "sync-skills": "node scripts/sync-skills.mjs"
+  },
+  "devDependencies": {
+    "@types/node": "^26.2.0",
+    "tsdown": "^0.22.14"
+  },
+  "engines": {
+    "node": ">=22.18"
+  }
+}

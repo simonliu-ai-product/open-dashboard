@@ -1,0 +1,237 @@
+import { parse } from '@babel/parser'
+
+type Node = {
+  type: string
+  start?: number | null
+  end?: number | null
+  loc?: { start: { line: number; column: number } } | null
+  [key: string]: unknown
+}
+
+export interface FilterDecl {
+  kind: 'TimeRange' | 'Select'
+  name: string | undefined
+  default: string | null | undefined
+  /** Select only: the query that lists its options. */
+  query?: string
+  allowAll: boolean
+  line: number
+}
+
+export interface PanelRef {
+  component: string
+  title: string | undefined
+  query: string | undefined
+  /** Column names the panel names literally, to be checked against the result. */
+  columns: string[]
+  line: number
+}
+
+export interface QueryRef {
+  name: string
+  line: number
+  /** Column names read from this query's result. */
+  columns: string[]
+}
+
+export interface DashboardAnalysis {
+  meta: Record<string, string | number | boolean>
+  filters: FilterDecl[]
+  panels: PanelRef[]
+  queryRefs: QueryRef[]
+}
+
+const PANELS = new Set(['Stat', 'LineChart', 'AreaChart', 'BarChart', 'PieChart', 'Table', 'Text'])
+const COLUMN_PROPS = ['x', 'y', 'series', 'label', 'value', 'column', 'compare']
+
+export function parseSource(code: string, strict = false): Node {
+  return parse(code, {
+    sourceType: 'module',
+    plugins: ['jsx', 'typescript'],
+    errorRecovery: !strict,
+  }) as unknown as Node
+}
+
+function children(node: Node): Node[] {
+  const out: Node[] = []
+  for (const [key, value] of Object.entries(node)) {
+    if (key === 'loc' || key === 'leadingComments' || key === 'trailingComments' || key === 'extra')
+      continue
+    if (Array.isArray(value)) {
+      for (const item of value)
+        if (item && typeof item === 'object' && 'type' in item) out.push(item as Node)
+    } else if (value && typeof value === 'object' && 'type' in value) {
+      out.push(value as Node)
+    }
+  }
+  return out
+}
+
+export function walk(
+  node: Node,
+  visit: (node: Node, parent: Node | undefined) => void,
+  parent?: Node,
+): void {
+  visit(node, parent)
+  for (const child of children(node)) walk(child, visit, node)
+}
+
+export function literal(node: Node | undefined | null): unknown {
+  if (!node) return undefined
+  switch (node.type) {
+    case 'StringLiteral':
+    case 'NumericLiteral':
+    case 'BooleanLiteral':
+      return node.value
+    case 'NullLiteral':
+      return null
+    case 'TemplateLiteral': {
+      const quasis = node.quasis as Node[]
+      if ((node.expressions as Node[]).length > 0) return undefined
+      return (quasis[0]?.value as { cooked?: string })?.cooked
+    }
+    case 'JSXExpressionContainer':
+      return literal(node.expression as Node)
+    case 'TSAsExpression':
+    case 'TSSatisfiesExpression':
+      return literal(node.expression as Node)
+    case 'ArrayExpression':
+      return (node.elements as Node[]).map((element) => literal(element))
+    case 'ObjectExpression': {
+      const out: Record<string, unknown> = {}
+      for (const property of node.properties as Node[]) {
+        if (property.type !== 'ObjectProperty') continue
+        const key = property.key as Node
+        const name =
+          key.type === 'Identifier'
+            ? key.name
+            : key.type === 'StringLiteral'
+              ? key.value
+              : undefined
+        if (typeof name === 'string') out[name] = literal(property.value as Node)
+      }
+      return out
+    }
+    default:
+      return undefined
+  }
+}
+
+export function elementName(node: Node): string | undefined {
+  const name = (node.openingElement as Node | undefined)?.name as Node | undefined
+  if (!name) return undefined
+  if (name.type === 'JSXIdentifier') return name.name as string
+  if (name.type === 'JSXMemberExpression')
+    return ((name.property as Node).name as string) ?? undefined
+  return undefined
+}
+
+export function attributes(node: Node): Map<string, Node | null> {
+  const out = new Map<string, Node | null>()
+  for (const attr of ((node.openingElement as Node).attributes as Node[]) ?? []) {
+    if (attr.type !== 'JSXAttribute') continue
+    out.set(((attr.name as Node).name as string) ?? '', (attr.value as Node | null) ?? null)
+  }
+  return out
+}
+
+function stringsIn(value: unknown): string[] {
+  if (typeof value === 'string') return [value]
+  if (Array.isArray(value)) return value.flatMap(stringsIn)
+  return []
+}
+
+function line(node: Node): number {
+  return node.loc?.start.line ?? 0
+}
+
+export function readMeta(code: string): Record<string, string | number | boolean> {
+  return analyzeDashboard(code).meta
+}
+
+/**
+ * Reads only what is written literally. A prop computed at runtime is invisible
+ * here, which is fine: this feeds `check` and the dashboard list, and both say
+ * less rather than guess.
+ */
+export function analyzeDashboard(code: string): DashboardAnalysis {
+  const ast = parseSource(code)
+  const result: DashboardAnalysis = { meta: {}, filters: [], panels: [], queryRefs: [] }
+
+  walk(ast, (node) => {
+    if (node.type === 'VariableDeclarator' && (node.id as Node).name === 'meta') {
+      const value = literal(node.init as Node)
+      if (value && typeof value === 'object' && !Array.isArray(value)) {
+        for (const [key, v] of Object.entries(value)) {
+          if (typeof v === 'string' || typeof v === 'number' || typeof v === 'boolean')
+            result.meta[key] = v
+        }
+      }
+      return
+    }
+    if (node.type !== 'JSXElement') return
+    const name = elementName(node)
+    if (!name) return
+    const attrs = attributes(node)
+    const read = (key: string) => (attrs.has(key) ? literal(attrs.get(key)) : undefined)
+
+    if (name === 'TimeRange' || name === 'Select') {
+      const raw = read('default')
+      const query = read('query')
+      const decl: FilterDecl = {
+        kind: name,
+        name: typeof read('name') === 'string' ? (read('name') as string) : undefined,
+        default: typeof raw === 'string' || raw === null ? raw : undefined,
+        allowAll: read('allowAll') !== false,
+        line: line(node),
+      }
+      if (typeof query === 'string') {
+        decl.query = query
+        result.queryRefs.push({ name: query, line: line(node), columns: [] })
+      }
+      result.filters.push(decl)
+      return
+    }
+
+    if (!PANELS.has(name)) return
+    const query = read('query')
+    const columns: string[] = []
+    for (const prop of COLUMN_PROPS) columns.push(...stringsIn(read(prop)))
+    const tableColumns = read('columns')
+    if (Array.isArray(tableColumns)) {
+      for (const column of tableColumns) {
+        if (typeof column === 'string') columns.push(column)
+        else if (
+          column &&
+          typeof column === 'object' &&
+          typeof (column as { key?: unknown }).key === 'string'
+        ) {
+          columns.push((column as { key: string }).key)
+        }
+      }
+    }
+    const panel: PanelRef = {
+      component: name,
+      title: typeof read('title') === 'string' ? (read('title') as string) : undefined,
+      query: typeof query === 'string' ? query : undefined,
+      columns,
+      line: line(node),
+    }
+    result.panels.push(panel)
+    if (panel.query) result.queryRefs.push({ name: panel.query, line: panel.line, columns })
+
+    const spark = read('spark')
+    if (spark && typeof spark === 'object' && !Array.isArray(spark)) {
+      const s = spark as { query?: unknown; x?: unknown; y?: unknown }
+      const sparkQuery = typeof s.query === 'string' ? s.query : panel.query
+      if (sparkQuery)
+        result.queryRefs.push({
+          name: sparkQuery,
+          line: panel.line,
+          columns: [...stringsIn(s.x), ...stringsIn(s.y)],
+        })
+    }
+  })
+
+  return result
+}

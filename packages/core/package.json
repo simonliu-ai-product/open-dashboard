@@ -1,0 +1,108 @@
+{
+  "name": "@open-database-dashboard/core",
+  "version": "0.1.0",
+  "description": "The dashboard framework built for agents — describe the charts you want, get a live dashboard over your database.",
+  "license": "MIT",
+  "type": "module",
+  "sideEffects": false,
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.mts",
+      "default": "./dist/index.mjs"
+    },
+    "./node": {
+      "types": "./dist/node.d.mts",
+      "default": "./dist/node.mjs"
+    },
+    "./jsx-runtime": {
+      "types": "./dist/jsx-runtime.d.mts",
+      "default": "./dist/jsx-runtime.mjs"
+    },
+    "./jsx-dev-runtime": {
+      "types": "./dist/jsx-dev-runtime.d.mts",
+      "default": "./dist/jsx-dev-runtime.mjs"
+    },
+    "./package.json": "./package.json"
+  },
+  "files": [
+    "dist",
+    "bin.js",
+    "skills",
+    "src",
+    "!src/**/*.test.ts",
+    "!src/**/*.test.tsx"
+  ],
+  "scripts": {
+    "build": "tsdown",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@babel/parser": "^8.0.4",
+    "@types/react": "^19.2.18",
+    "@vitejs/plugin-react": "^6.0.5",
+    "react": "^19.2.8",
+    "react-dom": "^19.2.8",
+    "vite": "^8.2.1"
+  },
+  "devDependencies": {
+    "@clickhouse/client": "^1.23.1",
+    "@duckdb/node-api": "1.5.6-r.1",
+    "@google-cloud/bigquery": "^9.1.0",
+    "@testing-library/react": "^16.3.2",
+    "@types/mssql": "^12.3.0",
+    "@types/node": "^26.2.0",
+    "@types/oracledb": "^7.0.3",
+    "@types/pg": "^8.15.0",
+    "@types/react-dom": "^19.2.4",
+    "jsdom": "^30.0.1",
+    "mssql": "^12.7.2",
+    "mysql2": "^3.24.5",
+    "oracledb": "^7.0.1",
+    "pg": "^8.23.1",
+    "snowflake-sdk": "^3.4.0",
+    "tsdown": "^0.22.14"
+  },
+  "peerDependencies": {
+    "@clickhouse/client": "*",
+    "@duckdb/node-api": "*",
+    "@google-cloud/bigquery": "*",
+    "mssql": "*",
+    "mysql2": "*",
+    "oracledb": "*",
+    "pg": "*",
+    "snowflake-sdk": "*"
+  },
+  "peerDependenciesMeta": {
+    "@clickhouse/client": {
+      "optional": true
+    },
+    "@duckdb/node-api": {
+      "optional": true
+    },
+    "@google-cloud/bigquery": {
+      "optional": true
+    },
+    "mssql": {
+      "optional": true
+    },
+    "mysql2": {
+      "optional": true
+    },
+    "oracledb": {
+      "optional": true
+    },
+    "pg": {
+      "optional": true
+    },
+    "snowflake-sdk": {
+      "optional": true
+    }
+  },
+  "bin": {
+    "open-dashboard": "./bin.js"
+  },
+  "engines": {
+    "node": ">=22.18"
+  }
+}

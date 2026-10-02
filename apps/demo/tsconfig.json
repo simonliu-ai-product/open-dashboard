@@ -1,0 +1,9 @@
+{
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    "jsx": "react-jsx",
+    "types": [],
+    "jsxImportSource": "@open-database-dashboard/core"
+  },
+  "include": ["dashboards/**/*", "open-dashboard.config.ts"]
+}

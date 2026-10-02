@@ -1,0 +1,14 @@
+node_modules
+dist
+.turbo
+*.log
+.DS_Store
+coverage
+test-results
+packages/cli/template/skills
+*.local.md
+.env
+*.db
+*.db-journal
+*.db-wal
+*.db-shm

@@ -1,0 +1,145 @@
+export interface SqliteSource {
+  type: 'sqlite'
+  /** Path to the database file, relative to the workspace root. */
+  file: string
+}
+
+export interface PostgresSource {
+  type: 'postgres'
+  /** A connection string, usually read from `.env`: `process.env.DATABASE_URL`. */
+  url: string
+  /** Passed through to `pg.Pool` — ssl, application_name, and so on. */
+  options?: Record<string, unknown>
+}
+
+export interface MysqlSource {
+  type: 'mysql'
+  url: string
+  options?: Record<string, unknown>
+}
+
+export interface MssqlSource {
+  type: 'mssql'
+  /** `mssql://user:pass@host:1433/db?encrypt=true` or an ADO.NET string `Server=…;Database=…;User Id=…;Password=…`. */
+  url: string
+  /** Passed through to `mssql.ConnectionPool`. */
+  options?: Record<string, unknown>
+}
+
+export interface OracleSource {
+  type: 'oracle'
+  /** `oracle://user:pass@host:1521/SERVICE_NAME`. Or give user, password and connectString. */
+  url?: string
+  user?: string
+  password?: string
+  /** Easy Connect (`host:1521/service`) or a TNS alias. */
+  connectString?: string
+  /** List and query another user's tables. Default: the connected user's own. */
+  schema?: string
+  options?: Record<string, unknown>
+}
+
+export interface DuckdbSource {
+  type: 'duckdb'
+  /** A .duckdb file relative to the workspace, or ':memory:' (the default) to query Parquet/CSV files in place. */
+  file?: string
+  /** Statements run once when the connection opens — e.g. `CREATE VIEW sales AS SELECT * FROM 'data/sales.parquet'`. */
+  init?: string[]
+}
+
+export interface ClickhouseSource {
+  type: 'clickhouse'
+  /** `https://user:pass@host:8443/database`. */
+  url: string
+  /** Passed through to `@clickhouse/client`'s createClient. */
+  options?: Record<string, unknown>
+}
+
+export interface BigquerySource {
+  type: 'bigquery'
+  projectId: string
+  /** Default dataset, so queries can say `orders` instead of `project.dataset.orders`. */
+  dataset?: string
+  /** Datasets to list in the schema. Default: `dataset`, else every dataset (first 20). */
+  datasets?: string[]
+  location?: string
+  /** A service-account key file. Omit to use Application Default Credentials. */
+  keyFilename?: string
+  credentials?: Record<string, unknown>
+  /** Refuse any query that would scan more than this many bytes. Default 10 GiB. */
+  maximumBytesBilled?: number
+  options?: Record<string, unknown>
+}
+
+export interface SnowflakeSource {
+  type: 'snowflake'
+  /** Account identifier, e.g. `myorg-myaccount`. */
+  account: string
+  username: string
+  password?: string
+  /** A PEM private key file for key-pair auth, relative to the workspace. */
+  privateKeyPath?: string
+  authenticator?: string
+  warehouse?: string
+  database?: string
+  schema?: string
+  role?: string
+  options?: Record<string, unknown>
+}
+
+export type DatasourceConfig =
+  | SqliteSource
+  | PostgresSource
+  | MysqlSource
+  | MssqlSource
+  | OracleSource
+  | DuckdbSource
+  | ClickhouseSource
+  | BigquerySource
+  | SnowflakeSource
+export type DatasourceType = DatasourceConfig['type']
+
+export interface OpenDashboardConfig {
+  /** Where dashboards live. Default `dashboards`. */
+  dashboardsDir?: string
+  datasources: Record<string, DatasourceConfig>
+  /** The source a query uses when it names none. Defaults to the only one, if there is only one. */
+  defaultSource?: string
+  /** Rows returned per query before the result is marked truncated. Default 5000. */
+  maxRows?: number
+  /** Per-query timeout, where the driver supports one. Default 15000. */
+  timeoutMs?: number
+}
+
+export type ColumnType = 'number' | 'string' | 'date' | 'boolean' | 'unknown'
+
+export interface ColumnInfo {
+  name: string
+  type: ColumnType
+}
+
+export type Row = Record<string, unknown>
+
+export interface QueryResult {
+  columns: ColumnInfo[]
+  rows: Row[]
+  truncated: boolean
+  elapsedMs: number
+}
+
+export type ParamValue = string | number | boolean | null
+
+export interface TableInfo {
+  name: string
+  schema?: string
+  kind: 'table' | 'view'
+  rowCount?: number
+  columns: { name: string; type: string; nullable: boolean; primaryKey: boolean }[]
+  foreignKeys: { column: string; table: string; references: string }[]
+}
+
+export interface SchemaInfo {
+  source: string
+  type: DatasourceType
+  tables: TableInfo[]
+}

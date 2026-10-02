@@ -1,0 +1,28 @@
+{
+  "name": "open-database-dashboard-monorepo",
+  "private": true,
+  "type": "module",
+  "packageManager": "pnpm@11.9.0",
+  "engines": {
+    "node": ">=22.18"
+  },
+  "scripts": {
+    "dev": "turbo run dev --filter=@open-database-dashboard/demo",
+    "build": "turbo run build",
+    "typecheck": "turbo run typecheck",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "check": "biome check .",
+    "check:fix": "biome check --write .",
+    "core": "pnpm --filter @open-database-dashboard/core",
+    "cli": "pnpm --filter @open-database-dashboard/cli",
+    "demo": "pnpm --filter @open-database-dashboard/demo"
+  },
+  "devDependencies": {
+    "@biomejs/biome": "^2.3.0",
+    "playwright": "^1.62.1",
+    "turbo": "^2.5.0",
+    "typescript": "^5.7.0",
+    "vitest": "^3.0.0"
+  }
+}
