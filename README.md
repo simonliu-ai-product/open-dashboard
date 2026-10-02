@@ -25,13 +25,16 @@ pnpm install
 pnpm dev                     # http://localhost:5473
 ```
 
-A sample SQLite database and a *Getting started* dashboard are included. Then, in
-your agent:
+The workspace starts empty: the home page asks you to connect a database first,
+then to create a dashboard. In your agent:
 
 ```
 /connect-database  use the Postgres in WAREHOUSE_URL
 /create-dashboard  weekly signups by plan, MRR trend, and the 20 accounts with the most usage
 ```
+
+To try it without a database of your own, `init my-dashboards --sample` adds a
+small SQLite shop and a dashboard over it.
 
 ## What a dashboard is
 

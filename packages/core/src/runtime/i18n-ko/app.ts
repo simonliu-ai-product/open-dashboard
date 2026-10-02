@@ -81,6 +81,8 @@ export const APP: Record<string, string> = {
   'Saved beside the panel in {file}:{line}. Ask your agent to /apply-comments.':
     '{file}:{line} 의 패널 옆에 저장했습니다. 에이전트에게 /apply-comments 를 요청하세요.',
   'Could not save: {error}': '저장하지 못했습니다: {error}',
+  'Connect a database': '데이터베이스 연결',
+  'Create a dashboard': '대시보드 만들기',
   Basics: '기본',
   'Compare and rank': '비교와 순위',
   'Over time': '시간 흐름',

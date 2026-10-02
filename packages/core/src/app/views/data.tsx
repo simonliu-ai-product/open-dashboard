@@ -3,6 +3,7 @@ import type { SchemaInfo } from '../../config.js'
 import { driverFor } from '../../datasource/registry.js'
 import type { SourceStatus } from '../../ops/sources.js'
 import { useT } from '../../runtime/i18n.js'
+import { CommandButton } from '../components/command-button.js'
 import { api } from '../lib/api.js'
 import { linkProps } from '../lib/router.js'
 
@@ -34,12 +35,20 @@ export function DataSourcesView({ source }: { source?: string }) {
     <div className="odd-page">
       <header className="odd-page-head">
         <h1>{t('Data sources')}</h1>
-        <p>
-          {t(
-            'The tables and columns your agent reads before writing SQL. Every query runs read-only.',
-          )}
-        </p>
       </header>
+      {sources?.length === 0 ? (
+        <ol className="odd-setup">
+          <li data-state="current">
+            <span className="odd-setup-mark" aria-hidden="true">
+              1
+            </span>
+            <div className="odd-setup-body">
+              <h2>{t('Connect a database')}</h2>
+              <CommandButton command="/connect-database" />
+            </div>
+          </li>
+        </ol>
+      ) : null}
       <div className="odd-tabs" role="tablist">
         {sources?.map((s) => (
           <a

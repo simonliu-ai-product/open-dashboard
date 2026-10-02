@@ -4,13 +4,13 @@ import { init } from './init.js'
 const USAGE = `create-open-dashboard — scaffold an open-dashboard workspace
 
 Usage:
-  npx @open-database-dashboard/cli init [directory] [--no-sample]
+  npx @open-database-dashboard/cli init [directory] [--sample]
 
 Arguments:
   directory     Where to create the workspace (default: my-dashboards)
 
 Options:
-  --no-sample   Skip the sample SQLite database and getting-started dashboard
+  --sample      Add a sample SQLite database and a dashboard over it
 `
 
 export async function run(argv: string[]): Promise<number> {
@@ -25,7 +25,7 @@ export async function run(argv: string[]): Promise<number> {
   }
 
   const directory = argv.slice(1).find((arg) => !arg.startsWith('--')) ?? 'my-dashboards'
-  const result = await init({ directory, sample: !argv.includes('--no-sample') })
+  const result = await init({ directory, sample: argv.includes('--sample') })
 
   const visible = result.files.filter(
     (file) => !file.startsWith('.claude/') && !file.startsWith('.agents/'),

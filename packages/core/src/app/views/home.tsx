@@ -3,7 +3,8 @@ import { driverFor } from '../../datasource/registry.js'
 import type { DashboardSummary } from '../../ops/dashboards.js'
 import type { SourceStatus } from '../../ops/sources.js'
 import { useT } from '../../runtime/i18n.js'
-import { CheckIcon, CopyIcon } from '../components/icons.js'
+import { CommandButton } from '../components/command-button.js'
+import { CheckIcon } from '../components/icons.js'
 import { api } from '../lib/api.js'
 import { intervalLabel } from '../lib/refresh.js'
 import { linkProps } from '../lib/router.js'
@@ -22,39 +23,6 @@ const COMMANDS = [
     text: 'Apply the notes you left on panels in the inspector.',
   },
 ]
-
-function CommandButton({ command, text }: { command: string; text: string }) {
-  const t = useT()
-  const [copied, setCopied] = useState(false)
-  useEffect(() => {
-    if (!copied) return
-    const timer = window.setTimeout(() => setCopied(false), 1600)
-    return () => window.clearTimeout(timer)
-  }, [copied])
-  return (
-    <li>
-      <button
-        type="button"
-        className="odd-command"
-        onClick={() => {
-          navigator.clipboard?.writeText(`${command} `).then(
-            () => setCopied(true),
-            () => {},
-          )
-        }}
-      >
-        <span className="odd-command-head">
-          <code>{command}</code>
-          <span className="odd-command-copy" aria-live="polite" data-copied={copied || undefined}>
-            {copied ? <CheckIcon /> : <CopyIcon />}
-            {copied ? t('Copied') : t('Copy')}
-          </span>
-        </span>
-        <span className="odd-command-text">{t(text)}</span>
-      </button>
-    </li>
-  )
-}
 
 function DashboardRow({ dashboard }: { dashboard: DashboardSummary }) {
   const t = useT()
@@ -86,6 +54,44 @@ function DashboardRow({ dashboard }: { dashboard: DashboardSummary }) {
   )
 }
 
+/**
+ * A fresh workspace: connect a database first, then ask for a dashboard. Shown
+ * until the first dashboard exists.
+ */
+function Setup({ sources }: { sources: SourceStatus[] | undefined }) {
+  const t = useT()
+  const connected = sources?.filter((s) => s.ok) ?? []
+  const done = connected.length > 0
+  return (
+    <ol className="odd-setup">
+      <li data-state={done ? 'done' : 'current'}>
+        <span className="odd-setup-mark" aria-hidden="true">
+          {done ? <CheckIcon /> : '1'}
+        </span>
+        <div className="odd-setup-body">
+          <h2>{t('Connect a database')}</h2>
+          {done ? (
+            <a className="odd-setup-done" {...linkProps('/data')}>
+              {connected.map((s) => s.name).join(', ')}
+            </a>
+          ) : (
+            <CommandButton command="/connect-database" />
+          )}
+        </div>
+      </li>
+      <li data-state={done ? 'current' : 'next'}>
+        <span className="odd-setup-mark" aria-hidden="true">
+          2
+        </span>
+        <div className="odd-setup-body">
+          <h2>{t('Create a dashboard')}</h2>
+          {done ? <CommandButton command="/create-dashboard" /> : null}
+        </div>
+      </li>
+    </ol>
+  )
+}
+
 export function HomeView({
   dashboards,
   error,
@@ -103,84 +109,74 @@ export function HomeView({
     <div className="odd-page odd-home">
       <header className="odd-page-head">
         <h1>{t('Dashboards')}</h1>
-        <p>
-          {t(
-            'Ask your coding agent for the dashboard you want. It writes the queries and panels; this page follows along.',
-          )}
-        </p>
       </header>
 
       {error ? <p className="odd-callout odd-callout-error">{error}</p> : null}
 
-      <div className="odd-home-grid">
-        <section aria-label={t('Dashboards')}>
-          {dashboards && dashboards.length === 0 ? (
-            <div className="odd-empty">
-              <h2>{t('No dashboards yet')}</h2>
-              <p>
-                {t(
-                  'Ask your agent for one with /create-dashboard. It lands in dashboards/<id>/ and shows up here while it is being written.',
-                )}
-              </p>
-            </div>
-          ) : (
+      {dashboards?.length === 0 ? (
+        <Setup sources={sources} />
+      ) : (
+        <div className="odd-home-grid">
+          <section aria-label={t('Dashboards')}>
             <ul className="odd-boards">
               {dashboards?.map((d) => (
                 <DashboardRow key={d.id} dashboard={d} />
               ))}
             </ul>
-          )}
-        </section>
-
-        <aside className="odd-rail">
-          <section className="odd-rail-block" aria-labelledby="odd-sources-heading">
-            <header className="odd-rail-head">
-              <h2 id="odd-sources-heading">{t('Data sources')}</h2>
-              <a {...linkProps('/data')}>{t('Browse tables')}</a>
-            </header>
-            {sources === undefined ? (
-              <p className="odd-muted">{t('Checking connections…')}</p>
-            ) : null}
-            {sources?.length === 0 ? (
-              <p className="odd-muted">
-                {t('None configured yet. Ask your agent: /connect-database')}
-              </p>
-            ) : null}
-            <ul className="odd-sources">
-              {sources?.map((s) => (
-                <li key={s.name}>
-                  <a className="odd-source" {...linkProps(`/data/${encodeURIComponent(s.name)}`)}>
-                    <span
-                      className="odd-status"
-                      data-ok={s.ok}
-                      title={s.ok ? t('Connected') : t('Not connected')}
-                    >
-                      {s.ok ? '●' : '▲'}
-                    </span>
-                    <span className="odd-source-name">{s.name}</span>
-                    <span className="odd-source-type">{driverFor(s.type)?.label ?? s.type}</span>
-                    <span className="odd-source-detail">
-                      {s.ok ? t('{n} tables', { n: s.tables ?? 0 }) : s.error}
-                      {s.default ? <span className="odd-badge">{t('default')}</span> : null}
-                    </span>
-                  </a>
-                </li>
-              ))}
-            </ul>
           </section>
 
-          <section className="odd-rail-block" aria-labelledby="odd-agent-heading">
-            <header className="odd-rail-head">
-              <h2 id="odd-agent-heading">{t('Ask your agent')}</h2>
-            </header>
-            <ul className="odd-commands">
-              {COMMANDS.map((c) => (
-                <CommandButton key={c.command} {...c} />
-              ))}
-            </ul>
-          </section>
-        </aside>
-      </div>
+          <aside className="odd-rail">
+            <section className="odd-rail-block" aria-labelledby="odd-sources-heading">
+              <header className="odd-rail-head">
+                <h2 id="odd-sources-heading">{t('Data sources')}</h2>
+                <a {...linkProps('/data')}>{t('Browse tables')}</a>
+              </header>
+              {sources === undefined ? (
+                <p className="odd-muted">{t('Checking connections…')}</p>
+              ) : null}
+              {sources?.length === 0 ? (
+                <p className="odd-muted">
+                  {t('None configured yet. Ask your agent: /connect-database')}
+                </p>
+              ) : null}
+              <ul className="odd-sources">
+                {sources?.map((s) => (
+                  <li key={s.name}>
+                    <a className="odd-source" {...linkProps(`/data/${encodeURIComponent(s.name)}`)}>
+                      <span
+                        className="odd-status"
+                        data-ok={s.ok}
+                        title={s.ok ? t('Connected') : t('Not connected')}
+                      >
+                        {s.ok ? '●' : '▲'}
+                      </span>
+                      <span className="odd-source-name">{s.name}</span>
+                      <span className="odd-source-type">{driverFor(s.type)?.label ?? s.type}</span>
+                      <span className="odd-source-detail">
+                        {s.ok ? t('{n} tables', { n: s.tables ?? 0 }) : s.error}
+                        {s.default ? <span className="odd-badge">{t('default')}</span> : null}
+                      </span>
+                    </a>
+                  </li>
+                ))}
+              </ul>
+            </section>
+
+            <section className="odd-rail-block" aria-labelledby="odd-agent-heading">
+              <header className="odd-rail-head">
+                <h2 id="odd-agent-heading">{t('Ask your agent')}</h2>
+              </header>
+              <ul className="odd-commands">
+                {COMMANDS.map((c) => (
+                  <li key={c.command}>
+                    <CommandButton {...c} />
+                  </li>
+                ))}
+              </ul>
+            </section>
+          </aside>
+        </div>
+      )}
     </div>
   )
 }

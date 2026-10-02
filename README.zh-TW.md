@@ -22,12 +22,14 @@ pnpm install
 pnpm dev                     # http://localhost:5473
 ```
 
-內附一個範例 SQLite 資料庫與「Getting started」Dashboard。接著在 Agent 裡輸入：
+新的 workspace 是空的：首頁會先請你連接資料庫，再建立 Dashboard。在 Agent 裡輸入：
 
 ```
 /connect-database  連到 .env 裡 WAREHOUSE_URL 的 Postgres
 /create-dashboard  每週各方案的註冊數、MRR 趨勢，以及用量最高的 20 個帳號
 ```
+
+手邊沒有資料庫想先試用，可用 `init my-dashboards --sample`，會加入一個小型 SQLite 商店資料與一張 Dashboard。
 
 ## 一個 Dashboard 長什麼樣子
 

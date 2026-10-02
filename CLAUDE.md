@@ -11,7 +11,7 @@ pnpm + Turbo monorepo.
 | Path | Package | Role |
 | --- | --- | --- |
 | `packages/core` | `@open-database-dashboard/core` | Datasource drivers, named-query loader, ops layer, Vite plugins + dev API, viewer app, panel components, `open-dashboard` CLI, canonical skills. |
-| `packages/cli` | `@open-database-dashboard/cli` | `npx @open-database-dashboard/cli init` scaffolder + project template + sample database generator. |
+| `packages/cli` | `@open-database-dashboard/cli` | `npx @open-database-dashboard/cli init` scaffolder + project template. New workspaces start empty (connect a database → create a dashboard); `--sample` adds a generated SQLite shop and a getting-started dashboard. |
 | `apps/demo` | private | Dogfood workspace over a seeded SQLite shop (`scripts/seed.mjs`). |
 | `scripts/` | — | `screenshot.mjs`, `interact.mjs`: Playwright drivers for eyeballing the viewer. |
 

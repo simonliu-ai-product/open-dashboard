@@ -27,16 +27,19 @@ export async function dev(
   const sources = Object.keys(config.datasources)
   const out = process.stdout
   out.write(`\n  open-dashboard  ${url}\n`)
-  out.write(
-    sources.length === 0
-      ? '  no datasources — add one to open-dashboard.config.ts\n'
-      : `  datasources: ${sources.map((s) => `${s} (${config.datasources[s]?.type})`).join(', ')}\n`,
-  )
-  out.write(
-    found.length === 0
-      ? `  no dashboards yet — ask your agent: /create-dashboard\n\n`
-      : `  ${found.length} dashboard${found.length === 1 ? '' : 's'}: ${found.map((f) => f.id).join(', ')}\n\n`,
-  )
+  // A fresh workspace is told one step at a time: a database, then a dashboard.
+  if (sources.length === 0) {
+    out.write('  next: connect a database — ask your agent: /connect-database\n\n')
+  } else {
+    out.write(
+      `  datasources: ${sources.map((s) => `${s} (${config.datasources[s]?.type})`).join(', ')}\n`,
+    )
+    out.write(
+      found.length === 0
+        ? '  next: ask your agent: /create-dashboard\n\n'
+        : `  ${found.length} dashboard${found.length === 1 ? '' : 's'}: ${found.map((f) => f.id).join(', ')}\n\n`,
+    )
+  }
   if (options.open) server.openBrowser()
 
   return {

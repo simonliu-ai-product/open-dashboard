@@ -81,6 +81,8 @@ export const APP: Record<string, string> = {
   'Saved beside the panel in {file}:{line}. Ask your agent to /apply-comments.':
     '{file}:{line} のパネルの隣に保存しました。エージェントに /apply-comments を頼んでください。',
   'Could not save: {error}': '保存できませんでした：{error}',
+  'Connect a database': 'データベースを接続',
+  'Create a dashboard': 'ダッシュボードを作成',
   Basics: '基本',
   'Compare and rank': '比較とランキング',
   'Over time': '時系列',

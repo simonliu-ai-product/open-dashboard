@@ -20,7 +20,10 @@ export interface InitOptions {
   directory: string
   cwd?: string
   version?: string
-  /** Generate data/sample.db and the getting-started dashboard over it. Default true. */
+  /**
+   * Add data/sample.db and a getting-started dashboard over it. Default false:
+   * a new workspace starts empty, at "connect a database".
+   */
   sample?: boolean
 }
 
@@ -119,17 +122,19 @@ export async function init(options: InitOptions): Promise<InitResult> {
     rmSync(join(root, 'skills'), { recursive: true, force: true })
   }
 
-  if (options.sample === false) {
-    rmSync(join(root, 'dashboards', 'getting-started'), { recursive: true, force: true })
+  if (options.sample) {
+    await writeSampleDatabase(join(root, 'data', 'sample.db'))
+    const config = join(root, 'open-dashboard.config.ts')
     writeFileSync(
-      join(root, 'open-dashboard.config.ts'),
-      readFileSync(join(root, 'open-dashboard.config.ts'), 'utf8').replace(
-        /\n\s*sample: \{[^}]*\},?/,
-        '',
+      config,
+      readFileSync(config, 'utf8').replace(
+        'datasources: {\n',
+        "datasources: {\n    sample: { type: 'sqlite', file: 'data/sample.db' },\n",
       ),
     )
   } else {
-    await writeSampleDatabase(join(root, 'data', 'sample.db'))
+    rmSync(join(root, 'dashboards', 'getting-started'), { recursive: true, force: true })
+    mkdirSync(join(root, 'dashboards'), { recursive: true })
   }
 
   const files: string[] = []

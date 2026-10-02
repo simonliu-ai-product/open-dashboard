@@ -80,6 +80,8 @@ export const APP: Record<string, string> = {
   'Saved beside the panel in {file}:{line}. Ask your agent to /apply-comments.':
     '已保存到 {file}:{line} 的面板旁。请 Agent 执行 /apply-comments。',
   'Could not save: {error}': '无法保存：{error}',
+  'Connect a database': '连接数据库',
+  'Create a dashboard': '创建 Dashboard',
   Basics: '基本',
   'Compare and rank': '比较与排名',
   'Over time': '随时间变化',

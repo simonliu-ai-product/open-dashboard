@@ -571,22 +571,89 @@ button {
   font-variant-numeric: tabular-nums;
 }
 
-.odd-empty {
-  padding: 32px 24px;
-  border: 1px dashed var(--odd-border-strong);
-  border-radius: var(--odd-radius);
+.odd-setup {
+  display: flex;
+  flex-direction: column;
+  max-width: 440px;
+  margin: 28px 0 0;
+  padding: 0;
+  list-style: none;
 }
 
-.odd-empty h2 {
-  margin: 0 0 6px;
+.odd-setup > li {
+  position: relative;
+  display: grid;
+  grid-template-columns: 28px minmax(0, 1fr);
+  column-gap: 14px;
+  padding-bottom: 28px;
+}
+
+.odd-setup > li:last-child {
+  padding-bottom: 0;
+}
+
+/* The line joining one step to the next. */
+.odd-setup > li:not(:last-child)::before {
+  content: "";
+  position: absolute;
+  top: 32px;
+  bottom: 4px;
+  left: 13.5px;
+  width: 1px;
+  background: var(--odd-border-strong);
+}
+
+.odd-setup-mark {
+  display: grid;
+  place-items: center;
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  box-shadow: inset 0 0 0 1px var(--odd-border-strong);
+  color: var(--odd-muted);
+  font-size: 13px;
+  font-weight: 620;
+  font-variant-numeric: tabular-nums;
+}
+
+.odd-setup > li[data-state="current"] .odd-setup-mark {
+  background: var(--odd-accent);
+  box-shadow: none;
+  color: #fff;
+}
+
+.odd-setup > li[data-state="done"] .odd-setup-mark {
+  box-shadow: inset 0 0 0 1px var(--odd-good);
+  color: var(--odd-good);
+}
+
+.odd-setup-body {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  min-width: 0;
+  padding-top: 3px;
+}
+
+.odd-setup-body h2 {
+  margin: 0;
   font-size: 16px;
   font-weight: 620;
 }
 
-.odd-empty p {
-  margin: 0;
-  max-width: 60ch;
+.odd-setup > li[data-state="next"] h2 {
+  color: var(--odd-muted);
+  font-weight: 520;
+}
+
+.odd-setup-done {
   color: var(--odd-ink-2);
+  font-size: 13px;
+  text-decoration: none;
+}
+
+.odd-setup-done:hover {
+  text-decoration: underline;
 }
 
 .odd-rail {
