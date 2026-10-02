@@ -3,6 +3,7 @@ import {
   Dashboard,
   type DashboardMeta,
   Filters,
+  Heatmap,
   Row,
   Select,
   Stat,
@@ -11,8 +12,6 @@ import {
 
 export const meta: DashboardMeta = {
   title: '即時營運看板',
-  description:
-    '今天到目前為止的營收與訂單，跟昨天同一時間點比較。營收與訂單數只計已付款訂單；時間以伺服器本地時間為準。',
   refresh: '1m',
   locale: 'zh-TW',
   currency: 'USD',
@@ -66,12 +65,22 @@ export default function LiveOps() {
       <Row height={320}>
         <BarChart
           title="每小時訂單量"
-          description="依下單時間，每個整點一格；沒有訂單的時段為 0"
           query="hourly_orders"
           x="hour"
           y={['paid', 'cancelled_or_refunded']}
           labels={{ paid: '已付款', cancelled_or_refunded: '取消或退款' }}
           stacked
+          format="integer"
+        />
+      </Row>
+
+      <Row height={300}>
+        <Heatmap
+          title="一週各時段訂單熱度"
+          query="weekday_hour"
+          x="hour"
+          y="weekday"
+          value="orders"
           format="integer"
         />
       </Row>

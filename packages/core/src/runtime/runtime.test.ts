@@ -103,4 +103,19 @@ describe('formats', () => {
     expect(ticks.map(format)).toEqual(['$0', '$2K', '$4K', '$6K', '$8K', '$10K'])
     expect([0, 0.5, 1].map(tickFormatter([0, 0.5, 1], undefined, ctx))).toEqual(['0', '0.5', '1'])
   })
+
+  it('keeps a 萬 axis consistent: compact only when every tick reaches 10,000', () => {
+    const zh = { locale: 'zh-TW', currency: 'USD' }
+    const low = [0, 2000, 4000, 6000, 8000, 10000]
+    expect(low.map(tickFormatter(low, 'integer', zh))).toEqual([
+      '0',
+      '2,000',
+      '4,000',
+      '6,000',
+      '8,000',
+      '10,000',
+    ])
+    const high = [0, 50000, 100000]
+    expect(high.map(tickFormatter(high, 'integer', zh))).toEqual(['0', '5萬', '10萬'])
+  })
 })

@@ -5,11 +5,14 @@ import { errorMessage } from '../datasource/types.js'
 import {
   addComment,
   dashboardQueries,
+  editLayout,
   getCurrent,
+  type LayoutEdit,
   listComments,
   listDashboards,
   listSources,
   OpsError,
+  readLayout,
   readSchema,
   runDashboardQuery,
   schemaToText,
@@ -132,6 +135,26 @@ export function apiPlugin(workspace: Workspace, overrides: ConfigOverrides): Plu
             const id = q('id')
             if (!id) return json(res, 400, { error: 'id is required' })
             return json(res, 200, { queries: [...dashboardQueries(config, id).values()] })
+          }
+          if (route === 'layout' && req.method === 'GET') {
+            const id = q('id')
+            if (!id) return json(res, 400, { error: 'id is required' })
+            return json(res, 200, readLayout(config, id))
+          }
+          if (route === 'layout' && req.method === 'POST') {
+            const body = await readBody(req)
+            if (
+              typeof body.id !== 'string' ||
+              typeof body.hash !== 'string' ||
+              !Array.isArray(body.edits)
+            ) {
+              return json(res, 400, { error: 'id, hash and edits are required' })
+            }
+            return json(
+              res,
+              200,
+              editLayout(config, body.id, body.edits as LayoutEdit[], body.hash),
+            )
           }
           if (route === 'sources' && req.method === 'GET') {
             return json(res, 200, { sources: await listSources(workspace) })

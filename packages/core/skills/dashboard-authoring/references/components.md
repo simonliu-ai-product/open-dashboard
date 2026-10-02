@@ -5,9 +5,30 @@ All from `@open-database-dashboard/core`. Every panel takes the common props:
 | Prop | Type | |
 | --- | --- | --- |
 | `title` | string | **required**; unique within the dashboard |
-| `description` | string | one line under the title — put definitions here |
+| `description` | string | one line under the title. Only when the user asks for it — definitions go in the query's `-- description:` |
 | `span` | 1–12 | width in the row's 12 columns; default: row split evenly |
 | `height` | number | px; default: the row's `height`, else the panel's own |
+| `drill` | string or object | click a mark to filter by it — see below |
+
+### Drill-down: `drill`
+
+Clicking a bar, line point, pie slice or table row sets a filter to that value;
+clicking it again clears it. Marks that do not match the active value dim.
+
+```tsx
+<BarChart title="Revenue by region" query="by_region" x="region" y="revenue" drill="region" />
+<Table title="Accounts" query="accounts" drill={{ filter: 'account', column: 'account_id' }} />
+<BarChart title="By plan" query="by_plan" x="plan" y="mrr" drill={{ filter: 'plan', dashboard: 'plan-detail' }} />
+```
+
+- a string names a `<Select>` on this dashboard; the clicked category (x, pie
+  label, or the table column of the same name) becomes its value
+- `column` reads the value from another column (tables)
+- `dashboard` opens that dashboard with the filter set in its URL instead
+- a chart that drills should usually **not** be filtered by the same select in
+  its own SQL, so every category stays clickable
+- `open-dashboard check` warns when `drill` names a filter the dashboard lacks
+- drill is off in edit mode
 
 ## Structure
 
@@ -78,7 +99,190 @@ Negative/zero values are dropped.
 - numbers right-aligned with tabular figures; `id` / `*_id` columns are not grouped
 - renders up to 1,000 rows
 
-### `<Text title span? height?>`
+### `<ScatterChart query x y series? size? label? format? xFormat?>`
+One point per row: how two measures move together.
+- `x`, `y`: numeric columns (required); axes do not force zero
+- `series`: a column whose values colour the points (≤ 7 groups, the rest "Other")
+- `size`: a numeric column → bubbles (area ∝ value)
+- `label`: names each point in the tooltip
+- `xFormat`: format of x when it differs from y's `format`
+
+### `<Heatmap query x y value format?>`
+Cells coloured by `value` on one blue ramp, light → dark, with a scale legend.
+Rows and columns appear in the query's order — `ORDER BY` them (weekday
+Monday-first, hour 0–23). Empty combinations show as blank cells. `drill`
+with `{ filter, column }` filters by the clicked cell's row or column.
+
+### `<FunnelChart query label? value? format?>`
+Ordered stages as bars on one scale, each with its share of the first stage
+and the step conversion from the stage before. Order the rows in SQL.
+
+### `<Gauge query column? max? target? format?>`
+A half-circle meter for one value (first row). `max` and `target` are numbers
+or column names in the same row: e.g. `target="last_month"` marks last month on
+the arc. With neither, the value is read as a fraction of 1 (a rate).
+
+### `<Treemap query label? value? format? maxItems?>`
+Share of a whole across many parts — use it where a pie would need more than
+six slices. Tiles sized by value, largest first; past `maxItems` (12) the rest
+is "Other".
+
+### Compare and rank
+
+#### `<DotPlot query label? value? format? zero?>`
+One row per category, a dot at its value — a ranking on a tight range, where
+bars from zero would all look the same length. `value` may be an array: one dot
+colour per measure. The axis does not start at zero unless `zero`.
+
+#### `<Dumbbell query label? from to format? labels? zero?>`
+Two dots per row joined by a line: before → after, plan → actual. The change is
+labelled at the right. `labels={{ from: 'Last month', to: 'This month' }}` names
+the ends in the legend.
+
+#### `<SlopeChart query label? from to format? labels? zero?>`
+The same data as a Dumbbell, drawn as lines between two columns: better when
+the question is *which rose and which fell*. Rises and falls are coloured.
+
+#### `<BulletChart query label? value? target? max? bands? format?>`
+Actual against a target, one row per label: a bar, a target tick, grey
+qualitative bands behind. `target`, `max` and each of `bands` are numbers or
+column names (`bands={['poor', 'fair']}`, low to high). Prefer it to a Gauge
+whenever there is more than one value.
+
+#### `<DivergingBar query label? value? format? invert?>`
+Signed values from a zero line — variance, growth, net change. Above zero is
+blue, below red; `invert` swaps them where below zero is good.
+
+#### `<Marimekko query x series value format?>`
+A 100 % stacked bar whose columns are as wide as their share of the total:
+size of each group and its mix at once (region width × channel mix).
+
+#### `<BumpChart query x series value ascending? top? format?>`
+Rank over time: one line per entity, rank 1 at the top. Rows are long-form
+(`x`, `series`, `value`) in period order; ranks are computed per period.
+`ascending` ranks the lowest first; `top` (8) hides entities that never reach
+that rank.
+
+#### `<Waterfall query label? value? type? total? format?>`
+How a start becomes an end: each row a signed step, floating from the running
+total. Rows whose `type` column is `'total'` are drawn from zero (an opening
+and a closing total); without `type`, a closing total named `total` is appended.
+
+### Over time
+
+#### `<CalendarHeatmap query x value? format?>`
+One square per day ('YYYY-MM-DD'), weeks as columns — daily patterns over a
+year. Missing days are blank, not zero.
+
+#### `<SmallMultiples query x y series kind? independent? format?>`
+One small chart per `series` value, sharing one y scale so they compare
+directly (`independent` gives each its own).
+`kind`: `'line'` (default), `'area'`, `'bar'`. Use it instead of a LineChart
+with more than four or five crossing lines.
+
+#### `<BandChart query x y low high low2? high2? format?>`
+A line inside a shaded range: a median within p25–p75, a forecast within its
+interval. `low2` / `high2` add a lighter outer band (p5–p95). Compute the
+columns in SQL.
+
+#### `<ControlChart query x y center? upper? lower? format?>`
+A measure over time against its centre line and control limits; points outside
+are marked and counted. Without `center` / `upper` / `lower` columns, the limits
+are mean ± 3σ of the data shown.
+
+#### `<HorizonChart query x series y bands? format?>`
+Many series over one time axis in little height: each row folds its values
+into `bands` (3) layers of darker blue. Good for 5–30 hosts, stores or regions.
+Values must be non-negative.
+
+#### `<Timeline query label start end series? now?>`
+Bars from `start` to `end` in lanes by `label` — jobs per worker, a project
+plan. `series` colours bars (with a legend); `now` draws the current time.
+
+#### `<Candlestick query x open high low close convention? format?>`
+Open / high / low / close per period. Rising colour follows the locale
+(red-up for zh, ja, ko); `convention="west"` or `"east"` overrides.
+
+### Distribution
+
+#### `<Histogram query value? bin? count? bins? format?>`
+How values spread. Pass raw rows (`value`, one per observation; bins are chosen
+automatically, or `bins`) or pre-binned rows (`bin`, `count`). Raw rows are
+capped like any result — past ~5,000 observations, bin in SQL.
+
+#### `<BoxPlot query value? label? stats? format?>`
+Median, quartiles, whiskers (1.5 × IQR) and outliers, one box per `label`
+(≤ 20). Raw values, or precomputed
+`stats={{ min: 'p0', q1: 'p25', median: 'p50', q3: 'p75', max: 'p100' }}`.
+
+#### `<StripPlot query value label? format?>`
+Every observation as a dot, jittered, with the median marked — for small
+samples (tens to a few hundred) where a box hides too much.
+
+#### `<EcdfChart query value series? marks? format?>`
+Cumulative share at or below each value; one line per `series` (≤ 8).
+`marks={[0.5, 0.9]}` draws percentile guides. Reads "90 % of orders are under
+$X" directly, and compares whole distributions without binning.
+
+#### `<ParetoChart query label? value? at? format?>`
+Concentration: entities sorted largest first, cumulative share against share of
+entities, with "top 20 % hold N %" called out (`at`, default 0.2). Pass every
+entity, not a top N.
+
+### Flow and composition
+
+#### `<Sankey query source target value format?>`
+Flows between stages. One row per link; a target can be the next stage's
+source. Prefix node names by stage if a name appears in two stages
+(`'web'` as a source and as a channel). Cycles are refused with a message.
+
+#### `<CohortTable query cohort period value mode? size? format?>`
+Retention triangle: one row per cohort (sign-up month), one column per period
+since (0, 1, 2…). `mode="percent"` (default) divides by `size` (a column), or
+by period 0 without it; `"count"` shows raw numbers.
+
+#### `<UpSetChart query sets value top? format?>`
+Overlaps between sets, where a Venn diagram would fail past three: `sets` is a
+comma-separated combination (`'Beans,Grinders'`, one row per exact
+combination), `value` how many have exactly it. Shows the largest `top` (15).
+
+### Maps
+
+The maps draw from data you give them; nothing is fetched at runtime. Import
+GeoJSON beside the dashboard: `import counties from './counties.json'`.
+
+#### `<ChoroplethMap query geo featureKey region value format? scale?>`
+Regions shaded by value. `geo` is a FeatureCollection of Polygon /
+MultiPolygon features; `featureKey` the feature property holding names; `region`
+the column with the same names (matched case-insensitively, 台 = 臺). Regions
+without data are grey and counted. `scale="diverging"` for signed values. Large
+regions dominate visually — use a TileMap when every region should count equally.
+
+#### `<SymbolMap query lat lng size? label? series? geo? format?>`
+A circle per row at its coordinates, area ∝ `size`, coloured by `series`.
+`geo` draws an outline underneath. Join coordinates in SQL.
+
+#### `<TileMap query region value format? grid?>`
+One equal square per place on a fixed grid: Taiwan's 22 counties and cities by
+default (Chinese, English or 台/臺 names), or `grid={{ name: [col, row] }}`.
+
+### Status and tables
+
+#### `<StateTimeline query x series state end? states?>`
+State over time per lane — up / degraded / down per service. Each row is a
+state starting at `x`, lasting until `end` or the lane's next row.
+`states={{ up: 'good', degraded: 'warning', down: 'critical' }}` uses the
+status colours; others take series colours. The legend shows each state's share.
+
+#### `<PivotTable query rows columns value agg? format? totals? heat?>`
+Cross-tab in the browser from long rows: `rows` (one field or two, nested),
+`columns`, `value`, `agg` (`sum` default, `count`, `avg`, `min`, `max`).
+Totals by default; `heat` shades cells. Aggregate in SQL first when the raw
+rows are many.
+
+### More
+
+#### `<Text title span? height?>`
 Children are ordinary JSX: `<p>`, `<strong>`, `<ul>`, `<a>`.
 
 ## Hooks (advanced)

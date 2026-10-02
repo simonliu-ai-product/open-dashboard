@@ -128,6 +128,18 @@ export async function checkDashboard(
     }
   }
 
+  const selects = new Set(
+    analysis.filters.filter((f) => f.kind === 'Select' && f.name).map((f) => f.name),
+  )
+  for (const panel of analysis.panels) {
+    if (!panel.drill || panel.drill.dashboard || selects.has(panel.drill.filter)) continue
+    findings.push({
+      severity: 'warning',
+      message: `<${panel.component}${panel.title ? ` "${panel.title}"` : ''}> drills into "${panel.drill.filter}", but there is no <Select name="${panel.drill.filter}"> — clicks will do nothing`,
+      where: `${rel}:${panel.line}`,
+    })
+  }
+
   const used = new Set(analysis.queryRefs.map((ref) => ref.name))
   for (const ref of analysis.queryRefs) {
     if (!queries.has(ref.name)) {

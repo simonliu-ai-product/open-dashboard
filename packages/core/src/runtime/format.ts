@@ -126,7 +126,13 @@ export function tickFormatter(
 ): (value: number) => string {
   const largest = Math.max(0, ...ticks.map((t) => Math.abs(t)))
   const whole = ticks.every((t) => Number.isInteger(t))
-  const compact = largest >= 10_000
+  // Chinese, Japanese and Korean compact in units of 10⁴ (萬, 万, 만): below
+  // that a tick stays a plain number, so an axis would read 8000 under 1萬.
+  // There, go compact only when every non-zero tick can be.
+  const myriad = /^(zh|ja|ko)\b/i.test(ctx.locale ?? '')
+  const compact = myriad
+    ? largest >= 10_000 && ticks.every((t) => t === 0 || Math.abs(t) >= 10_000)
+    : largest >= 10_000
   if (format === 'percent') {
     const digits = ticks.every((t) => Number.isInteger(Math.round(t * 1e6) / 1e4)) ? 0 : 1
     return (value) => formatValue(value, { style: 'percent', maximumFractionDigits: digits }, ctx)

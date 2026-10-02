@@ -58,8 +58,9 @@ user already said, covering what the schema leaves open:
    breakdown table. It decides how many panels.
 
 If the user said "just make something useful", choose sensible definitions,
-build it, and state each definition in the panel `description` or a `<Text>`
-panel so they can correct you.
+build it, put each definition in the query's `-- description:` line (the
+inspector shows it), and list them in your reply so they can correct you.
+Do not write them onto the page.
 
 > **Never invent a number.** Every figure on a dashboard comes from a query
 > against the user's database. No hard-coded targets, benchmarks, "typical

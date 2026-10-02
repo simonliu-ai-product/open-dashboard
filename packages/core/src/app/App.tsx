@@ -1,8 +1,10 @@
 import { useEffect, useState } from 'react'
 import type { DashboardSummary } from '../ops/dashboards.js'
+import { LocaleProvider, useT } from '../runtime/i18n.js'
+import { SettingsMenu } from './components/settings-menu.js'
 import { api } from './lib/api.js'
 import { linkProps, useRoute } from './lib/router.js'
-import { type Theme, useTheme } from './lib/theme.js'
+import { useTheme } from './lib/theme.js'
 import { DashboardView } from './views/dashboard.js'
 import { DataSourcesView } from './views/data.js'
 import { HomeView } from './views/home.js'
@@ -27,13 +29,8 @@ function useDashboards(): { list: DashboardSummary[] | undefined; error: string 
   return { list, error }
 }
 
-const THEMES: { value: Theme; label: string }[] = [
-  { value: 'system', label: 'Auto' },
-  { value: 'light', label: 'Light' },
-  { value: 'dark', label: 'Dark' },
-]
-
-export function App() {
+function Shell() {
+  const t = useT()
   const route = useRoute()
   const [theme, setTheme] = useTheme()
   const dashboards = useDashboards()
@@ -57,20 +54,24 @@ export function App() {
           <button
             type="button"
             className="odd-menu-toggle"
-            aria-label="Menu"
+            aria-label={t('Menu')}
+            aria-expanded={menuOpen}
             onClick={() => setMenuOpen((v) => !v)}
           >
             ☰
           </button>
         </div>
-        <nav className="odd-nav" aria-label="Main">
+        <nav className="odd-nav" aria-label={t('Main')}>
           <a {...linkProps('/')} aria-current={route.name === 'home' ? 'page' : undefined}>
-            Overview
+            {t('Overview')}
           </a>
           <a {...linkProps('/data')} aria-current={route.name === 'data' ? 'page' : undefined}>
-            Data sources
+            {t('Data sources')}
           </a>
-          <div className="odd-nav-heading">Dashboards</div>
+          <h2 className="odd-nav-heading">
+            {t('Dashboards')}
+            {dashboards.list ? <span className="odd-count">{dashboards.list.length}</span> : null}
+          </h2>
           {dashboards.list?.map((d) => (
             <a
               key={d.id}
@@ -80,20 +81,9 @@ export function App() {
               {d.title}
             </a>
           ))}
-          {dashboards.list?.length === 0 ? <p className="odd-nav-empty">None yet</p> : null}
+          {dashboards.list?.length === 0 ? <p className="odd-nav-empty">{t('None yet')}</p> : null}
         </nav>
-        <fieldset className="odd-theme" aria-label="Theme">
-          {THEMES.map((t) => (
-            <button
-              key={t.value}
-              type="button"
-              aria-pressed={theme === t.value}
-              onClick={() => setTheme(t.value)}
-            >
-              {t.label}
-            </button>
-          ))}
-        </fieldset>
+        <SettingsMenu theme={theme} onTheme={setTheme} />
       </aside>
       <main className="odd-main">
         {route.name === 'dashboard' ? (
@@ -105,5 +95,13 @@ export function App() {
         )}
       </main>
     </div>
+  )
+}
+
+export function App() {
+  return (
+    <LocaleProvider>
+      <Shell />
+    </LocaleProvider>
   )
 }

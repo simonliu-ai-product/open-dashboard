@@ -1,10 +1,13 @@
 import { useEffect, useState } from 'react'
 import type { SchemaInfo } from '../../config.js'
+import { driverFor } from '../../datasource/registry.js'
 import type { SourceStatus } from '../../ops/sources.js'
+import { useT } from '../../runtime/i18n.js'
 import { api } from '../lib/api.js'
 import { linkProps } from '../lib/router.js'
 
 export function DataSourcesView({ source }: { source?: string }) {
+  const t = useT()
   const [sources, setSources] = useState<SourceStatus[]>()
   const [schema, setSchema] = useState<SchemaInfo>()
   const [error, setError] = useState<string>()
@@ -30,10 +33,11 @@ export function DataSourcesView({ source }: { source?: string }) {
   return (
     <div className="odd-page">
       <header className="odd-page-head">
-        <h1>Data sources</h1>
+        <h1>{t('Data sources')}</h1>
         <p>
-          What your agent sees when it runs <code>open-dashboard schema</code>. Every query runs
-          read-only.
+          {t(
+            'The tables and columns your agent reads before writing SQL. Every query runs read-only.',
+          )}
         </p>
       </header>
       <div className="odd-tabs" role="tablist">
@@ -47,7 +51,7 @@ export function DataSourcesView({ source }: { source?: string }) {
             <span className="odd-status" data-ok={s.ok}>
               {s.ok ? '●' : '▲'}
             </span>
-            {s.name} <span className="odd-muted">{s.type}</span>
+            {s.name} <span className="odd-muted">{driverFor(s.type)?.label ?? s.type}</span>
           </a>
         ))}
       </div>
@@ -57,7 +61,8 @@ export function DataSourcesView({ source }: { source?: string }) {
           <input
             className="odd-search"
             type="search"
-            placeholder={`Filter ${schema.tables.length} tables`}
+            placeholder={t('Filter {n} tables', { n: schema.tables.length })}
+            aria-label={t('Filter tables')}
             value={filter}
             onChange={(e) => setFilter(e.target.value)}
           />
@@ -71,10 +76,11 @@ export function DataSourcesView({ source }: { source?: string }) {
                       : table.name}
                   </h2>
                   <span className="odd-muted">
-                    {table.kind}
                     {table.rowCount !== undefined
-                      ? ` · ${table.rowCount.toLocaleString()} rows`
-                      : ''}
+                      ? t(table.kind === 'view' ? 'View, {n} rows' : '{n} rows', {
+                          n: table.rowCount.toLocaleString(),
+                        })
+                      : t(table.kind === 'view' ? 'View' : 'Table')}
                   </span>
                 </header>
                 <table>
@@ -93,7 +99,7 @@ export function DataSourcesView({ source }: { source?: string }) {
                               ? `→ ${fk.table}.${fk.references}`
                               : column.nullable
                                 ? ''
-                                : 'not null'}
+                                : t('not null')}
                           </td>
                         </tr>
                       )
@@ -105,7 +111,7 @@ export function DataSourcesView({ source }: { source?: string }) {
           </div>
         </>
       ) : !error && selected ? (
-        <p className="odd-muted">Reading schema…</p>
+        <p className="odd-muted">{t('Reading schema…')}</p>
       ) : null}
     </div>
   )

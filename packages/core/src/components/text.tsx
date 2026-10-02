@@ -1,4 +1,5 @@
 import type { ReactNode } from 'react'
+import { editable } from './editable.js'
 import { PanelFrame } from './panel.js'
 
 export interface TextProps {
@@ -9,7 +10,7 @@ export interface TextProps {
 }
 
 /** Notes beside the numbers: definitions, caveats, where the data comes from. */
-export function Text(props: TextProps) {
+function TextPanel(props: TextProps) {
   return (
     <PanelFrame
       {...props}
@@ -21,3 +22,5 @@ export function Text(props: TextProps) {
     </PanelFrame>
   )
 }
+
+export const Text = editable('Text', TextPanel)

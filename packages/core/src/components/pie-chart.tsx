@@ -1,8 +1,11 @@
 import { useState } from 'react'
 import { formatShort, formatValue } from '../runtime/format.js'
+import { useT } from '../runtime/i18n.js'
 import { pickX, pickY } from '../runtime/shape.js'
 import type { Format, QueryRun } from '../runtime/types.js'
 import { useQuery } from '../runtime/use-query.js'
+import { useDrill } from './drill.js'
+import { editable } from './editable.js'
 import { PanelFrame, type PanelProps, useFormatContext, useSize } from './panel.js'
 
 export interface PieChartProps extends PanelProps {
@@ -30,27 +33,35 @@ function arc(cx: number, cy: number, r: number, inner: number, a0: number, a1: n
 
 function Donut({ run, props }: { run: QueryRun; props: PieChartProps }) {
   const ctx = useFormatContext()
+  const t = useT()
+  const drill = useDrill(props.drill)
   const [ref, size] = useSize<HTMLDivElement>()
   const [hover, setHover] = useState<number | null>(null)
   const { columns, rows } = run.result
   const label = pickX(columns, props.label)
   const value = pickY(columns, label, props.value)[0]
   if (!label || !value)
-    return <div className="odd-panel-message">Needs a label column and a numeric value column.</div>
+    return (
+      <div className="odd-panel-message">
+        {t('Needs a label column and a numeric value column.')}
+      </div>
+    )
 
   const limit = Math.max(2, props.maxSlices ?? MAX)
   let slices = rows
-    .map((row) => ({ label: String(row[label] ?? '—'), value: Number(row[value]) }))
+    .map((row) => ({ label: String(row[label] ?? '—'), value: Number(row[value]), other: false }))
     .filter((s) => Number.isFinite(s.value) && s.value > 0)
     .sort((a, b) => b.value - a.value)
   if (slices.length > limit) {
     const rest = slices.slice(limit - 1).reduce((sum, s) => sum + s.value, 0)
-    slices = [...slices.slice(0, limit - 1), { label: 'Other', value: rest }]
+    slices = [...slices.slice(0, limit - 1), { label: t('Other'), value: rest, other: true }]
   }
   const total = slices.reduce((sum, s) => sum + s.value, 0)
   if (total <= 0)
     return (
-      <div className="odd-panel-message">Nothing to show — every value is zero or negative.</div>
+      <div className="odd-panel-message">
+        {t('Nothing to show: every value is zero or negative.')}
+      </div>
     )
 
   const narrow = size.width < 440
@@ -84,12 +95,20 @@ function Donut({ run, props }: { run: QueryRun; props: PieChartProps }) {
             const a0 = angle
             angle += (slice.value / total) * Math.PI * 2
             return (
+              // biome-ignore lint/a11y/noStaticElementInteractions: a pointer shortcut; the filter's own <select> is the keyboard path
               <path
                 key={slice.label}
                 d={arc(cx, cy, r, inner, a0, angle)}
                 fill={`var(--odd-series-${i + 1})`}
                 className="odd-slice"
-                data-dim={hover !== null && hover !== i ? '' : undefined}
+                data-dim={
+                  (hover !== null && hover !== i) ||
+                  (drill?.anyActive && !drill.isActive(slice.label))
+                    ? ''
+                    : undefined
+                }
+                data-drillable={(drill && !slice.other) || undefined}
+                onClick={drill && !slice.other ? () => drill.pick(slice.label) : undefined}
                 onPointerEnter={() => setHover(i)}
                 onPointerLeave={() => setHover(null)}
               />
@@ -105,7 +124,7 @@ function Donut({ run, props }: { run: QueryRun; props: PieChartProps }) {
             {centerText}
           </text>
           <text x={cx} y={cy + 14} textAnchor="middle" className="odd-donut-caption">
-            {active ? active.label : 'Total'}
+            {active ? active.label : t('Total')}
           </text>
         </svg>
       ) : null}
@@ -136,7 +155,7 @@ function Donut({ run, props }: { run: QueryRun; props: PieChartProps }) {
 }
 
 /** Part of a whole, at a glance. Six slices at most; for close values use a BarChart. */
-export function PieChart(props: PieChartProps) {
+function PieChartPanel(props: PieChartProps) {
   const state = useQuery(props.query)
   return (
     <PanelFrame {...props} component="PieChart" state={state} defaultHeight={300}>
@@ -144,3 +163,5 @@ export function PieChart(props: PieChartProps) {
     </PanelFrame>
   )
 }
+
+export const PieChart = editable('PieChart', PieChartPanel)

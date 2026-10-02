@@ -13,16 +13,16 @@ import {
 } from 'react'
 import type { ParamValue } from '../../config.js'
 import { HostContext, type HostContextValue } from '../../runtime/context.js'
+import { applyProps } from '../../runtime/convert.js'
+import { EditContext } from '../../runtime/edit.js'
+import { useT } from '../../runtime/i18n.js'
 import type { DashboardMeta, PanelInfo, QueryRun } from '../../runtime/types.js'
+import { DashboardHeader } from '../components/dashboard-header.js'
+import { SaveBar } from '../components/save-bar.js'
 import { api } from '../lib/api.js'
-import {
-  intervalLabel,
-  parseInterval,
-  REFRESH_OPTIONS,
-  readRefresh,
-  writeRefresh,
-} from '../lib/refresh.js'
-import { Inspector } from './inspector.js'
+import { parseInterval, REFRESH_OPTIONS, readRefresh, writeRefresh } from '../lib/refresh.js'
+import { useLayoutEdit } from '../lib/use-layout-edit.js'
+import { Inspector, type InspectorTab } from './inspector.js'
 
 interface Loaded {
   view: ReactNode
@@ -30,7 +30,7 @@ interface Loaded {
 }
 
 class Boundary extends Component<
-  { children: ReactNode; resetKey: unknown },
+  { children: ReactNode; resetKey: unknown; title: string },
   { error: Error | null }
 > {
   state = { error: null as Error | null }
@@ -48,7 +48,7 @@ class Boundary extends Component<
     if (this.state.error) {
       return (
         <div className="odd-callout odd-callout-error" role="alert">
-          <strong>This dashboard failed to render</strong>
+          <strong>{this.props.title}</strong>
           <pre>{this.state.error.message}</pre>
         </div>
       )
@@ -58,11 +58,14 @@ class Boundary extends Component<
 }
 
 function useDashboardModule(id: string): { loaded?: Loaded; error?: string } {
+  const t = useT()
   const [state, setState] = useState<{ loaded?: Loaded; error?: string }>({})
   useEffect(() => {
     const entry = dashboards.find((d) => d.id === id)
     if (!entry) {
-      setState({ error: `No dashboard "${id}". It should live at dashboards/${id}/index.tsx.` })
+      setState({
+        error: t('No dashboard "{id}". It should live at dashboards/{id}/index.tsx.', { id }),
+      })
       return
     }
     let live = true
@@ -77,7 +80,12 @@ function useDashboardModule(id: string): { loaded?: Loaded; error?: string } {
             : null
         if (!view) {
           setState({
-            error: `dashboards/${id}/index.tsx must default-export a component or a <Dashboard> element.`,
+            error: t(
+              'dashboards/{id}/index.tsx must default-export a component or a <Dashboard> element.',
+              {
+                id,
+              },
+            ),
           })
           return
         }
@@ -88,7 +96,7 @@ function useDashboardModule(id: string): { loaded?: Loaded; error?: string } {
     return () => {
       live = false
     }
-  }, [id])
+  }, [id, t])
   return state
 }
 
@@ -101,10 +109,64 @@ function timeOf(date: Date): string {
 }
 
 export function DashboardView({ id }: { id: string }) {
+  const t = useT()
   const { loaded, error } = useDashboardModule(id)
   const [tick, setTick] = useState(0)
   const [updatedAt, setUpdatedAt] = useState(() => new Date())
-  const [inspecting, setInspecting] = useState<{ panel: PanelInfo; run: QueryRun | undefined }>()
+  const [inspecting, setInspecting] = useState<{
+    panel: PanelInfo
+    run: QueryRun | undefined
+    tab?: InspectorTab
+  }>()
+  const configureRef = useRef<(title: string) => void>(() => {})
+  const onConfigure = useCallback((title: string) => configureRef.current(title), [])
+  const editor = useLayoutEdit(id, onConfigure)
+  configureRef.current = (title) => {
+    const source = editor.layout?.panels.find((p) => p.title === title)
+    if (!source) return
+    const staged = editor.editState.panels[title]
+    const props = applyProps(source.props, staged?.changes ?? {})
+    setInspecting({
+      panel: {
+        title,
+        component: staged?.component ?? source.component,
+        ...(typeof props.query === 'string' ? { query: props.query } : {}),
+      },
+      run: undefined,
+      tab: 'chart',
+    })
+  }
+
+  const { mode, edits, save, undo } = editor
+  useEffect(() => {
+    if (mode !== 'edit') return
+    const onKey = (event: KeyboardEvent) => {
+      const typing = (event.target as HTMLElement | null)?.closest(
+        'input, textarea, select, [contenteditable]',
+      )
+      if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === 's') {
+        event.preventDefault()
+        save()
+      } else if (
+        (event.metaKey || event.ctrlKey) &&
+        event.key.toLowerCase() === 'z' &&
+        !event.shiftKey &&
+        !typing
+      ) {
+        event.preventDefault()
+        undo()
+      }
+    }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [mode, save, undo])
+
+  useEffect(() => {
+    if (edits.length === 0) return
+    const warn = (event: BeforeUnloadEvent) => event.preventDefault()
+    window.addEventListener('beforeunload', warn)
+    return () => window.removeEventListener('beforeunload', warn)
+  }, [edits.length])
   const [notes, setNotes] = useState<{ line: number; text: string }[]>([])
   const params = useRef<Record<string, ParamValue>>({})
   const focus = useRef<{ panel?: string; query?: string }>({})
@@ -195,10 +257,9 @@ export function DashboardView({ id }: { id: string }) {
         if (!pending) {
           pending = api.query(id, name, values)
           inflight.current.set(key, pending)
-          pending.then(
-            () => setTimeout(() => inflight.current.delete(key), 0),
-            () => inflight.current.delete(key),
-          )
+          // Results are kept until the next refresh: a panel re-mounted by a
+          // move into another row reads them again instead of re-querying.
+          pending.catch(() => inflight.current.delete(key))
         }
         return pending
       },
@@ -212,51 +273,50 @@ export function DashboardView({ id }: { id: string }) {
       </div>
     )
   }
-  if (!loaded || !host) return <div className="odd-page odd-muted">Loading…</div>
+  if (!loaded || !host) return <div className="odd-page odd-muted">{t('Loading…')}</div>
 
   return (
     <HostContext.Provider value={host}>
-      <div className="odd-dashboard-page">
-        <div className="odd-toolbar">
-          {notes.length > 0 ? (
-            <span
-              className="odd-notes-pill"
-              title={notes.map((n) => `line ${n.line}: ${n.text}`).join('\n')}
-            >
-              {notes.length} note{notes.length === 1 ? '' : 's'} for your agent · /apply-comments
-            </span>
-          ) : null}
-          <span className="odd-muted">Updated {timeOf(updatedAt)}</span>
-          <label className="odd-refresh">
-            <span className="odd-sr-only">Auto-refresh</span>
-            <select
-              value={refreshSetting ?? 'off'}
-              onChange={(event) => chooseRefresh(event.target.value)}
-              title="Auto-refresh"
-            >
-              {refreshChoices.map((value) => (
-                <option key={value} value={value}>
-                  {value === 'off' ? 'Auto-refresh off' : intervalLabel(value)}
-                </option>
-              ))}
-            </select>
-          </label>
-          <button type="button" className="odd-button" onClick={refresh}>
-            Refresh
-          </button>
-        </div>
-        <Boundary resetKey={loaded}>{loaded.view}</Boundary>
-      </div>
-      {inspecting ? (
-        <Inspector
-          id={id}
-          panel={inspecting.panel}
-          initial={inspecting.run}
-          params={params.current}
-          onClose={() => setInspecting(undefined)}
-          onNote={loadNotes}
+      <EditContext.Provider value={editor.editState}>
+        <DashboardHeader
+          title={meta?.title ?? id}
+          updatedAt={timeOf(updatedAt)}
+          refreshSetting={refreshSetting ?? 'off'}
+          refreshChoices={refreshChoices}
+          onRefreshSetting={chooseRefresh}
+          onRefresh={refresh}
+          notes={notes}
+          mode={mode}
+          onMode={editor.setMode}
         />
-      ) : null}
+        <div className="odd-dashboard-page" data-editing={editor.editState.editing || undefined}>
+          <Boundary resetKey={loaded} title={t('This dashboard failed to render')}>
+            {loaded.view}
+          </Boundary>
+        </div>
+        {mode === 'edit' ? (
+          <SaveBar
+            file={editor.layout?.file}
+            count={edits.length}
+            status={editor.status}
+            onUndo={undo}
+            onDiscard={editor.discard}
+            onSave={save}
+            onReload={editor.reload}
+          />
+        ) : null}
+        {inspecting ? (
+          <Inspector
+            id={id}
+            panel={inspecting.panel}
+            initial={inspecting.run}
+            params={params.current}
+            onClose={() => setInspecting(undefined)}
+            onNote={loadNotes}
+            {...(inspecting.tab ? { tab: inspecting.tab } : {})}
+          />
+        ) : null}
+      </EditContext.Provider>
     </HostContext.Provider>
   )
 }

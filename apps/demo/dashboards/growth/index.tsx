@@ -4,6 +4,8 @@ import {
   Dashboard,
   type DashboardMeta,
   Filters,
+  FunnelChart,
+  Gauge,
   Row,
   Stat,
   Table,
@@ -13,7 +15,6 @@ import {
 
 export const meta: DashboardMeta = {
   title: '成長與流量',
-  description: '各來源的流量、註冊與轉換，以及新舊客的訂單結構。',
   locale: 'zh-TW',
   currency: 'USD',
   createdAt: '2026-10-02T00:00:00.000Z',
@@ -30,12 +31,26 @@ export default function Growth() {
         <Stat title="工作階段" query="funnel_totals" column="sessions" format="compact" />
         <Stat title="註冊數" query="funnel_totals" column="signups" format="integer" />
         <Stat title="付款訂單" query="funnel_totals" column="orders" format="integer" />
-        <Stat
-          title="訂單轉換率"
-          description="付款訂單 ÷ 工作階段"
-          query="funnel_totals"
-          column="conversion"
-          format="percent"
+        <Stat title="訂單轉換率" query="funnel_totals" column="conversion" format="percent" />
+      </Row>
+
+      <Row height={300}>
+        <FunnelChart
+          title="從造訪到回購"
+          query="funnel"
+          label="stage"
+          value="people"
+          format="integer"
+          span={8}
+        />
+        <Gauge
+          title="本月營收進度"
+          query="month_pace"
+          column="this_month"
+          target="last_month"
+          max="scale"
+          format="currencyCompact"
+          span={4}
         />
       </Row>
 

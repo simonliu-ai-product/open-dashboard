@@ -95,7 +95,6 @@ import {
 
 export const meta: DashboardMeta = {
   title: 'Sales overview',
-  description: 'Paid revenue and orders. Refunds excluded.',
   refresh: '5m',          // default auto-refresh: '30s' | '1m' | '5m' | '1h' — the reader can change it
   currency: 'USD',        // for 'currency' formats
   locale: 'en-US',        // numbers and dates; e.g. 'zh-TW', 'ja-JP'
@@ -140,6 +139,24 @@ export default function SalesOverview() {
 
 Every component, every prop: [references/components.md](references/components.md).
 
+## Edits made on the page
+
+The viewer has a **Preview / Edit** switch. In Edit, people resize panels,
+reorder them within a row, and change a chart's type, columns, format and
+`drill` — and Save writes those changes into `index.tsx` as ordinary props
+(`span`, `height`, `x`, `y`, `format`…) and element order.
+
+- **Re-read `index.tsx` before every edit.** It may have changed since you last
+  looked. Never restore a `span`, `height` or type the person set on the page
+  unless they ask.
+- People can also move panels between rows and move whole rows up or down;
+  Save rewrites the JSX order and removes a `<Row>` emptied by a move.
+- The page only edits literal props on panels with a literal, unique `title`.
+  Write props as literals (`span={6}`, not `span={half}`) wherever a person
+  might want to adjust them.
+- Saving is refused if the file changed after the page read it, so your edits
+  are never overwritten — but keep each edit small and the file parseable.
+
 ## Layout
 
 - `<Row>` is a 12-column band. Children split it evenly unless they set `span`
@@ -173,9 +190,33 @@ Every component, every prop: [references/components.md](references/components.md
 | change over time | `<LineChart>`; `<AreaChart stacked>` if the series add up to a whole |
 | compare categories | `<BarChart>`; `horizontal` for rankings / long names / > 8 bars |
 | part of a whole, ≤ 6 parts | `<PieChart>` (a donut). Close values → use a BarChart |
+| part of a whole, many parts | `<Treemap>` |
+| two measures against each other | `<ScatterChart>` (`size` for a third → bubbles) |
+| intensity across two categories | `<Heatmap>` (weekday × hour, region × month) |
+| drop-off through ordered stages | `<FunnelChart>` |
+| one value against a scale or target | `<Gauge>`; without a target, `<Stat>` is usually clearer |
 | composition over time | `<BarChart stacked>` (few periods) or `<AreaChart stacked>` (many) |
-| look things up | `<Table>` |
-| a definition or caveat | `<Text>` |
+| a ranking on a tight range | `<DotPlot>` (bars from zero would all look alike) |
+| before → after per category | `<Dumbbell>`; `<SlopeChart>` when "who rose, who fell" is the point |
+| actual against target, several rows | `<BulletChart>` |
+| signed change per category | `<DivergingBar>` |
+| group sizes and their mix at once | `<Marimekko>` |
+| rank changes over time | `<BumpChart>` |
+| how a start became an end | `<Waterfall>` |
+| a daily pattern over a year | `<CalendarHeatmap>` |
+| many series over time (> 4 lines) | `<SmallMultiples>`; dozens in little space → `<HorizonChart>` |
+| a trend with its spread or interval | `<BandChart>` |
+| is this process stable / which days are abnormal | `<ControlChart>` |
+| jobs, tasks or bookings in time | `<Timeline>` |
+| open / high / low / close | `<Candlestick>` |
+| how values are spread | `<Histogram>`; per group → `<BoxPlot>`; small samples → `<StripPlot>`; "N % are under X" → `<EcdfChart>` |
+| how concentrated (top 20 % hold…) | `<ParetoChart>` |
+| flows between stages | `<Sankey>` (a single path of drop-off → `<FunnelChart>`) |
+| retention by cohort | `<CohortTable>` |
+| overlaps between sets | `<UpSetChart>` |
+| values by region | `<ChoroplethMap>` (needs GeoJSON); every region equally visible → `<TileMap>`; points → `<SymbolMap>` |
+| up / down / degraded over time | `<StateTimeline>` |
+| look things up | `<Table>`; a cross-tab → `<PivotTable>` |
 
 Rules that are not taste:
 
@@ -223,7 +264,9 @@ before you hand a dashboard back.**
 ## Self-review
 
 - [ ] Every number traces to a query; nothing is hard-coded.
-- [ ] Each metric's definition is stated where a reader can see it (`description` or `<Text>`).
+- [ ] Each metric's definition is in its query's `-- description:` line, not on the page.
+- [ ] No `description` on panels, sections or `meta`, and no `<Text>` explaining the
+      charts — titles and axes carry the meaning. Add them only when the user asks.
 - [ ] Time filters use `>= :from AND < :to`; selects use `(:x IS NULL OR …)`.
 - [ ] Default time range has data in it (`check` shows rows).
 - [ ] The current, partial period is handled: say so, or exclude it.

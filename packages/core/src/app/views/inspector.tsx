@@ -1,9 +1,20 @@
 import { useEffect, useState } from 'react'
 import type { ParamValue } from '../../config.js'
+import { useEdit } from '../../runtime/edit.js'
+import { useT } from '../../runtime/i18n.js'
 import type { PanelInfo, QueryRun } from '../../runtime/types.js'
+import { ChartSettings } from '../components/chart-settings.js'
 import { api } from '../lib/api.js'
 
-type Tab = 'data' | 'sql' | 'params'
+export type InspectorTab = 'chart' | 'data' | 'sql' | 'params'
+type Tab = InspectorTab
+
+const TAB_LABELS: Record<Tab, string> = {
+  chart: 'Chart',
+  data: 'Data',
+  sql: 'SQL',
+  params: 'Params',
+}
 
 export function Inspector(props: {
   id: string
@@ -12,11 +23,18 @@ export function Inspector(props: {
   params: Record<string, ParamValue>
   onClose: () => void
   onNote: () => void
+  tab?: InspectorTab
 }) {
   const { id, panel, initial, params, onClose, onNote } = props
+  const t = useT()
+  const edit = useEdit()
   const [run, setRun] = useState(initial)
   const [error, setError] = useState<string>()
-  const [tab, setTab] = useState<Tab>('data')
+  const [tab, setTab] = useState<Tab>(props.tab ?? 'data')
+  // biome-ignore lint/correctness/useExhaustiveDependencies: a newly inspected panel re-applies the requested tab
+  useEffect(() => {
+    if (props.tab) setTab(props.tab)
+  }, [props.tab, panel])
   const [note, setNote] = useState('')
   const [saved, setSaved] = useState<string>()
   const [saving, setSaving] = useState(false)
@@ -43,12 +61,15 @@ export function Inspector(props: {
     try {
       const where = await api.comment(id, panel.title, note)
       setSaved(
-        `Saved beside the panel in ${where.file}:${where.line}. Ask your agent to /apply-comments.`,
+        t('Saved beside the panel in {file}:{line}. Ask your agent to /apply-comments.', {
+          file: where.file,
+          line: where.line,
+        }),
       )
       setNote('')
       onNote()
     } catch (e) {
-      setSaved(`Could not save: ${(e as Error).message}`)
+      setSaved(t('Could not save: {error}', { error: (e as Error).message }))
     } finally {
       setSaving(false)
     }
@@ -61,14 +82,16 @@ export function Inspector(props: {
     <aside className="odd-inspector" aria-label={`Inspect ${panel.title}`}>
       <header className="odd-inspector-head">
         <div>
-          <span className="odd-muted">{panel.component}</span>
+          <span className="odd-muted">
+            {edit.panels[panel.title]?.component ?? panel.component}
+          </span>
           <h2>{panel.title}</h2>
         </div>
         <button
           type="button"
           className="odd-icon-button"
           onClick={onClose}
-          aria-label="Close inspector"
+          aria-label={t('Close inspector')}
         >
           ✕
         </button>
@@ -77,28 +100,28 @@ export function Inspector(props: {
       {run ? (
         <dl className="odd-facts">
           <div>
-            <dt>Query</dt>
+            <dt>{t('Query')}</dt>
             <dd>
               <code>{run.query.name}</code>
             </dd>
           </div>
           <div>
-            <dt>Source</dt>
+            <dt>{t('Source')}</dt>
             <dd>{run.query.source}</dd>
           </div>
           <div>
-            <dt>Rows</dt>
+            <dt>{t('Rows')}</dt>
             <dd>
               {rows.length.toLocaleString()}
-              {run.result.truncated ? ' (truncated)' : ''}
+              {run.result.truncated ? ` ${t('(truncated)')}` : ''}
             </dd>
           </div>
           <div>
-            <dt>Time</dt>
+            <dt>{t('Time')}</dt>
             <dd>{run.result.elapsedMs.toFixed(1)} ms</dd>
           </div>
           <div className="odd-facts-wide">
-            <dt>Defined in</dt>
+            <dt>{t('Defined in')}</dt>
             <dd>
               <code>
                 {run.query.file}:{run.query.line}
@@ -109,28 +132,30 @@ export function Inspector(props: {
       ) : error ? (
         <p className="odd-callout odd-callout-error">{error}</p>
       ) : panel.query ? (
-        <p className="odd-muted">Running…</p>
+        <p className="odd-muted">{t('Running…')}</p>
       ) : (
-        <p className="odd-muted">This panel has no query.</p>
+        <p className="odd-muted">{t('This panel has no query.')}</p>
       )}
 
       {run ? (
         <>
           <div className="odd-tabs odd-tabs-small" role="tablist">
-            {(['data', 'sql', 'params'] as Tab[]).map((t) => (
+            {(['chart', 'data', 'sql', 'params'] as Tab[]).map((name) => (
               <button
-                key={t}
+                key={name}
                 type="button"
                 role="tab"
-                aria-selected={tab === t}
-                onClick={() => setTab(t)}
+                aria-selected={tab === name}
+                onClick={() => setTab(name)}
               >
-                {t === 'data' ? 'Data' : t === 'sql' ? 'SQL' : 'Params'}
+                {t(TAB_LABELS[name])}
               </button>
             ))}
           </div>
           <div className="odd-inspector-body">
-            {tab === 'data' ? (
+            {tab === 'chart' ? (
+              <ChartSettings title={panel.title} columns={run.result.columns} />
+            ) : tab === 'data' ? (
               <div className="odd-table-wrap">
                 <table className="odd-table odd-table-dense">
                   <thead>
@@ -177,12 +202,12 @@ export function Inspector(props: {
           submit()
         }}
       >
-        <label htmlFor="odd-note">Note for your agent</label>
+        <label htmlFor="odd-note">{t('Note for your agent')}</label>
         <textarea
           id="odd-note"
           rows={3}
           value={note}
-          placeholder="e.g. show this per week instead, and split by channel"
+          placeholder={t('e.g. show this per week instead, and split by channel')}
           onChange={(e) => setNote(e.target.value)}
           onKeyDown={(e) => {
             if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) submit()
@@ -192,14 +217,14 @@ export function Inspector(props: {
           {saved ? (
             <span className="odd-muted">{saved}</span>
           ) : (
-            <span className="odd-muted">Written into the source as @dashboard-comment</span>
+            <span className="odd-muted">{t('Written into the source beside the panel')}</span>
           )}
           <button
             type="submit"
             className="odd-button odd-button-primary"
             disabled={saving || !note.trim()}
           >
-            Leave note
+            {t('Leave note')}
           </button>
         </div>
       </form>

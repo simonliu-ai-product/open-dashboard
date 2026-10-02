@@ -18,8 +18,10 @@
   --odd-good: #006300;
   --odd-bad: #b42f2f;
   --odd-critical: #d03b3b;
+  --odd-warning: #fab219;
   --odd-warning-bg: #fff4dc;
   --odd-shadow: 0 1px 2px rgba(11, 11, 11, 0.04), 0 8px 24px rgba(11, 11, 11, 0.06);
+  --odd-lift: 0 2px 6px rgba(11, 11, 11, 0.08), 0 22px 48px rgba(11, 11, 11, 0.18);
 
   --odd-series-1: #2a78d6;
   --odd-series-2: #eb6834;
@@ -29,6 +31,14 @@
   --odd-series-6: #008300;
   --odd-series-7: #4a3aa7;
   --odd-series-8: #e34948;
+  --odd-series-1-ink: #0b0b0b;
+  --odd-series-2-ink: #0b0b0b;
+  --odd-series-3-ink: #0b0b0b;
+  --odd-series-4-ink: #0b0b0b;
+  --odd-series-5-ink: #0b0b0b;
+  --odd-series-6-ink: #ffffff;
+  --odd-series-7-ink: #ffffff;
+  --odd-series-8-ink: #0b0b0b;
 
   --odd-font: system-ui, -apple-system, "Segoe UI", "Noto Sans TC", "PingFang TC", sans-serif;
   --odd-mono: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
@@ -56,8 +66,10 @@
     --odd-good: #0ca30c;
     --odd-bad: #e66767;
     --odd-critical: #e66767;
+    --odd-warning: #fab219;
     --odd-warning-bg: #3a2e12;
     --odd-shadow: 0 1px 2px rgba(0, 0, 0, 0.4), 0 8px 24px rgba(0, 0, 0, 0.35);
+    --odd-lift: 0 2px 8px rgba(0, 0, 0, 0.5), 0 24px 56px rgba(0, 0, 0, 0.6);
     --odd-series-1: #3987e5;
     --odd-series-2: #d95926;
     --odd-series-3: #199e70;
@@ -66,6 +78,14 @@
     --odd-series-6: #008300;
     --odd-series-7: #9085e9;
     --odd-series-8: #e66767;
+    --odd-series-1-ink: #0b0b0b;
+    --odd-series-2-ink: #0b0b0b;
+    --odd-series-3-ink: #0b0b0b;
+    --odd-series-4-ink: #0b0b0b;
+    --odd-series-5-ink: #0b0b0b;
+    --odd-series-6-ink: #ffffff;
+    --odd-series-7-ink: #0b0b0b;
+    --odd-series-8-ink: #0b0b0b;
   }
 }
 
@@ -89,8 +109,10 @@
   --odd-good: #0ca30c;
   --odd-bad: #e66767;
   --odd-critical: #e66767;
+  --odd-warning: #fab219;
   --odd-warning-bg: #3a2e12;
   --odd-shadow: 0 1px 2px rgba(0, 0, 0, 0.4), 0 8px 24px rgba(0, 0, 0, 0.35);
+  --odd-lift: 0 2px 8px rgba(0, 0, 0, 0.5), 0 24px 56px rgba(0, 0, 0, 0.6);
   --odd-series-1: #3987e5;
   --odd-series-2: #d95926;
   --odd-series-3: #199e70;
@@ -99,6 +121,14 @@
   --odd-series-6: #008300;
   --odd-series-7: #9085e9;
   --odd-series-8: #e66767;
+  --odd-series-1-ink: #0b0b0b;
+  --odd-series-2-ink: #0b0b0b;
+  --odd-series-3-ink: #0b0b0b;
+  --odd-series-4-ink: #0b0b0b;
+  --odd-series-5-ink: #0b0b0b;
+  --odd-series-6-ink: #ffffff;
+  --odd-series-7-ink: #0b0b0b;
+  --odd-series-8-ink: #0b0b0b;
 }
 
 *,
@@ -224,12 +254,26 @@ button {
 }
 
 .odd-nav-heading {
-  margin: 16px 10px 4px;
-  font-size: 11.5px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 18px 10px 6px;
+  font-size: 12.5px;
   font-weight: 600;
-  letter-spacing: 0.04em;
-  text-transform: uppercase;
+  color: var(--odd-ink-2);
+}
+
+.odd-count {
+  min-width: 20px;
+  padding: 0 6px;
+  border-radius: 999px;
+  background: var(--odd-hover);
   color: var(--odd-muted);
+  font-size: 11px;
+  font-weight: 560;
+  line-height: 18px;
+  text-align: center;
+  font-variant-numeric: tabular-nums;
 }
 
 .odd-nav-empty {
@@ -237,32 +281,176 @@ button {
   color: var(--odd-muted);
 }
 
-.odd-theme {
+/* Settings: theme + language, opening upward from the sidebar foot */
+
+.odd-settings {
+  position: relative;
+}
+
+.odd-settings-trigger {
   display: flex;
-  gap: 2px;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  padding: 8px 10px;
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--odd-ink-2);
+  text-align: left;
+  cursor: pointer;
+}
+
+.odd-settings-trigger:hover,
+.odd-settings-trigger[aria-expanded="true"] {
+  background: var(--odd-hover);
+  color: var(--odd-ink);
+}
+
+.odd-settings-label {
+  font-weight: 560;
+}
+
+.odd-settings-current {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  margin-left: auto;
+  color: var(--odd-muted);
+  font-size: 12px;
+}
+
+.odd-settings-current svg {
+  width: 13px;
+  height: 13px;
+}
+
+.odd-settings-trigger > svg:last-child {
+  color: var(--odd-muted);
+  transition: transform 160ms ease;
+}
+
+.odd-settings-trigger[aria-expanded="false"] > svg:last-child {
+  transform: rotate(180deg);
+}
+
+.odd-settings-panel {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: calc(100% + 6px);
+  z-index: 30;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  padding: 12px;
+  border-radius: 10px;
+  background: var(--odd-surface);
+  box-shadow:
+    0 0 0 1px var(--odd-border-strong),
+    var(--odd-shadow);
+  transform-origin: bottom center;
+  animation: odd-pop 140ms ease-out;
+}
+
+@keyframes odd-pop {
+  from {
+    opacity: 0;
+    transform: translateY(4px) scale(0.98);
+  }
+}
+
+.odd-settings-group {
   margin: 0;
+  padding: 0;
   border: 0;
   min-width: 0;
+}
+
+.odd-settings-group legend {
+  margin-bottom: 6px;
+  padding: 0;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--odd-muted);
+}
+
+.odd-segmented {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 2px;
   padding: 2px;
   border-radius: 8px;
   background: var(--odd-hover);
 }
 
-.odd-theme button {
-  flex: 1;
-  border: 0;
+.odd-segment {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 3px;
+  padding: 6px 0 5px;
   border-radius: 6px;
-  padding: 4px 0;
-  background: none;
   color: var(--odd-muted);
-  font-size: 12px;
+  font-size: 11.5px;
   cursor: pointer;
 }
 
-.odd-theme button[aria-pressed="true"] {
+.odd-segment:hover {
+  color: var(--odd-ink);
+}
+
+.odd-segment:has(input:checked) {
   background: var(--odd-surface);
   color: var(--odd-ink);
   box-shadow: 0 0 0 1px var(--odd-border);
+}
+
+.odd-segment:has(input:focus-visible),
+.odd-option:has(input:focus-visible) {
+  outline: 2px solid var(--odd-accent);
+  outline-offset: 1px;
+}
+
+.odd-segment input,
+.odd-option input {
+  position: absolute;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.odd-options {
+  display: flex;
+  flex-direction: column;
+}
+
+.odd-option {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 6px 8px;
+  border-radius: 6px;
+  color: var(--odd-ink-2);
+  cursor: pointer;
+}
+
+.odd-option:hover {
+  background: var(--odd-hover);
+  color: var(--odd-ink);
+}
+
+.odd-option svg {
+  color: var(--odd-accent);
+  visibility: hidden;
+}
+
+.odd-option:has(input:checked) {
+  color: var(--odd-ink);
+  font-weight: 560;
+}
+
+.odd-option:has(input:checked) svg {
+  visibility: visible;
 }
 
 .odd-main {
@@ -273,105 +461,205 @@ button {
 
 .odd-page {
   max-width: 1120px;
+  margin-inline: auto;
   padding: 32px 32px 64px;
 }
 
 .odd-page-head h1 {
   margin: 0 0 6px;
-  font-size: 24px;
+  font-size: 26px;
   font-weight: 650;
-  letter-spacing: -0.015em;
+  letter-spacing: -0.018em;
+  line-height: 1.2;
 }
 
 .odd-page-head p {
-  margin: 0 0 24px;
+  margin: 0 0 28px;
   color: var(--odd-ink-2);
-  max-width: 64ch;
+  max-width: 62ch;
 }
 
-.odd-cards {
+/* Home */
+
+.odd-home {
+  max-width: 1320px;
+}
+
+.odd-home-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
-  gap: 12px;
-  margin-bottom: 32px;
+  grid-template-columns: minmax(0, 1fr) 320px;
+  gap: 32px;
+  align-items: start;
 }
 
-.odd-card {
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-  padding: 16px;
+.odd-boards {
+  margin: 0;
+  padding: 0;
+  list-style: none;
   border-radius: var(--odd-radius);
   background: var(--odd-surface);
   box-shadow: 0 0 0 1px var(--odd-border);
+  overflow: hidden;
+}
+
+.odd-boards li + li {
+  border-top: 1px solid var(--odd-grid);
+}
+
+.odd-board {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 24px;
+  padding: 18px 20px;
   text-decoration: none;
-  transition: box-shadow 120ms ease;
 }
 
-a.odd-card:hover {
-  box-shadow:
-    0 0 0 1px var(--odd-border-strong),
-    var(--odd-shadow);
+.odd-board:hover {
+  background: var(--odd-hover);
 }
 
-.odd-card h2 {
+.odd-board:focus-visible {
+  outline-offset: -2px;
+}
+
+.odd-board-main {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+}
+
+.odd-board-title {
+  font-size: 15.5px;
+  font-weight: 620;
+  letter-spacing: -0.005em;
+}
+
+.odd-board-desc {
+  max-width: 68ch;
+  color: var(--odd-ink-2);
+  font-size: 13.5px;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.odd-board-meta {
+  display: grid;
+  grid-template-columns: 56px 112px 116px;
+  gap: 16px;
+  margin: 0;
+}
+
+.odd-board-meta div {
+  min-width: 0;
+}
+
+.odd-board-meta dt {
+  color: var(--odd-muted);
+  font-size: 11.5px;
+}
+
+.odd-board-meta dd {
+  margin: 2px 0 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 13px;
+  font-variant-numeric: tabular-nums;
+}
+
+.odd-empty {
+  padding: 32px 24px;
+  border: 1px dashed var(--odd-border-strong);
+  border-radius: var(--odd-radius);
+}
+
+.odd-empty h2 {
+  margin: 0 0 6px;
+  font-size: 16px;
+  font-weight: 620;
+}
+
+.odd-empty p {
+  margin: 0;
+  max-width: 60ch;
+  color: var(--odd-ink-2);
+}
+
+.odd-rail {
+  display: flex;
+  flex-direction: column;
+  gap: 28px;
+}
+
+.odd-rail-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 10px;
+}
+
+.odd-rail-head h2 {
   margin: 0;
   font-size: 15px;
   font-weight: 620;
 }
 
-.odd-card p {
-  margin: 0;
-  color: var(--odd-ink-2);
+.odd-rail-head a {
+  color: var(--odd-accent-ink);
+  font-size: 12.5px;
+  text-decoration: none;
 }
 
-.odd-card-meta {
-  margin-top: auto;
-  padding-top: 8px;
+.odd-rail-head a:hover {
+  text-decoration: underline;
+}
+
+.odd-sources,
+.odd-commands {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.odd-source {
+  display: grid;
+  grid-template-columns: 12px minmax(0, 1fr) auto;
+  align-items: baseline;
+  column-gap: 8px;
+  row-gap: 2px;
+  padding: 10px 12px;
+  border-radius: 8px;
+  background: var(--odd-surface);
+  box-shadow: 0 0 0 1px var(--odd-border);
+  text-decoration: none;
+}
+
+.odd-source:hover {
+  box-shadow: 0 0 0 1px var(--odd-border-strong);
+}
+
+.odd-source-name {
+  font-weight: 600;
+}
+
+.odd-source-type {
   color: var(--odd-muted);
   font-size: 12px;
 }
 
-.odd-card-empty {
-  border: 1px dashed var(--odd-border-strong);
-  box-shadow: none;
-  background: transparent;
-}
-
-.odd-split {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
-  gap: 24px;
-}
-
-.odd-block h2 {
-  margin: 0 0 12px;
-  font-size: 13px;
-  font-weight: 600;
-  letter-spacing: 0.02em;
-  text-transform: uppercase;
-  color: var(--odd-muted);
-}
-
-.odd-source-list,
-.odd-prompts {
-  list-style: none;
-  margin: 0;
-  padding: 0;
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-}
-
-.odd-source-list li {
-  display: grid;
-  grid-template-columns: auto auto 1fr;
-  column-gap: 8px;
-  align-items: baseline;
-}
-
 .odd-source-detail {
   grid-column: 2 / -1;
+  display: flex;
+  align-items: center;
+  gap: 6px;
   color: var(--odd-muted);
   font-size: 12.5px;
   overflow-wrap: anywhere;
@@ -386,18 +674,67 @@ a.odd-card:hover {
   color: var(--odd-critical);
 }
 
-.odd-prompts li {
+.odd-command {
   display: flex;
   flex-direction: column;
-  gap: 2px;
+  gap: 4px;
+  width: 100%;
   padding: 10px 12px;
+  border: 0;
   border-radius: 8px;
   background: var(--odd-surface);
   box-shadow: 0 0 0 1px var(--odd-border);
+  text-align: left;
+  cursor: pointer;
 }
 
-.odd-prompts span {
+.odd-command:hover {
+  box-shadow: 0 0 0 1px var(--odd-border-strong);
+}
+
+.odd-command-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.odd-command code {
+  font-size: 13px;
+  font-weight: 560;
+  color: var(--odd-ink);
+}
+
+.odd-command-copy {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  color: var(--odd-muted);
+  font-size: 12px;
+  opacity: 0;
+  transition: opacity 120ms ease;
+}
+
+.odd-command:hover .odd-command-copy,
+.odd-command:focus-visible .odd-command-copy,
+.odd-command-copy[data-copied] {
+  opacity: 1;
+}
+
+.odd-command-copy svg {
+  width: 13px;
+  height: 13px;
+}
+
+.odd-command-text {
   color: var(--odd-ink-2);
+  font-size: 13px;
+}
+
+@media (hover: none) {
+  .odd-command-copy {
+    opacity: 1;
+  }
 }
 
 .odd-callout {
@@ -580,16 +917,732 @@ a.odd-card:hover {
 /* Dashboard */
 
 .odd-dashboard-page {
-  padding: 16px 24px 48px;
+  padding: 20px 24px 96px;
 }
 
-.odd-toolbar {
+/* Dashboard header: where you are, what you can do, and the mode switch */
+
+.odd-header {
+  position: sticky;
+  top: 0;
+  z-index: 15;
   display: flex;
-  justify-content: flex-end;
   align-items: center;
-  gap: 12px;
-  min-height: 30px;
+  justify-content: space-between;
+  gap: 16px;
+  min-height: 52px;
+  padding: 8px 24px;
+  background: color-mix(in srgb, var(--odd-page) 88%, transparent);
+  backdrop-filter: blur(8px);
+  border-bottom: 1px solid var(--odd-border);
+}
+
+.odd-header[data-mode="edit"] {
+  box-shadow: inset 0 -2px 0 var(--odd-accent);
+}
+
+.odd-crumbs {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  font-size: 13.5px;
+}
+
+.odd-crumbs a {
+  color: var(--odd-muted);
+  text-decoration: none;
+  white-space: nowrap;
+}
+
+.odd-crumbs a:hover {
+  color: var(--odd-ink);
+}
+
+.odd-crumbs > span[aria-hidden] {
+  color: var(--odd-axis);
+}
+
+.odd-crumbs [aria-current] {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-weight: 600;
+}
+
+.odd-header-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}
+
+.odd-header-updated {
+  color: var(--odd-muted);
   font-size: 12.5px;
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+}
+
+.odd-header-icon {
+  width: 30px;
+  height: 30px;
+  box-shadow: 0 0 0 1px var(--odd-border-strong);
+  background: var(--odd-surface);
+  color: var(--odd-ink-2);
+}
+
+.odd-mode {
+  display: flex;
+  gap: 2px;
+  margin: 0 0 0 4px;
+  padding: 2px;
+  border: 0;
+  border-radius: 8px;
+  background: var(--odd-hover);
+  min-width: 0;
+}
+
+.odd-mode button {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 10px;
+  border: 0;
+  border-radius: 6px;
+  background: none;
+  color: var(--odd-muted);
+  font-size: 12.5px;
+  cursor: pointer;
+}
+
+.odd-mode button:hover {
+  color: var(--odd-ink);
+}
+
+.odd-mode button[aria-pressed="true"] {
+  background: var(--odd-surface);
+  color: var(--odd-ink);
+  font-weight: 560;
+  box-shadow: 0 0 0 1px var(--odd-border);
+}
+
+.odd-header[data-mode="edit"] .odd-mode button[aria-pressed="true"] {
+  background: var(--odd-accent);
+  color: #fff;
+  box-shadow: none;
+}
+
+/* Edit mode on the grid */
+
+.odd-dashboard-page[data-editing] .odd-panel[data-editing] {
+  box-shadow:
+    0 0 0 1px var(--odd-border),
+    0 0 0 4px transparent;
+  outline: 1px dashed var(--odd-border-strong);
+  outline-offset: 3px;
+}
+
+.odd-dashboard-page[data-editing] .odd-panel[data-editing]:hover,
+.odd-panel[data-resizing],
+.odd-panel[data-dragging] {
+  outline-color: var(--odd-accent);
+}
+
+.odd-panel[data-dragging] {
+  z-index: 20;
+  outline-color: var(--odd-accent);
+  box-shadow:
+    0 0 0 1px var(--odd-border-strong),
+    var(--odd-lift);
+  cursor: grabbing;
+  will-change: transform;
+}
+
+.odd-panel[data-resizing] {
+  z-index: 6;
+  box-shadow:
+    0 0 0 1px var(--odd-accent),
+    var(--odd-shadow);
+}
+
+.odd-row {
+  position: relative;
+}
+
+.odd-row-grip {
+  position: absolute;
+  top: 50%;
+  left: -22px;
+  z-index: 3;
+  display: grid;
+  place-items: center;
+  width: 18px;
+  height: 28px;
+  margin-top: -14px;
+  padding: 0;
+  border: 0;
+  border-radius: 5px;
+  background: var(--odd-surface);
+  box-shadow: 0 0 0 1px var(--odd-border-strong);
+  color: var(--odd-muted);
+  cursor: grab;
+  touch-action: none;
+  opacity: 0.55;
+  transition: opacity 120ms ease;
+}
+
+.odd-row-grip svg {
+  transform: rotate(90deg);
+}
+
+.odd-row:hover > .odd-row-grip,
+.odd-row-grip:focus-visible,
+.odd-row[data-dragging] > .odd-row-grip {
+  opacity: 1;
+  color: var(--odd-ink);
+}
+
+.odd-row[data-dragging] {
+  z-index: 20;
+  opacity: 0.88;
+  border-radius: calc(var(--odd-radius) + 4px);
+  background: color-mix(in srgb, var(--odd-page) 70%, transparent);
+  box-shadow: var(--odd-lift);
+  outline: 1px dashed var(--odd-accent);
+  outline-offset: 4px;
+  will-change: transform;
+}
+
+.odd-insert-caret {
+  position: fixed;
+  z-index: 30;
+  border-radius: 2px;
+  background: var(--odd-accent);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--odd-accent) 22%, transparent);
+  pointer-events: none;
+  transition:
+    left 120ms ease-out,
+    top 120ms ease-out;
+}
+
+.odd-drop-target {
+  position: fixed;
+  z-index: 4;
+  border: 2px dashed var(--odd-accent);
+  border-radius: var(--odd-radius);
+  background: color-mix(in srgb, var(--odd-accent) 8%, transparent);
+  pointer-events: none;
+  transition:
+    left 160ms cubic-bezier(0.2, 0.8, 0.2, 1),
+    top 160ms cubic-bezier(0.2, 0.8, 0.2, 1),
+    width 120ms ease-out,
+    height 120ms ease-out;
+}
+
+.odd-drop-target[data-kind="size"] {
+  z-index: 30;
+  background: none;
+}
+
+.odd-panel[data-editing] .odd-panel-actions {
+  opacity: 1;
+}
+
+.odd-grip {
+  display: inline-grid;
+  place-items: center;
+  width: 18px;
+  height: 22px;
+  margin: -2px 2px 0 -6px;
+  padding: 0;
+  border: 0;
+  border-radius: 4px;
+  background: none;
+  color: var(--odd-muted);
+  cursor: grab;
+  touch-action: none;
+}
+
+.odd-grip:hover {
+  background: var(--odd-hover);
+  color: var(--odd-ink);
+}
+
+.odd-handle {
+  position: absolute;
+  z-index: 4;
+  touch-action: none;
+}
+
+.odd-handle-e {
+  top: 12px;
+  right: -4px;
+  bottom: 12px;
+  width: 10px;
+  cursor: ew-resize;
+}
+
+.odd-handle-s {
+  left: 12px;
+  right: 12px;
+  bottom: -4px;
+  height: 10px;
+  cursor: ns-resize;
+}
+
+.odd-handle-se {
+  right: -4px;
+  bottom: -4px;
+  width: 16px;
+  height: 16px;
+  cursor: nwse-resize;
+}
+
+.odd-handle-se::after {
+  content: "";
+  position: absolute;
+  right: 7px;
+  bottom: 7px;
+  width: 7px;
+  height: 7px;
+  border-right: 2px solid var(--odd-muted);
+  border-bottom: 2px solid var(--odd-muted);
+  border-radius: 0 0 2px 0;
+}
+
+.odd-handle-e:hover,
+.odd-handle-s:hover {
+  background: color-mix(in srgb, var(--odd-accent) 18%, transparent);
+  border-radius: 4px;
+}
+
+.odd-size-badge {
+  position: absolute;
+  top: 10px;
+  right: 12px;
+  z-index: 5;
+  padding: 2px 8px;
+  border-radius: 999px;
+  background: var(--odd-accent);
+  color: #fff;
+  font-size: 12px;
+  font-weight: 560;
+  font-variant-numeric: tabular-nums;
+  pointer-events: none;
+}
+
+body.odd-dragging,
+body.odd-dragging * {
+  user-select: none;
+  cursor: grabbing;
+}
+
+/* Save bar */
+
+.odd-savebar {
+  position: fixed;
+  left: calc(232px + (100vw - 232px) / 2);
+  bottom: 20px;
+  z-index: 25;
+  transform: translateX(-50%);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  max-width: calc(100vw - 232px - 48px);
+  padding: 8px 8px 8px 16px;
+  border-radius: 12px;
+  background: var(--odd-surface);
+  box-shadow:
+    0 0 0 1px var(--odd-border-strong),
+    var(--odd-shadow);
+  font-size: 13px;
+}
+
+.odd-savebar-message {
+  color: var(--odd-ink-2);
+  padding-right: 8px;
+}
+
+.odd-savebar[data-dirty] .odd-savebar-message {
+  color: var(--odd-ink);
+  font-weight: 560;
+}
+
+.odd-savebar[data-status="error"],
+.odd-savebar[data-status="blocked"] {
+  box-shadow:
+    inset 3px 0 0 var(--odd-critical),
+    0 0 0 1px var(--odd-border-strong),
+    var(--odd-shadow);
+}
+
+.odd-savebar[data-status="blocked"] {
+  animation: odd-nudge 260ms ease;
+}
+
+@keyframes odd-nudge {
+  25% {
+    transform: translateX(calc(-50% - 6px));
+  }
+  75% {
+    transform: translateX(calc(-50% + 6px));
+  }
+}
+
+.odd-savebar .odd-button {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  white-space: nowrap;
+}
+
+.odd-button-ghost {
+  background: transparent;
+  box-shadow: none;
+}
+
+.odd-button-ghost:hover {
+  background: var(--odd-hover);
+}
+
+.odd-savebar kbd {
+  padding: 0 4px;
+  border-radius: 4px;
+  background: rgba(255, 255, 255, 0.18);
+  font-family: var(--odd-font);
+  font-size: 10.5px;
+}
+
+/* Chart settings */
+
+.odd-chart-settings {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  padding: 4px 2px 8px;
+}
+
+.odd-chart-settings .odd-callout {
+  margin: 0;
+  font-size: 13px;
+  color: var(--odd-ink-2);
+}
+
+.odd-field {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  min-width: 0;
+  font-size: 12.5px;
+}
+
+.odd-field > span,
+.odd-field > legend {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  padding: 0;
+  margin-bottom: 2px;
+  color: var(--odd-muted);
+  font-weight: 560;
+}
+
+.odd-field select,
+.odd-field input[type="number"] {
+  width: 100%;
+  padding: 6px 10px;
+  border: 0;
+  border-radius: 7px;
+  background: var(--odd-page);
+  box-shadow: 0 0 0 1px var(--odd-border-strong);
+  color: var(--odd-ink);
+  font: inherit;
+  font-size: 13px;
+}
+
+.odd-field select:disabled,
+.odd-field input:disabled {
+  opacity: 0.6;
+}
+
+.odd-field-note {
+  margin-left: auto;
+  font-style: normal;
+  font-weight: 400;
+  color: var(--odd-muted);
+}
+
+.odd-field-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+}
+
+.odd-types {
+  display: grid;
+  grid-template-columns: repeat(6, minmax(0, 1fr));
+  gap: 4px;
+}
+
+.odd-types legend {
+  grid-column: 1 / -1;
+}
+
+.odd-type {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  padding: 8px 0 6px;
+  border-radius: 8px;
+  box-shadow: 0 0 0 1px var(--odd-border);
+  color: var(--odd-ink-2);
+  font-size: 11.5px;
+  cursor: pointer;
+}
+
+.odd-type:hover {
+  box-shadow: 0 0 0 1px var(--odd-border-strong);
+  color: var(--odd-ink);
+}
+
+.odd-type:has(input:checked) {
+  box-shadow: 0 0 0 2px var(--odd-accent);
+  color: var(--odd-ink);
+  font-weight: 560;
+}
+
+.odd-type:has(input:focus-visible),
+.odd-check:has(input:focus-visible) {
+  outline: 2px solid var(--odd-accent);
+  outline-offset: 2px;
+}
+
+.odd-type input {
+  position: absolute;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.odd-types:disabled .odd-type {
+  cursor: default;
+  opacity: 0.6;
+}
+
+.odd-checks {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 16px;
+}
+
+.odd-check {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--odd-ink-2);
+  font-size: 13px;
+  cursor: pointer;
+}
+
+.odd-check input {
+  accent-color: var(--odd-accent);
+}
+
+/* Heatmap, funnel, gauge, treemap */
+
+.odd-cell,
+.odd-tile {
+  transition: opacity 120ms ease;
+}
+
+.odd-cell[data-dim],
+[data-dim] > .odd-tile {
+  opacity: 0.45;
+}
+
+.odd-dot[data-dim] {
+  opacity: 0.25;
+}
+
+.odd-scale {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  justify-content: flex-end;
+  color: var(--odd-muted);
+  font-size: 11px;
+  font-variant-numeric: tabular-nums;
+}
+
+.odd-scale-bar {
+  width: 120px;
+  height: 8px;
+  border-radius: 4px;
+}
+
+.odd-funnel {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 2px;
+  flex: 1;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.odd-funnel li {
+  display: flex;
+  flex-direction: column;
+  transition: opacity 120ms ease;
+}
+
+.odd-funnel li[data-dim] {
+  opacity: 0.45;
+}
+
+.odd-funnel-row {
+  display: grid;
+  grid-template-columns: minmax(80px, 28%) minmax(0, 1fr) auto 3.4em;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  padding: 4px 0;
+  border: 0;
+  background: none;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+}
+
+.odd-funnel-row:not(:disabled) {
+  cursor: pointer;
+}
+
+.odd-funnel-row:disabled {
+  cursor: default;
+}
+
+.odd-funnel-label {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--odd-ink-2);
+  font-size: 13px;
+}
+
+.odd-funnel-track {
+  height: 22px;
+  border-radius: 4px;
+  background: color-mix(in srgb, var(--odd-series-1) 12%, var(--odd-surface));
+}
+
+.odd-funnel-bar {
+  display: block;
+  height: 100%;
+  border-radius: 4px;
+  background: var(--odd-series-1);
+}
+
+.odd-funnel-value {
+  font-size: 13px;
+  font-weight: 560;
+  font-variant-numeric: tabular-nums;
+}
+
+.odd-funnel-share {
+  color: var(--odd-muted);
+  font-size: 12px;
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
+.odd-funnel-step {
+  padding-left: calc(28% + 10px);
+  color: var(--odd-muted);
+  font-size: 11.5px;
+  line-height: 1.2;
+}
+
+.odd-funnel-step::before {
+  content: "↓ ";
+}
+
+.odd-gauge,
+.odd-treemap {
+  position: relative;
+  flex: 1;
+  min-height: 0;
+}
+
+.odd-gauge svg,
+.odd-treemap svg {
+  position: absolute;
+  inset: 0;
+}
+
+.odd-gauge-track {
+  fill: none;
+  stroke: color-mix(in srgb, var(--odd-series-1) 16%, var(--odd-surface));
+  stroke-linecap: round;
+}
+
+.odd-gauge-fill {
+  fill: none;
+  stroke: var(--odd-series-1);
+  stroke-linecap: round;
+}
+
+.odd-gauge-target {
+  stroke: var(--odd-ink);
+  stroke-width: 2.5;
+  stroke-linecap: round;
+}
+
+.odd-gauge-value {
+  fill: var(--odd-ink);
+  font-weight: 620;
+  font-variant-numeric: normal;
+}
+
+.odd-gauge-caption {
+  fill: var(--odd-muted);
+  font-size: 12px;
+}
+
+.odd-tile-label {
+  font-size: 12.5px;
+  font-weight: 600;
+}
+
+.odd-tile-value {
+  font-size: 12px;
+  opacity: 0.85;
+  font-variant-numeric: tabular-nums;
+}
+
+/* Drill-down */
+
+.odd-drillable {
+  cursor: pointer;
+}
+
+.odd-slice[data-drillable] {
+  cursor: pointer;
+}
+
+.odd-table tbody tr.odd-drillable:focus-visible {
+  outline: 2px solid var(--odd-accent);
+  outline-offset: -2px;
+}
+
+.odd-table tbody tr[data-active] td {
+  background: color-mix(in srgb, var(--odd-accent) 12%, transparent);
 }
 
 .odd-refresh select {
@@ -697,6 +1750,12 @@ a.odd-card:hover {
 .odd-row {
   grid-column: 1 / -1;
   align-items: stretch;
+}
+
+/* Panels of a row stretch to the tallest one — except that a panel given its
+   own height (or being resized) must not drag its unsized neighbours along. */
+.odd-row:has(> .odd-panel[data-sized]) > .odd-panel:not([data-sized]) {
+  align-self: start;
 }
 
 .odd-section {
@@ -842,6 +1901,22 @@ a.odd-card:hover {
 }
 
 @media (prefers-reduced-motion: reduce) {
+  .odd-insert-caret {
+    transition: none;
+  }
+
+  .odd-drop-target {
+    transition: none;
+  }
+
+  .odd-savebar[data-status="blocked"] {
+    animation: none;
+  }
+
+  .odd-settings-panel {
+    animation: none;
+  }
+
   .odd-panel-skeleton,
   .odd-panel-progress::after {
     animation: none;
@@ -1405,6 +2480,18 @@ a.odd-card:hover {
   font-size: 12px;
 }
 
+@media (max-width: 1100px) {
+  .odd-home-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .odd-rail {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+    gap: 24px;
+  }
+}
+
 /* Small screens */
 
 @media (max-width: 860px) {
@@ -1427,7 +2514,7 @@ a.odd-card:hover {
   }
 
   .odd-shell:not([data-menu]) .odd-nav,
-  .odd-shell:not([data-menu]) .odd-theme {
+  .odd-shell:not([data-menu]) .odd-settings {
     display: none;
   }
 
@@ -1436,11 +2523,47 @@ a.odd-card:hover {
   }
 
   .odd-dashboard-page {
-    padding: 8px 16px 48px;
+    padding: 12px 16px 96px;
   }
 
-  .odd-split {
+  .odd-header {
+    position: static;
+    flex-direction: column;
+    align-items: stretch;
+    padding: 10px 16px;
+  }
+
+  .odd-header-actions {
+    justify-content: flex-start;
+  }
+
+  .odd-header-updated {
+    display: none;
+  }
+
+  .odd-row-grip {
+    left: auto;
+    right: -8px;
+    top: -10px;
+    margin-top: 0;
+  }
+
+  .odd-savebar {
+    left: 50%;
+    max-width: calc(100vw - 24px);
+    flex-wrap: wrap;
+  }
+
+  .odd-board {
     grid-template-columns: minmax(0, 1fr);
+    gap: 12px;
+    padding: 16px;
+  }
+
+  .odd-board-meta {
+    grid-template-columns: auto auto auto;
+    justify-content: start;
+    gap: 20px;
   }
 
   .odd-grid > *,

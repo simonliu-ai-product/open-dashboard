@@ -43,3 +43,40 @@ LEFT JOIN order_items i ON i.order_id = o.id
 WHERE c.signed_up_at >= :from AND c.signed_up_at < :to
 GROUP BY c.acquisition_channel
 ORDER BY revenue_per_customer DESC;
+
+-- name: funnel
+-- description: Sessions, sign-ups, and customers who signed up in the range and then bought once, then again
+WITH signed AS (
+  SELECT id FROM customers WHERE signed_up_at >= :from AND signed_up_at < :to
+),
+paid AS (
+  SELECT o.customer_id, COUNT(*) AS n
+  FROM orders o JOIN signed s ON s.id = o.customer_id
+  WHERE o.status = 'paid'
+  GROUP BY o.customer_id
+)
+SELECT '工作階段' AS stage, (SELECT SUM(sessions) FROM daily_traffic WHERE date >= :from AND date < :to) AS people, 1 AS step
+UNION ALL SELECT '註冊', (SELECT COUNT(*) FROM signed), 2
+UNION ALL SELECT '首次購買', (SELECT COUNT(*) FROM paid), 3
+UNION ALL SELECT '回購', (SELECT COUNT(*) FROM paid WHERE n >= 2), 4
+ORDER BY step;
+
+-- name: month_pace
+-- description: Paid revenue this calendar month so far, against all of last month
+WITH paid AS (
+  SELECT o.ordered_at, SUM(i.quantity * i.unit_price) AS amount
+  FROM orders o JOIN order_items i ON i.order_id = o.id
+  WHERE o.status = 'paid' AND o.ordered_at >= date('now', 'localtime', 'start of month', '-1 month')
+  GROUP BY o.id
+),
+-- scale is the gauge's full arc: a quarter above the larger of the two
+totals AS (
+  SELECT
+    SUM(CASE WHEN ordered_at >= date('now', 'localtime', 'start of month')
+              AND ordered_at < datetime('now', 'localtime') THEN amount END) AS this_month,
+    SUM(CASE WHEN ordered_at < date('now', 'localtime', 'start of month') THEN amount END) AS last_month
+  FROM paid
+)
+SELECT this_month, last_month,
+       MAX(COALESCE(this_month, 0), COALESCE(last_month, 0)) * 1.25 AS scale
+FROM totals;

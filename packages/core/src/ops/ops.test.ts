@@ -59,6 +59,8 @@ describe('dashboards', () => {
         title: 'Sales',
         description: 'Test',
         queries: 3,
+        panels: 2,
+        sources: ['db'],
         file: 'dashboards/sales/index.tsx',
       },
     ])
@@ -227,5 +229,35 @@ describe('sqlite file replaced underneath', () => {
     db.close()
     renameSync(next, join(fixture.root, 'test.db'))
     expect((await runSql(fixture.workspace, 'SELECT count(*) AS n FROM sales')).rows[0]?.n).toBe(1)
+  })
+})
+
+describe('drill checks', () => {
+  it('warns about a drill into a filter the dashboard does not have', async () => {
+    fixture.write(
+      'dashboards/sales/index.tsx',
+      DASHBOARD.replace('y="amount" />', 'y="amount" drill="channel" />'),
+    )
+    const report = await checkDashboard(
+      fixture.workspace,
+      'sales',
+      join(fixture.root, 'dashboards/sales/index.tsx'),
+    )
+    expect(report.findings.map((f) => f.message)).toContain(
+      '<BarChart "By region"> drills into "channel", but there is no <Select name="channel"> — clicks will do nothing',
+    )
+  })
+
+  it('accepts a drill into an existing filter', async () => {
+    fixture.write(
+      'dashboards/sales/index.tsx',
+      DASHBOARD.replace('y="amount" />', 'y="amount" drill="region" />'),
+    )
+    const report = await checkDashboard(
+      fixture.workspace,
+      'sales',
+      join(fixture.root, 'dashboards/sales/index.tsx'),
+    )
+    expect(report.findings).toEqual([])
   })
 })

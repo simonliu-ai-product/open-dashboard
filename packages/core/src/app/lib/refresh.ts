@@ -1,3 +1,5 @@
+import type { Translate } from '../../runtime/i18n.js'
+
 const UNITS: Record<string, number> = { s: 1000, m: 60_000, h: 3_600_000 }
 
 export const REFRESH_OPTIONS = ['off', '30s', '1m', '2m', '5m', '10m', '15m', '30m', '1h'] as const
@@ -10,12 +12,14 @@ export function parseInterval(value: string | undefined): number | undefined {
   return Math.max(5000, Number(match[1]) * (UNITS[match[2] as string] as number))
 }
 
-export function intervalLabel(value: string): string {
-  if (value === 'off') return 'Off'
+export function intervalLabel(value: string, t: Translate): string {
+  if (value === 'off') return t('Off')
   const match = /^(\d+)\s*([smh])$/.exec(value.trim())
   if (!match) return value
-  const unit = { s: 'sec', m: 'min', h: 'hour' }[match[2] as 's' | 'm' | 'h']
-  return `Every ${match[1]} ${unit}`
+  const n = Number(match[1])
+  if (match[2] === 's') return t('Every {n} sec', { n })
+  if (match[2] === 'h') return n === 1 ? t('Every hour') : t('Every {n} hours', { n })
+  return n === 1 ? t('Every minute') : t('Every {n} min', { n })
 }
 
 /**

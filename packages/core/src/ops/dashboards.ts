@@ -19,6 +19,11 @@ export interface DashboardSummary {
   title: string
   description?: string
   queries: number
+  panels: number
+  /** Datasources its queries read, a query without `-- source:` counting as the default. */
+  sources: string[]
+  /** `meta.refresh`, when the dashboard sets a default auto-refresh. */
+  refresh?: string
   file: string
 }
 
@@ -54,10 +59,16 @@ export function dashboardFile(config: ResolvedConfig, id: string): string {
 
 export function listDashboards(config: ResolvedConfig): DashboardSummary[] {
   return discoverDashboards(config.root, config.dashboardsDir).map(({ id, file }) => {
-    const { meta } = analyzeDashboard(readFileSync(file, 'utf8'))
+    const { meta, panels } = analyzeDashboard(readFileSync(file, 'utf8'))
     let queries = 0
+    const sources = new Set<string>()
     try {
-      queries = loadQueries(join(config.root, config.dashboardsDir, id), config.root).size
+      const found = loadQueries(join(config.root, config.dashboardsDir, id), config.root)
+      queries = found.size
+      for (const query of found.values()) {
+        const source = query.source || config.defaultSource
+        if (source) sources.add(source)
+      }
     } catch {
       // a broken query file is reported where it is used, not in the list
     }
@@ -65,9 +76,12 @@ export function listDashboards(config: ResolvedConfig): DashboardSummary[] {
       id,
       title: typeof meta.title === 'string' ? meta.title : id,
       queries,
+      panels: panels.length,
+      sources: [...sources].sort(),
       file: relative(config.root, file),
     }
     if (typeof meta.description === 'string') summary.description = meta.description
+    if (typeof meta.refresh === 'string') summary.refresh = meta.refresh
     return summary
   })
 }

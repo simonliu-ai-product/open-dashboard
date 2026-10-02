@@ -1,0 +1,136 @@
+/* Batch C: distribution and flow charts */
+
+.odd-sample-note {
+  margin: 4px 0 0;
+  color: var(--odd-muted);
+  font-size: 11.5px;
+}
+
+.odd-whisker {
+  stroke: var(--odd-ink-2);
+  stroke-width: 1.5;
+}
+
+.odd-box-body {
+  fill-opacity: 0.22;
+  stroke: var(--odd-series-1);
+  stroke-width: 1.5;
+}
+
+.odd-median {
+  stroke: var(--odd-ink);
+  stroke-width: 2;
+  stroke-linecap: round;
+}
+
+.odd-box,
+.odd-upset-column {
+  transition: opacity 120ms ease;
+}
+
+.odd-box[data-dim],
+.odd-upset-column[data-dim] {
+  opacity: 0.4;
+}
+
+.odd-reference {
+  stroke: var(--odd-axis);
+  stroke-width: 1;
+}
+
+.odd-reference-label {
+  fill: var(--odd-muted);
+  font-size: 11px;
+  font-variant-numeric: tabular-nums;
+}
+
+.odd-callout-label {
+  fill: var(--odd-ink);
+  font-size: 12.5px;
+  font-weight: 600;
+}
+
+.odd-sankey-link {
+  fill-opacity: 0.35;
+  transition: fill-opacity 120ms ease;
+}
+
+.odd-sankey-link[data-lit] {
+  fill-opacity: 0.6;
+}
+
+.odd-sankey-link[data-dim] {
+  fill-opacity: 0.1;
+}
+
+.odd-sankey-node {
+  stroke: var(--odd-surface);
+  stroke-width: 1;
+}
+
+.odd-sankey-label {
+  fill: var(--odd-ink-2);
+  font-size: 12px;
+}
+
+.odd-sankey-value {
+  fill: var(--odd-muted);
+  font-variant-numeric: tabular-nums;
+}
+
+.odd-cohort th,
+.odd-cohort td {
+  text-align: right;
+}
+
+.odd-cohort-head {
+  display: block;
+  padding: 6px 10px;
+}
+
+.odd-cohort tbody th {
+  padding: 6px 16px;
+  font-weight: 560;
+  text-align: left;
+  white-space: nowrap;
+  border-bottom: 1px solid var(--odd-grid);
+}
+
+.odd-cohort td {
+  padding: 6px 10px;
+}
+
+.odd-cohort-cell {
+  font-variant-numeric: tabular-nums;
+  border-bottom: 2px solid var(--odd-surface);
+  border-right: 2px solid var(--odd-surface);
+}
+
+.odd-cohort-cell[data-strong] {
+  color: #ffffff;
+}
+
+.odd-cohort-empty {
+  background: transparent;
+}
+
+.odd-upset-stripe {
+  fill: var(--odd-hover);
+}
+
+.odd-upset-total {
+  fill: var(--odd-axis);
+}
+
+.odd-upset-on {
+  fill: var(--odd-ink);
+}
+
+.odd-upset-off {
+  fill: var(--odd-grid);
+}
+
+.odd-upset-link {
+  stroke: var(--odd-ink);
+  stroke-width: 2;
+}

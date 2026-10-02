@@ -1,0 +1,133 @@
+/* Maps */
+
+.odd-region {
+  stroke: var(--odd-surface);
+  stroke-width: 0.75;
+  transition: opacity 120ms ease;
+}
+
+.odd-region[data-dim] {
+  opacity: 0.45;
+}
+
+.odd-region:hover {
+  stroke: var(--odd-ink);
+  stroke-width: 1.25;
+}
+
+.odd-map-outline {
+  fill: var(--odd-grid);
+  stroke: var(--odd-axis);
+  stroke-width: 0.75;
+}
+
+.odd-map-note {
+  flex: 1 1 auto;
+  min-width: 0;
+  margin-right: auto;
+  color: var(--odd-muted);
+}
+
+.odd-scale:has(.odd-map-note) {
+  flex-wrap: wrap;
+  row-gap: 4px;
+}
+
+.odd-scale:has(.odd-map-note) > span:not(.odd-map-note) {
+  white-space: nowrap;
+}
+
+.odd-tile-map-label {
+  font-size: 12px;
+  font-weight: 600;
+  pointer-events: none;
+}
+
+.odd-tile-map-value {
+  font-size: 11px;
+  font-variant-numeric: tabular-nums;
+  opacity: 0.9;
+  pointer-events: none;
+}
+
+/* State timeline */
+
+.odd-state {
+  transition: opacity 120ms ease;
+}
+
+.odd-state[data-dim] {
+  opacity: 0.5;
+}
+
+.odd-legend .odd-muted {
+  margin-left: 2px;
+  font-variant-numeric: tabular-nums;
+}
+
+/* Pivot table */
+
+.odd-pivot th.odd-pivot-key {
+  position: sticky;
+  left: 0;
+  z-index: 1;
+  padding: 6px 16px;
+  background: var(--odd-surface);
+  color: var(--odd-ink);
+  font-weight: 560;
+  text-align: left;
+  white-space: nowrap;
+}
+
+.odd-pivot thead th.odd-pivot-key {
+  z-index: 2;
+  color: var(--odd-muted);
+  font-size: 12px;
+}
+
+.odd-pivot th.odd-pivot-key[data-level="1"] {
+  left: auto;
+  position: static;
+  font-weight: 400;
+  color: var(--odd-ink-2);
+}
+
+.odd-pivot th.odd-pivot-key[data-repeat] {
+  color: transparent;
+}
+
+.odd-pivot tbody th.odd-pivot-key {
+  border-bottom: 1px solid var(--odd-grid);
+}
+
+.odd-pivot th:not(.odd-pivot-key) {
+  text-align: right;
+}
+
+.odd-pivot th:not(.odd-pivot-key) button {
+  text-align: right;
+}
+
+.odd-pivot td,
+.odd-pivot th:not(.odd-pivot-key) {
+  min-width: 72px;
+}
+
+.odd-pivot td {
+  text-align: right;
+}
+
+.odd-pivot .odd-pivot-total {
+  font-weight: 600;
+  box-shadow: inset 1px 0 0 var(--odd-axis);
+}
+
+.odd-pivot tfoot td,
+.odd-pivot tfoot th {
+  position: sticky;
+  bottom: 0;
+  background: var(--odd-surface);
+  border-top: 1px solid var(--odd-axis);
+  font-weight: 600;
+  padding: 6px 16px;
+}

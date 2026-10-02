@@ -167,7 +167,9 @@ const last = [
   'Cheng',
 ]
 
-const end = new Date()
+// Today stops at the moment of generation: nothing is dated in the future.
+const now = new Date()
+const end = new Date(now)
 end.setHours(0, 0, 0, 0)
 const start = new Date(end)
 start.setMonth(start.getMonth() - 18)
@@ -217,6 +219,7 @@ for (let d = 0; d <= totalDays; d += 1) {
         Math.floor(random() * 60),
         Math.floor(random() * 60),
       )
+      if (signed > now) continue
       const name = `${first[Math.floor(random() * first.length)]} ${last[Math.floor(random() * last.length)]}`
       insertCustomer.run(id, name, `customer${id}@example.com`, region, city, source, stamp(signed))
       customers.push({ id, region })
@@ -233,6 +236,7 @@ for (let d = 0; d <= totalDays; d += 1) {
         ]
     const at = new Date(date)
     at.setHours(pick(HOURS, HOUR_WEIGHTS), Math.floor(random() * 60), Math.floor(random() * 60))
+    if (at > now) continue
     const status = pick(['paid', 'refunded', 'cancelled'], [93, 4, 3])
     const channel = pick(channels, [44 - progress * 10, 30 + progress * 14, 26 - progress * 4])
     orderId += 1
@@ -252,6 +256,128 @@ for (let d = 0; d <= totalDays; d += 1) {
     insertOrder.run(orderId, customer.id, stamp(at), status, channel, customer.region, shipping)
     for (const [productId, quantity, unit] of items)
       insertItem.run(orderId, productId, quantity, unit)
+  }
+}
+db.exec('COMMIT')
+
+// Reference and operations tables for the chart gallery. Coordinates are
+// public facts about the cities; everything else here is as fictional as the
+// orders above.
+db.exec(`
+  CREATE TABLE city_coordinates (city TEXT PRIMARY KEY, lat REAL NOT NULL, lng REAL NOT NULL);
+  CREATE TABLE fulfillment_jobs (
+    id INTEGER PRIMARY KEY,
+    order_id INTEGER NOT NULL REFERENCES orders(id),
+    stage TEXT NOT NULL,
+    worker TEXT NOT NULL,
+    started_at TEXT NOT NULL,
+    finished_at TEXT NOT NULL
+  );
+  CREATE TABLE bean_prices (date TEXT PRIMARY KEY, open REAL NOT NULL, high REAL NOT NULL, low REAL NOT NULL, close REAL NOT NULL);
+  CREATE TABLE service_checks (
+    checked_at TEXT NOT NULL,
+    service TEXT NOT NULL,
+    status TEXT NOT NULL CHECK (status IN ('up', 'degraded', 'down')),
+    latency_ms INTEGER NOT NULL,
+    PRIMARY KEY (checked_at, service)
+  );
+`)
+db.exec('BEGIN')
+
+const coordinates = {
+  Taipei: [25.033, 121.5654],
+  'New Taipei': [25.012, 121.465],
+  Taoyuan: [24.9936, 121.301],
+  Keelung: [25.1276, 121.7392],
+  Hsinchu: [24.8138, 120.9675],
+  Miaoli: [24.5602, 120.8214],
+  Taichung: [24.1477, 120.6736],
+  Changhua: [24.0518, 120.5161],
+  Nantou: [23.9609, 120.9719],
+  Chiayi: [23.4801, 120.4491],
+  Tainan: [22.9999, 120.227],
+  Kaohsiung: [22.6273, 120.3014],
+  Pingtung: [22.669, 120.4862],
+  Yilan: [24.7021, 121.7378],
+  Hualien: [23.991, 121.6114],
+  Taitung: [22.7583, 121.1444],
+}
+const insertCoordinate = db.prepare(
+  'INSERT INTO city_coordinates (city, lat, lng) VALUES (?, ?, ?)',
+)
+for (const [city, [lat, lng]] of Object.entries(coordinates)) insertCoordinate.run(city, lat, lng)
+
+// Pick, pack and ship for the last two days' paid orders, by a small crew.
+const workers = ['Amy', 'Ben', 'Chloe', 'Dan', 'Eva', 'Finn']
+const insertJob = db.prepare(
+  'INSERT INTO fulfillment_jobs (order_id, stage, worker, started_at, finished_at) VALUES (?, ?, ?, ?, ?)',
+)
+const recent = db
+  .prepare(
+    "SELECT id, ordered_at FROM orders WHERE status = 'paid' AND ordered_at >= ? ORDER BY ordered_at",
+  )
+  .all(day(new Date(end.getTime() - 2 * 86_400_000)))
+const busyUntil = new Map(workers.map((w) => [w, 0]))
+for (const order of recent) {
+  let t = new Date(order.ordered_at.replace(' ', 'T')).getTime() + (10 + random() * 50) * 60_000
+  for (const [stage, minutes] of [
+    ['pick', 6],
+    ['pack', 4],
+    ['ship', 3],
+  ]) {
+    const worker = workers[Math.floor(random() * workers.length)]
+    const begin = Math.max(t, busyUntil.get(worker))
+    if (begin > now.getTime()) break
+    const finish = begin + (minutes + random() * minutes) * 60_000
+    busyUntil.set(worker, finish)
+    insertJob.run(order.id, stage, worker, stamp(new Date(begin)), stamp(new Date(finish)))
+    t = finish + random() * 20 * 60_000
+  }
+}
+
+// A daily price for green coffee, as a random walk with a gentle drift.
+const insertPrice = db.prepare(
+  'INSERT INTO bean_prices (date, open, high, low, close) VALUES (?, ?, ?, ?, ?)',
+)
+let price = 6.2
+for (let d = 0; d <= totalDays; d += 1) {
+  const date = new Date(start)
+  date.setDate(start.getDate() + d)
+  if (date.getDay() === 0 || date.getDay() === 6) continue
+  const open = price
+  const close = Math.max(3, open * (1 + (random() - 0.48) * 0.04))
+  const high = Math.max(open, close) * (1 + random() * 0.015)
+  const low = Math.min(open, close) * (1 - random() * 0.015)
+  insertPrice.run(day(date), +open.toFixed(3), +high.toFixed(3), +low.toFixed(3), +close.toFixed(3))
+  price = close
+}
+
+// Health checks every ten minutes for three days, with a few incidents.
+const services = ['checkout', 'search', 'payments', 'inventory']
+const insertCheck = db.prepare(
+  'INSERT INTO service_checks (checked_at, service, status, latency_ms) VALUES (?, ?, ?, ?)',
+)
+const checkStart = new Date(end.getTime() - 3 * 86_400_000)
+const incidents = [
+  { service: 'payments', from: 0.31, to: 0.33, status: 'down' },
+  { service: 'search', from: 0.52, to: 0.6, status: 'degraded' },
+  { service: 'checkout', from: 0.74, to: 0.75, status: 'down' },
+  { service: 'inventory', from: 0.12, to: 0.2, status: 'degraded' },
+]
+for (let k = 0; k < 3 * 24 * 6; k += 1) {
+  const at = new Date(checkStart.getTime() + k * 10 * 60_000)
+  const f = k / (3 * 24 * 6)
+  const hour = at.getHours()
+  const load = 1 + 0.6 * Math.sin(((hour - 8) / 24) * Math.PI * 2)
+  for (const [i, service] of services.entries()) {
+    const incident = incidents.find((x) => x.service === service && f >= x.from && f < x.to)
+    const status = incident ? incident.status : 'up'
+    const base = [180, 90, 240, 60][i]
+    const latency =
+      status === 'down'
+        ? 0
+        : Math.round(base * load * (status === 'degraded' ? 3.2 : 1) * (0.8 + random() * 0.5))
+    insertCheck.run(stamp(at), service, status, latency)
   }
 }
 db.exec('COMMIT')

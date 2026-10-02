@@ -1,0 +1,87 @@
+.odd-waterfall-connector {
+  stroke: var(--odd-axis);
+  stroke-width: 1;
+  shape-rendering: crispEdges;
+}
+
+.odd-multiples {
+  flex: 1;
+  min-height: 0;
+  display: grid;
+  gap: 12px;
+  align-content: start;
+}
+
+.odd-facet {
+  position: relative;
+  margin: 0;
+  min-width: 0;
+  transition: opacity 120ms ease;
+}
+
+.odd-facet[data-dim] {
+  opacity: 0.4;
+}
+
+.odd-facet figcaption {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--odd-ink-2);
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.odd-multiples-note,
+.odd-band {
+  fill: color-mix(in srgb, var(--odd-series-1) 22%, transparent);
+}
+
+.odd-band-outer {
+  fill: color-mix(in srgb, var(--odd-series-1) 10%, transparent);
+}
+
+.odd-band-key {
+  background: color-mix(in srgb, var(--odd-series-1) 30%, var(--odd-surface));
+}
+
+.odd-band-key-outer {
+  background: color-mix(in srgb, var(--odd-series-1) 14%, var(--odd-surface));
+}
+
+.odd-control-center {
+  fill: none;
+  stroke: var(--odd-ink-2);
+  stroke-width: 1;
+}
+
+.odd-control-limit {
+  fill: none;
+  stroke: var(--odd-muted);
+  stroke-width: 1;
+}
+
+.odd-control-out {
+  fill: var(--odd-critical);
+  stroke: var(--odd-surface);
+  stroke-width: 2;
+}
+
+.odd-horizon,
+.odd-timeline {
+  overflow-y: auto;
+}
+
+.odd-horizon svg,
+.odd-timeline svg {
+  position: static;
+}
+
+.odd-timeline-now {
+  stroke: var(--odd-critical);
+  stroke-width: 1.5;
+}

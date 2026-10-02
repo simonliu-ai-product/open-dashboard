@@ -1,0 +1,37 @@
+/* Batch A: dot plot, dumbbell, bullet, diverging bar, marimekko, slope, bump */
+
+.odd-key-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+}
+
+.odd-row-mark,
+.odd-slope {
+  transition: opacity 120ms ease;
+}
+
+.odd-row-mark[data-dim],
+.odd-slope[data-dim] {
+  opacity: 0.35;
+}
+
+.odd-slope[data-active] .odd-line {
+  stroke-width: 3;
+}
+
+.odd-connector {
+  stroke: var(--odd-axis);
+  stroke-width: 1;
+}
+
+.odd-connector-strong {
+  stroke-width: 2;
+  stroke-linecap: round;
+}
+
+.odd-target-mark {
+  stroke: var(--odd-ink);
+  stroke-width: 2.5;
+  stroke-linecap: round;
+}

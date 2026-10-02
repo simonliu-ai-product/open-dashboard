@@ -79,3 +79,21 @@ WHERE o.status IN ('cancelled', 'refunded')
   AND o.ordered_at < datetime('now', 'localtime')
 GROUP BY o.id
 ORDER BY o.ordered_at DESC;
+
+-- name: weekday_hour
+-- description: Paid orders by weekday and hour of day over the last four weeks, up to now
+WITH placed AS (
+  SELECT CAST(strftime('%w', ordered_at) AS INTEGER) AS dow,
+         CAST(strftime('%H', ordered_at) AS INTEGER) AS hour
+  FROM orders
+  WHERE status = 'paid'
+    AND ordered_at >= date('now', 'localtime', '-28 days')
+    AND ordered_at < datetime('now', 'localtime')
+)
+SELECT printf('%02d:00', hour) AS hour,
+       CASE dow WHEN 1 THEN '週一' WHEN 2 THEN '週二' WHEN 3 THEN '週三' WHEN 4 THEN '週四'
+                WHEN 5 THEN '週五' WHEN 6 THEN '週六' ELSE '週日' END AS weekday,
+       COUNT(*) AS orders
+FROM placed
+GROUP BY dow, hour
+ORDER BY (dow + 6) % 7, hour;

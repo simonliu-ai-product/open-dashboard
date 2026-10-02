@@ -15,8 +15,6 @@ import {
 
 export const meta: DashboardMeta = {
   title: 'Sales overview',
-  description:
-    'Paid revenue, orders and products for the online store. Refunds and cancellations are excluded from revenue.',
   refresh: '5m',
   currency: 'USD',
   createdAt: '2026-10-02T00:00:00.000Z',
@@ -106,8 +104,8 @@ export default function SalesOverview() {
       <Row height={380}>
         <BarChart
           title="Revenue by region"
-          description="Ignores the region filter, for comparison"
           query="revenue_by_region"
+          drill="region"
           x="region"
           y="revenue"
           format="currency"

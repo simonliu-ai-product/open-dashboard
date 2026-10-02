@@ -180,6 +180,6 @@ correct.
 
 - Return one row per bucket even when a bucket is empty only if the reader
   needs to see the gap; otherwise missing buckets simply have no point.
-- The current period is partial. For "by month" charts, either say so in the
-  `description` or end the range at the start of the current month.
+- The current period is partial. For "by month" charts, end the range at the
+  start of the current month, or name it in the title ("this month so far").
 - `LIMIT` rankings in SQL (`ORDER BY revenue DESC LIMIT 10`).

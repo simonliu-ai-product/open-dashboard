@@ -1,7 +1,9 @@
 import { formatValue } from '../runtime/format.js'
+import { useT } from '../runtime/i18n.js'
 import { pickY } from '../runtime/shape.js'
 import type { Format } from '../runtime/types.js'
 import { useQuery } from '../runtime/use-query.js'
+import { editable } from './editable.js'
 import { PanelFrame, type PanelProps, useFormatContext, useSize } from './panel.js'
 
 export interface StatProps extends PanelProps {
@@ -49,7 +51,8 @@ function Sparkline({ query, x, y }: { query: string; x?: string; y: string }) {
   )
 }
 
-export function Stat(props: StatProps) {
+function StatPanel(props: StatProps) {
+  const t = useT()
   const state = useQuery(props.query)
   const ctx = useFormatContext()
   return (
@@ -78,12 +81,12 @@ export function Stat(props: StatProps) {
                 <span aria-hidden="true">{delta > 0 ? '▲' : delta < 0 ? '▼' : '■'}</span>
                 <span>
                   {formatValue(Math.abs(delta), 'percent', ctx)}{' '}
-                  <span className="odd-muted">{props.compareLabel ?? 'vs previous period'}</span>
+                  <span className="odd-muted">{props.compareLabel ?? t('vs previous period')}</span>
                 </span>
               </div>
             ) : props.compare ? (
               <div className="odd-stat-delta" data-good="flat">
-                <span className="odd-muted">no comparison value</span>
+                <span className="odd-muted">{t('no comparison value')}</span>
               </div>
             ) : null}
             {props.spark ? (
@@ -99,3 +102,5 @@ export function Stat(props: StatProps) {
     </PanelFrame>
   )
 }
+
+export const Stat = editable('Stat', StatPanel)

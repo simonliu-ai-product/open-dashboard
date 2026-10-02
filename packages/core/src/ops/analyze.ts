@@ -1,4 +1,5 @@
 import { parse } from '@babel/parser'
+import { columnProps, PANEL_NAMES } from '../runtime/convert.js'
 
 type Node = {
   type: string
@@ -24,6 +25,8 @@ export interface PanelRef {
   query: string | undefined
   /** Column names the panel names literally, to be checked against the result. */
   columns: string[]
+  /** The filter a click on this panel sets, and the dashboard it opens, if any. */
+  drill?: { filter: string; dashboard?: string }
   line: number
 }
 
@@ -40,9 +43,6 @@ export interface DashboardAnalysis {
   panels: PanelRef[]
   queryRefs: QueryRef[]
 }
-
-const PANELS = new Set(['Stat', 'LineChart', 'AreaChart', 'BarChart', 'PieChart', 'Table', 'Text'])
-const COLUMN_PROPS = ['x', 'y', 'series', 'label', 'value', 'column', 'compare']
 
 export function parseSource(code: string, strict = false): Node {
   return parse(code, {
@@ -141,6 +141,13 @@ function stringsIn(value: unknown): string[] {
   return []
 }
 
+/** Column names inside a prop: a string, an array of them, or an object's values (`stats={{ q1: 'p25' }}`). */
+function columnsIn(value: unknown): string[] {
+  if (value && typeof value === 'object' && !Array.isArray(value))
+    return Object.values(value).flatMap(stringsIn)
+  return stringsIn(value)
+}
+
 function line(node: Node): number {
   return node.loc?.start.line ?? 0
 }
@@ -193,10 +200,10 @@ export function analyzeDashboard(code: string): DashboardAnalysis {
       return
     }
 
-    if (!PANELS.has(name)) return
+    if (!PANEL_NAMES.has(name)) return
     const query = read('query')
     const columns: string[] = []
-    for (const prop of COLUMN_PROPS) columns.push(...stringsIn(read(prop)))
+    for (const prop of columnProps(name)) columns.push(...columnsIn(read(prop)))
     const tableColumns = read('columns')
     if (Array.isArray(tableColumns)) {
       for (const column of tableColumns) {
@@ -210,12 +217,24 @@ export function analyzeDashboard(code: string): DashboardAnalysis {
         }
       }
     }
+    const drill = read('drill')
     const panel: PanelRef = {
       component: name,
       title: typeof read('title') === 'string' ? (read('title') as string) : undefined,
       query: typeof query === 'string' ? query : undefined,
       columns,
       line: line(node),
+    }
+    if (typeof drill === 'string') panel.drill = { filter: drill }
+    else if (
+      drill &&
+      typeof drill === 'object' &&
+      typeof (drill as { filter?: unknown }).filter === 'string'
+    ) {
+      const spec = drill as { filter: string; column?: unknown; dashboard?: unknown }
+      panel.drill = { filter: spec.filter }
+      if (typeof spec.dashboard === 'string') panel.drill.dashboard = spec.dashboard
+      if (typeof spec.column === 'string') columns.push(spec.column)
     }
     result.panels.push(panel)
     if (panel.query) result.queryRefs.push({ name: panel.query, line: panel.line, columns })

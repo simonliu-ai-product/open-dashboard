@@ -14,7 +14,6 @@ import {
 
 export const meta: DashboardMeta = {
   title: 'Getting started',
-  description: 'A sample dashboard over data/sample.db — a fictional shop. Replace it with your own.',
 }
 
 export default function GettingStarted() {

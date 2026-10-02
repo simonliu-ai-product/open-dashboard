@@ -1,5 +1,6 @@
 import type { ParamValue, SchemaInfo } from '../../config.js'
 import type { DashboardSummary } from '../../ops/dashboards.js'
+import type { DashboardLayout, LayoutEdit } from '../../ops/layout.js'
 import type { SourceStatus } from '../../ops/sources.js'
 import type { QueryRun } from '../../runtime/types.js'
 
@@ -36,4 +37,7 @@ export const api = {
   comment: (id: string, panel: string, text: string) =>
     post<{ file: string; line: number }>('comment', { id, panel, text }),
   current: (view: Record<string, unknown>) => post('current', view).catch(() => {}),
+  layout: (id: string) => request<DashboardLayout>(`layout?id=${encodeURIComponent(id)}`),
+  saveLayout: (id: string, hash: string, edits: LayoutEdit[]) =>
+    post<{ hash: string }>('layout', { id, hash, edits }),
 }

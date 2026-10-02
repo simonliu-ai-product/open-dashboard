@@ -1,5 +1,6 @@
 import { useEffect, useId } from 'react'
 import { useFilters } from '../runtime/context.js'
+import { useT } from '../runtime/i18n.js'
 import { humanize } from '../runtime/shape.js'
 import {
   isTimePreset,
@@ -32,6 +33,7 @@ function timeSpec(props: TimeRangeProps): FilterSpec {
 }
 
 export function TimeRange(props: TimeRangeProps) {
+  const t = useT()
   const id = useId()
   const { values, set } = useFilters()
   const spec = timeSpec(props)
@@ -39,11 +41,11 @@ export function TimeRange(props: TimeRangeProps) {
   const options = props.options ?? (Object.keys(TIME_PRESETS) as TimePreset[])
   return (
     <label className="odd-filter" htmlFor={id}>
-      <span>{props.label ?? 'Time range'}</span>
+      <span>{props.label ?? t('Time range')}</span>
       <select id={id} value={value ?? ''} onChange={(event) => set(spec.key, event.target.value)}>
         {options.map((preset) => (
           <option key={preset} value={preset}>
-            {TIME_PRESETS[preset]}
+            {t(TIME_PRESETS[preset])}
           </option>
         ))}
       </select>
@@ -74,6 +76,7 @@ function selectSpec(props: SelectProps): FilterSpec {
 }
 
 export function Select(props: SelectProps) {
+  const t = useT()
   const id = useId()
   const { values, set } = useFilters()
   const state = useQuery(props.query)
@@ -106,7 +109,7 @@ export function Select(props: SelectProps) {
         value={value ?? ''}
         onChange={(event) => set(props.name, event.target.value === '' ? null : event.target.value)}
       >
-        {allowAll ? <option value="">{props.allLabel ?? 'All'}</option> : null}
+        {allowAll ? <option value="">{props.allLabel ?? t('All')}</option> : null}
         {value !== null && !options.some((o) => o.value === value) ? (
           <option value={value}>{value}</option>
         ) : null}

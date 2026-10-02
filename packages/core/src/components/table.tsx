@@ -1,9 +1,12 @@
 import { useMemo, useState } from 'react'
 import type { ColumnInfo } from '../config.js'
 import { formatValue } from '../runtime/format.js'
+import { useT } from '../runtime/i18n.js'
 import { humanize } from '../runtime/shape.js'
 import type { Format, QueryRun } from '../runtime/types.js'
 import { useQuery } from '../runtime/use-query.js'
+import { useDrill } from './drill.js'
+import { editable } from './editable.js'
 import { PanelFrame, type PanelProps, useFormatContext } from './panel.js'
 
 export interface TableColumn {
@@ -29,6 +32,8 @@ const IDENTIFIER = /(^id$|_id$|^id_)/i
 const ID_FORMAT = { useGrouping: false, maximumFractionDigits: 0 } as const
 
 function DataTable({ run, props }: { run: QueryRun; props: TableProps }) {
+  const t = useT()
+  const drill = useDrill(props.drill)
   const ctx = useFormatContext()
   const [sort, setSort] = useState<string | undefined>(props.sort)
   const types = new Map<string, ColumnInfo['type']>(run.result.columns.map((c) => [c.name, c.type]))
@@ -104,8 +109,24 @@ function DataTable({ run, props }: { run: QueryRun; props: TableProps }) {
         </thead>
         <tbody>
           {rows.slice(0, 1000).map((row, i) => (
-            // biome-ignore lint/suspicious/noArrayIndexKey: rows have no identity of their own
-            <tr key={i}>
+            <tr
+              // biome-ignore lint/suspicious/noArrayIndexKey: rows have no identity of their own
+              key={i}
+              data-active={drill?.isActive(row[drill.column ?? drill.filter]) || undefined}
+              tabIndex={drill ? 0 : undefined}
+              onClick={drill ? () => drill.pick(row[drill.column ?? drill.filter]) : undefined}
+              onKeyDown={
+                drill
+                  ? (event) => {
+                      if (event.key === 'Enter' || event.key === ' ') {
+                        event.preventDefault()
+                        drill.pick(row[drill.column ?? drill.filter])
+                      }
+                    }
+                  : undefined
+              }
+              className={drill ? 'odd-drillable' : undefined}
+            >
               {columns.map((column) => {
                 const numeric = types.get(column.key) === 'number'
                 const value = row[column.key]
@@ -137,8 +158,9 @@ function DataTable({ run, props }: { run: QueryRun; props: TableProps }) {
       </table>
       {rows.length > 1000 || run.result.truncated ? (
         <p className="odd-table-note">
-          Showing the first {Math.min(rows.length, 1000).toLocaleString()} rows — aggregate in SQL
-          for the rest.
+          {t('Showing the first {n} rows. Aggregate in SQL for the rest.', {
+            n: Math.min(rows.length, 1000).toLocaleString(),
+          })}
         </p>
       ) : null}
     </div>
@@ -146,7 +168,7 @@ function DataTable({ run, props }: { run: QueryRun; props: TableProps }) {
 }
 
 /** Rows to look up, not a picture: top-N lists, recent records, breakdowns with many columns. */
-export function Table(props: TableProps) {
+function TablePanel(props: TableProps) {
   const state = useQuery(props.query)
   return (
     <PanelFrame {...props} component="Table" state={state} defaultHeight={360}>
@@ -154,3 +176,5 @@ export function Table(props: TableProps) {
     </PanelFrame>
   )
 }
+
+export const Table = editable('Table', TablePanel)

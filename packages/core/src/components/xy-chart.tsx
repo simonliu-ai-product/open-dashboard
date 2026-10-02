@@ -1,4 +1,4 @@
-import { type PointerEvent, type ReactNode, useState } from 'react'
+import { type MouseEvent, type ReactNode, useState } from 'react'
 import {
   type FormatContext,
   formatCategory,
@@ -6,10 +6,13 @@ import {
   formatValue,
   tickFormatter,
 } from '../runtime/format.js'
+import { type Translate, useT } from '../runtime/i18n.js'
 import { linear, niceDomain, thinIndices } from '../runtime/scale.js'
 import { humanize, pickX, pickY, type Series, shapeSeries } from '../runtime/shape.js'
 import type { Format, QueryRun } from '../runtime/types.js'
 import { useQuery } from '../runtime/use-query.js'
+import { useDrill } from './drill.js'
+import { editable } from './editable.js'
 import { PanelFrame, type PanelProps, useFormatContext, useSize } from './panel.js'
 
 export interface XYProps extends PanelProps {
@@ -46,16 +49,21 @@ interface Prepared {
   x: string
 }
 
-function prepare(run: QueryRun, props: XYProps): Prepared | string {
+function prepare(run: QueryRun, props: XYProps, t: Translate): Prepared | string {
   const { columns, rows } = run.result
   const x = pickX(columns, props.x)
-  if (!x) return 'The query returned no columns.'
+  if (!x) return t('The query returned no columns.')
   const y = pickY(columns, x, props.y)
   if (y.length === 0)
-    return `No numeric column to plot — name one with y="…" (columns: ${columns.map((c) => c.name).join(', ')}).`
+    return t('No numeric column to plot. Name one with y="…" (columns: {columns}).', {
+      columns: columns.map((c) => c.name).join(', '),
+    })
   const shaped = shapeSeries(rows, x, props.series ? y.slice(0, 1) : y, props.series)
   for (const s of shaped.series) {
-    s.label = props.labels?.[s.key] ?? (props.series ? s.label : humanize(s.key))
+    s.label =
+      s.key === '__other'
+        ? t('Other')
+        : (props.labels?.[s.key] ?? (props.series ? s.label : humanize(s.key)))
   }
   return { ...shaped, x }
 }
@@ -179,9 +187,11 @@ function Plot({
   kind: Kind
 }) {
   const ctx = useFormatContext()
+  const t = useT()
   const [ref, size] = useSize<HTMLDivElement>()
   const [hover, setHover] = useState<TooltipState | null>(null)
-  const prepared = prepare(run, props)
+  const prepared = prepare(run, props, t)
+  const drill = useDrill(props.drill)
   if (typeof prepared === 'string') return <div className="odd-panel-message">{prepared}</div>
 
   const { categories, series } = prepared
@@ -247,7 +257,7 @@ function Plot({
       })
     : thinned
 
-  const indexAt = (event: PointerEvent<SVGRectElement>): number => {
+  const indexAt = (event: MouseEvent<SVGRectElement>): number => {
     const rect = event.currentTarget.ownerSVGElement?.getBoundingClientRect()
     if (!rect) return 0
     const px = horizontal
@@ -308,7 +318,11 @@ function Plot({
             d={d}
             fill={color(si)}
             className="odd-bar"
-            data-dim={hover && hover.index !== i ? '' : undefined}
+            data-dim={
+              (hover && hover.index !== i) || (drill?.anyActive && !drill.isActive(categories[i]))
+                ? ''
+                : undefined
+            }
           />,
         )
       })
@@ -531,12 +545,15 @@ function Plot({
                 </text>
               ),
             )}
+            {/* biome-ignore lint/a11y/noStaticElementInteractions: hover and a pointer shortcut; the filter's own <select> is the keyboard path */}
             <rect
               x={margin.left}
               y={margin.top}
               width={innerW}
               height={innerH}
               fill="transparent"
+              className={drill ? 'odd-drillable' : undefined}
+              onClick={drill ? (event) => drill.pick(categories[indexAt(event)]) : undefined}
               onPointerMove={(event) => {
                 const index = indexAt(event)
                 const rect = event.currentTarget.ownerSVGElement?.getBoundingClientRect()
@@ -567,16 +584,22 @@ function XYPanel(props: BarChartProps & LineChartProps & { kind: Kind; component
 }
 
 /** Change over time. One line per measure, or per value of `series`. */
-export function LineChart(props: LineChartProps) {
+function LineChartPanel(props: LineChartProps) {
   return <XYPanel {...props} kind={props.area ? 'area' : 'line'} component="LineChart" />
 }
 
 /** A line chart with the area under each line washed in — stack it for part-of-whole over time. */
-export function AreaChart(props: XYProps) {
+function AreaChartPanel(props: XYProps) {
   return <XYPanel {...props} kind="area" component="AreaChart" />
 }
 
 /** Comparing magnitudes across categories. */
-export function BarChart(props: BarChartProps) {
+function BarChartPanel(props: BarChartProps) {
   return <XYPanel {...props} kind="bar" component="BarChart" />
 }
+
+export const LineChart = editable('LineChart', LineChartPanel)
+
+export const AreaChart = editable('AreaChart', AreaChartPanel)
+
+export const BarChart = editable('BarChart', BarChartPanel)
