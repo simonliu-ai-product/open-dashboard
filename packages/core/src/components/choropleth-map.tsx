@@ -63,12 +63,16 @@ function Regions({ run, props }: { run: QueryRun; props: ChoroplethMapProps }) {
     return <div className="odd-panel-message">{t('The GeoJSON has no polygons to draw.')}</div>
 
   const numbers = [...values.values()].map((v) => v.value)
-  const min = Math.min(0, ...numbers)
-  const max = Math.max(0, ...numbers, 1e-9)
+  // The colours span the data, not zero to max: county temperatures of 28–32 °C
+  // drawn from 0 would all be the same blue. The legend shows the range used.
+  const low = Math.min(...numbers)
+  const high = Math.max(...numbers)
+  const min = Number.isFinite(low) ? (low === high ? Math.min(0, low) : low) : 0
+  const max = Number.isFinite(high) ? (low === high && high === 0 ? 1e-9 : high) : 1e-9
   const polar = props.scale === 'diverging'
   const extent = Math.max(Math.abs(min), Math.abs(max), 1e-9)
   const colour = (n: number) =>
-    polar ? diverging(n / extent) : sequential((n - min) / (max - min || 1))
+    polar ? diverging(n / extent) : sequential(0.15 + (0.85 * (n - min)) / (max - min || 1))
   const project = fitProjection(bounds, size.width, size.height, 8)
   const ticks = tickFormatter([polar ? -extent : min, polar ? extent : max], props.format, ctx)
 
@@ -135,7 +139,7 @@ function Regions({ run, props }: { run: QueryRun; props: ChoroplethMapProps }) {
           style={{
             background: polar
               ? `linear-gradient(to right, ${diverging(-1)}, ${diverging(0)}, ${diverging(1)})`
-              : `linear-gradient(to right, ${sequential(0)}, ${sequential(0.5)}, ${sequential(1)})`,
+              : `linear-gradient(to right, ${sequential(0.15)}, ${sequential(0.575)}, ${sequential(1)})`,
           }}
         />
         <span>{ticks(polar ? extent : max)}</span>

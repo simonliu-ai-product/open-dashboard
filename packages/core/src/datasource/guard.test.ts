@@ -17,6 +17,14 @@ describe('assertReadOnlySql', () => {
     }
   })
 
+  it('accepts a SELECT that opens with a scalar subquery', () => {
+    expect(() =>
+      assertReadOnlySql('SELECT (SELECT max(x) FROM t) AS top, 1', 'sqlite'),
+    ).not.toThrow()
+    expect(() => assertReadOnlySql('WITH(x) AS (SELECT 1) SELECT * FROM x', 'sqlite')).not.toThrow()
+    expect(() => assertReadOnlySql('INSERT(1)', 'sqlite')).toThrow(/only SELECT/)
+  })
+
   it('refuses writes, scripts and procedures', () => {
     expect(() => assertReadOnlySql('DELETE FROM t', 'test')).toThrow(/only SELECT/)
     expect(() => assertReadOnlySql('WITH x AS (SELECT 1) DELETE FROM t', 'test')).toThrow(

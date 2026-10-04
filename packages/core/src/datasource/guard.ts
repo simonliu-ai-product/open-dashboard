@@ -122,7 +122,9 @@ export function assertReadOnlySql(sql: string, engine: string): void {
   if (words.includes(';')) {
     throw new DatasourceError(`${engine}: one statement per query — remove the extra ";"`)
   }
-  const first = words[0]
+  // `SELECT (SELECT …) AS x` reads as the word `select(`: the paren is a
+  // subquery here, not a call, so the statement still starts with SELECT.
+  const first = words[0]?.replace(/\($/, '')
   if (!first || !READ_STARTS.has(first)) {
     throw new DatasourceError(
       `${engine}: only SELECT / WITH queries can run here (got "${first ?? ''}")`,

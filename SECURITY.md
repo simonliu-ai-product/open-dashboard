@@ -41,7 +41,7 @@ a team — behind a login — is out of scope for 0.1.
 | Markdown in `database.md` injecting script | Rendered as React elements, never HTML; links only `http(s)` | 8.28 | `runtime/markdown.tsx` | `markdown.test.ts` |
 | Large request bodies, runaway queries | Bodies over 1 MB refused; per-query timeout; row cap | 8.6 Capacity management | `api-plugin` `readBody`, drivers | — |
 | Exposure on a network | Binds to localhost; `--host` prints a warning that the API has no login | 8.20 | `cli/dev.ts` | — |
-| Vulnerable dependencies | `pnpm audit --prod` before a release; drivers are optional peers, not bundled | 8.8 Technical vulnerabilities | release checklist | 0.2.0: no known vulnerabilities |
+| Vulnerable dependencies | `pnpm audit --prod` before a release; drivers are optional peers, not bundled | 8.8 Technical vulnerabilities | release checklist | 0.2.1: no known vulnerabilities |
 
 ## Known limits
 

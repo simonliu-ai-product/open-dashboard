@@ -71,8 +71,11 @@ function Tiles({ run, props }: { run: QueryRun; props: TileMapProps }) {
   if (numbers.length === 0) {
     return <div className="odd-panel-message">{t('No rows matched a place on the map.')}</div>
   }
-  const min = Math.min(0, ...numbers)
-  const max = Math.max(...numbers, 1e-9)
+  // As on the choropleth: the colours span the data, not zero to max.
+  const low = Math.min(...numbers)
+  const high = Math.max(...numbers)
+  const min = Number.isFinite(low) ? (low === high ? Math.min(0, low) : low) : 0
+  const max = Number.isFinite(high) ? (low === high && high === 0 ? 1e-9 : high) : 1e-9
   const cols = Math.max(...cells.map((c) => c.col)) + 1
   const rows = Math.max(...cells.map((c) => c.row)) + 1
   const side = Math.max(0, Math.min((size.width - GAP) / cols, (size.height - GAP) / rows))
@@ -124,7 +127,9 @@ function Tiles({ run, props }: { run: QueryRun; props: TileMapProps }) {
                     width={side - GAP}
                     height={side - GAP}
                     rx={Math.min(6, side / 8)}
-                    fill={share === undefined ? 'var(--odd-hover)' : sequential(share)}
+                    fill={
+                      share === undefined ? 'var(--odd-hover)' : sequential(0.15 + 0.85 * share)
+                    }
                     className="odd-tile"
                   />
                   {side >= 30 ? (
@@ -186,7 +191,7 @@ function Tiles({ run, props }: { run: QueryRun; props: TileMapProps }) {
         <span
           className="odd-scale-bar"
           style={{
-            background: `linear-gradient(to right, ${sequential(0)}, ${sequential(0.5)}, ${sequential(1)})`,
+            background: `linear-gradient(to right, ${sequential(0.15)}, ${sequential(0.575)}, ${sequential(1)})`,
           }}
         />
         <span>{ticks(max)}</span>

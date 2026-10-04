@@ -7,6 +7,7 @@ import { addComment, listComments } from './comment.js'
 import { listDashboards, runDashboardQuery, runSql } from './dashboards.js'
 import { docSourceOf, readDatabaseDoc } from './database-doc.js'
 import { type Fixture, makeFixture } from './fixture.test-helper.js'
+import { staleSkills, syncSkills } from './skills.js'
 import { describeSource, readSchema, schemaToText } from './sources.js'
 
 const DASHBOARD = `import { Dashboard, Filters, Row, Select, Stat, BarChart, TimeRange, type DashboardMeta } from '@open-dashboard/core'
@@ -302,5 +303,27 @@ describe('source detail', () => {
     expect(text).not.toContain('sk-secret-123456')
     expect(text).not.toContain('abc123secret')
     expect(await describeSource(fixture.workspace, 'db')).toEqual({ kind: 'database' })
+  })
+})
+
+describe('skills', () => {
+  it('finds skills older than the package and updates only those', () => {
+    fixture.write(
+      '.claude/skills/create-dashboard/SKILL.md',
+      '---\nname: create-dashboard\n---\nold\n',
+    )
+    fixture.write('.claude/skills/my-own/SKILL.md', '---\nname: my-own\n---\nmine\n')
+    expect(staleSkills(fixture.root)).toEqual(['create-dashboard'])
+
+    const names = syncSkills(fixture.root)
+    expect(names).toContain('create-dashboard')
+    expect(names).toContain('document-database')
+    expect(staleSkills(fixture.root)).toEqual([])
+    expect(readFileSync(join(fixture.root, '.claude/skills/my-own/SKILL.md'), 'utf8')).toContain(
+      'mine',
+    )
+    expect(
+      readFileSync(join(fixture.root, '.agents/skills/create-dashboard/SKILL.md'), 'utf8'),
+    ).toContain('name: create-dashboard')
   })
 })

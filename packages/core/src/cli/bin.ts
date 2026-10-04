@@ -8,7 +8,9 @@ import {
   readSchema,
   runDashboardQuery,
   runSql,
+  SKILL_DIRS,
   schemaToText,
+  syncSkills,
 } from '../ops/index.js'
 import { loadConfig, Workspace } from '../workspace.js'
 import { dev } from './dev.js'
@@ -28,6 +30,7 @@ Commands:
   query --dashboard <id> --name <query>
                             Run one of a dashboard's named queries
   check [id]                Run every query of every dashboard, verify panels
+  sync-skills               Update the agent skills in this workspace to the installed version
 
 Options:
   --help                 Show this, from any command
@@ -115,6 +118,12 @@ export async function run(argv: string[]): Promise<number> {
     if (host) options.host = host
     await dev(options)
     return new Promise<number>(() => {})
+  }
+
+  if (command === 'sync-skills') {
+    const names = syncSkills(root)
+    out(`updated ${names.length} skills in ${SKILL_DIRS.join(' and ')}: ${names.join(', ')}\n`)
+    return 0
   }
 
   if (command === 'drivers') {

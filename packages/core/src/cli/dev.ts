@@ -1,5 +1,6 @@
 import { createServer } from 'vite'
 import { discoverDashboards } from '../ops/dashboards.js'
+import { staleSkills } from '../ops/skills.js'
 import { viteConfigFor } from '../vite/index.js'
 import { type ConfigOverrides, loadConfig, Workspace } from '../workspace.js'
 
@@ -38,6 +39,12 @@ export async function dev(
       found.length === 0
         ? '  next: ask your agent: /create-dashboard\n\n'
         : `  ${found.length} dashboard${found.length === 1 ? '' : 's'}: ${found.map((f) => f.id).join(', ')}\n\n`,
+    )
+  }
+  const stale = staleSkills(config.root)
+  if (stale.length) {
+    out.write(
+      `  skills: ${stale.length === 1 ? '1 is' : `${stale.length} are`} older than this version of open-dashboard — run: open-dashboard sync-skills\n\n`,
     )
   }
   if (options.host) {

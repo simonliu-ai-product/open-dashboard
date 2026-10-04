@@ -24,6 +24,7 @@ pnpm exec open-dashboard schema [source]         # tables, columns, keys, row co
 pnpm exec open-dashboard query "SELECT …"        # run read-only SQL, see rows + types
 pnpm exec open-dashboard query --dashboard <id> --name <query> --param from=2026-01-01
 pnpm exec open-dashboard check [id]              # run every query, verify every panel
+pnpm exec open-dashboard sync-skills             # after upgrading @open-dashboard/core: refresh these skills
 ```
 
 ## Rules

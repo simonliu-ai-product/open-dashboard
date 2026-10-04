@@ -150,6 +150,7 @@ open-dashboard schema [source] [--json]      tables, columns, keys, row counts
 open-dashboard query "<sql>" [--source s] [--param k=v]
 open-dashboard query --dashboard <id> --name <query> [--param k=v]
 open-dashboard check [id] [--json]
+open-dashboard sync-skills                   update this workspace's agent skills after an upgrade
 ```
 
 ## Skills shipped to every workspace
