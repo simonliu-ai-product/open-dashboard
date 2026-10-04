@@ -107,6 +107,8 @@ shareable link. Light and dark themes, a 12-column grid, auto-refresh.
 | `clickhouse` | ClickHouse | `pnpm add @clickhouse/client` | ClickHouse Cloud |
 | `bigquery` | BigQuery | `pnpm add @google-cloud/bigquery` | |
 | `snowflake` | Snowflake | `pnpm add snowflake-sdk` | |
+| `http` | JSON HTTP API | built in | REST and open-data APIs — GET only |
+| `mcp` | MCP server | built in | remote or local; read-only tools only |
 
 Configure as many as you like; each query names its `-- source:`. To join
 across them, a query can `-- uses:` other queries' results as tables — it runs
@@ -133,6 +135,9 @@ tested against stand-ins for their SDKs.
   Use a read-only database role anyway — `/connect-database` gives the grant.
 - **BigQuery spend is capped**: queries over `maximumBytesBilled` (10 GiB by
   default) are refused before they run.
+- **Secrets are masked** in every error, log line and CLI message, and the
+  dev server never serves a database file, key, `.sql` or `.env` raw. See
+  [SECURITY.md](SECURITY.md).
 - **Parameters are bound, never interpolated.**
 - Results are capped (5,000 rows by default) — aggregate in SQL.
 

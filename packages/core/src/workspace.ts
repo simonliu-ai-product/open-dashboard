@@ -4,6 +4,7 @@ import { pathToFileURL } from 'node:url'
 import { parseEnv } from 'node:util'
 import type { DatasourceConfig, OpenDashboardConfig } from './config.js'
 import { type Datasource, DatasourceError, openDatasource } from './datasource/index.js'
+import { registerSecrets, secretsInEnv, secretsOf } from './datasource/redact.js'
 import type { QueryRun } from './ops/dashboards.js'
 import { parseDuration, QueryCache } from './ops/query-cache.js'
 
@@ -101,6 +102,9 @@ export async function loadConfig(
   }
   const datasources = user.datasources ?? {}
   const names = Object.keys(datasources)
+  // Before anything can fail and print: every secret this config or the
+  // environment holds is masked in messages from here on.
+  registerSecrets([...secretsOf(datasources), ...secretsInEnv(process.env)])
   return {
     root,
     dashboardsDir: user.dashboardsDir ?? 'dashboards',

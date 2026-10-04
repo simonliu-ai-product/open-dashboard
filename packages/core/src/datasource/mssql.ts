@@ -70,7 +70,11 @@ export async function openMssql(
   if (!config.url)
     throw new DatasourceError(`datasource "${name}": url is empty — is it set in .env?`, 500)
   const sql = await importPeer<MssqlModule>('mssql', root, 'mssql')
-  const base = mssqlConfig(config.url, sql.ConnectionPool.parseConnectionString) as {
+  // Called through the class: detached, the static method loses its `this`
+  // and every ADO.NET string failed with "reading '_parseConnectionString'".
+  const base = mssqlConfig(config.url, (text) =>
+    sql.ConnectionPool.parseConnectionString(text),
+  ) as {
     options?: Record<string, unknown>
   }
   const pool = new sql.ConnectionPool({

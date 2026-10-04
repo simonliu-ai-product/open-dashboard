@@ -1,5 +1,6 @@
 import type { ParamValue } from '../config.js'
 import { DRIVERS } from '../datasource/registry.js'
+import { errorMessage } from '../datasource/types.js'
 import {
   checkWorkspace,
   listSources,
@@ -89,6 +90,11 @@ function parseParam(raw: string): [string, ParamValue] {
 }
 
 const HELP = ['--help', '-h', 'help']
+
+/** An error as the user may see it: readable, and with any secret in it masked. */
+export function describeError(error: unknown): string {
+  return errorMessage(error)
+}
 
 export async function run(argv: string[]): Promise<number> {
   const command = argv[0]

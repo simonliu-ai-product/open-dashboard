@@ -49,6 +49,15 @@ ORDER BY 1;
 - Those header lines must come **directly** after `-- name:`.
 - A trailing `;` is fine. One statement per query.
 
+### HTTP and MCP sources
+
+Queries on an `http` or `mcp` source are **SQLite** SQL over the tables the
+config defines; each table is fetched (or its tool called) when a query names
+it. Values are as the API sent them — cast numeric strings (`CAST(x AS REAL)`),
+convert odd dates in SQL, and read nested JSON with `json_extract` /
+`json_each`. A table whose URL or tool `args` hold `:name` needs that
+parameter, usually a `<Select>`.
+
 ### Across databases — `-- uses:`
 
 A query cannot join tables from two datasources. Instead, write one query per

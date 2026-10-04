@@ -1114,6 +1114,223 @@ button {
   gap: 16px;
 }
 
+.odd-origin {
+  margin-bottom: 32px;
+  padding: 16px 18px;
+  border-radius: var(--odd-radius);
+  background: var(--odd-surface);
+  box-shadow: 0 0 0 1px var(--odd-border);
+}
+
+.odd-origin > header {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 6px 12px;
+  margin-bottom: 12px;
+}
+
+.odd-origin > header h2 {
+  margin: 0;
+  font-size: 15px;
+  font-weight: 620;
+}
+
+.odd-origin > header code {
+  color: var(--odd-ink-2);
+  font-family: var(--odd-mono);
+  font-size: 12.5px;
+}
+
+.odd-origin-note {
+  color: var(--odd-muted);
+  font-size: 12px;
+}
+
+.odd-safety {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  color: var(--odd-ink-2);
+  font-size: 11.5px;
+  font-weight: 560;
+  white-space: nowrap;
+}
+
+/* A dot in the status colour, so the state is never colour-only text. */
+.odd-safety::before {
+  content: "";
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--odd-muted);
+}
+
+.odd-safety[data-tone="good"]::before {
+  background: var(--odd-good);
+}
+
+.odd-safety[data-tone="warning"]::before {
+  background: var(--odd-warning);
+}
+
+.odd-safety[data-tone="critical"]::before {
+  background: var(--odd-critical);
+}
+
+.odd-origin-list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.odd-origin-list li {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto auto;
+  align-items: baseline;
+  column-gap: 14px;
+  padding: 7px 0;
+  border-top: 1px solid var(--odd-grid);
+  font-size: 13px;
+}
+
+.odd-method {
+  padding: 1px 6px;
+  border-radius: 4px;
+  background: color-mix(in srgb, var(--odd-good) 14%, transparent);
+  color: var(--odd-ink);
+  font-family: var(--odd-mono);
+  font-size: 11px;
+  font-weight: 650;
+}
+
+.odd-origin-call {
+  min-width: 0;
+  color: var(--odd-ink);
+  font-family: var(--odd-mono);
+  font-size: 12.5px;
+  overflow-wrap: anywhere;
+}
+
+.odd-origin-args {
+  color: var(--odd-muted);
+}
+
+.odd-origin-call mark {
+  padding: 0 2px;
+  border-radius: 3px;
+  background: color-mix(in srgb, var(--odd-accent) 18%, transparent);
+  color: var(--odd-accent-ink);
+}
+
+.odd-origin-table {
+  color: var(--odd-accent-ink);
+  font-family: var(--odd-mono);
+  font-size: 12.5px;
+  text-decoration: none;
+}
+
+.odd-origin-table::before {
+  content: "→ ";
+  color: var(--odd-muted);
+}
+
+.odd-origin-table:hover {
+  text-decoration: underline;
+}
+
+.odd-origin-meta {
+  display: flex;
+  gap: 10px;
+  color: var(--odd-muted);
+  font-size: 12px;
+  white-space: nowrap;
+}
+
+.odd-origin-error {
+  margin: 0 0 8px;
+  color: var(--odd-critical);
+  font-size: 12.5px;
+}
+
+.odd-origin-more {
+  margin-top: 12px;
+}
+
+.odd-origin-more summary {
+  color: var(--odd-ink-2);
+  font-size: 12.5px;
+  cursor: pointer;
+}
+
+.odd-origin-more .odd-search {
+  margin: 10px 0 6px;
+}
+
+.odd-tool-list {
+  max-height: 360px;
+  margin: 0;
+  padding: 0;
+  overflow-y: auto;
+  list-style: none;
+}
+
+.odd-tool-list li {
+  display: grid;
+  grid-template-columns: 96px minmax(160px, 260px) minmax(0, 1fr);
+  align-items: baseline;
+  column-gap: 12px;
+  padding: 5px 0;
+  border-top: 1px solid var(--odd-grid);
+  font-size: 12.5px;
+}
+
+.odd-tool-list code {
+  font-family: var(--odd-mono);
+  overflow-wrap: anywhere;
+}
+
+.odd-tool-list li > span:last-child {
+  color: var(--odd-muted);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.odd-table-origin {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 10px;
+  margin: -2px 0 10px;
+  color: var(--odd-muted);
+  font-size: 12px;
+}
+
+.odd-table-origin code {
+  color: var(--odd-ink-2);
+  font-family: var(--odd-mono);
+}
+
+@media (max-width: 640px) {
+  .odd-origin-list li {
+    grid-template-columns: auto minmax(0, 1fr);
+    row-gap: 2px;
+  }
+
+  .odd-origin-table,
+  .odd-origin-meta {
+    grid-column: 2;
+  }
+
+  .odd-tool-list li {
+    grid-template-columns: auto minmax(0, 1fr);
+  }
+
+  .odd-tool-list li > span:last-child {
+    grid-column: 2;
+  }
+}
+
 .odd-db {
   display: grid;
   grid-template-columns: minmax(0, 1fr);

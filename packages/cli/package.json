@@ -1,6 +1,6 @@
 {
   "name": "@open-dashboard/cli",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "Scaffolder for open-dashboard — describe a dashboard to your agent, get a live one over your database.",
   "license": "MIT",
   "repository": {

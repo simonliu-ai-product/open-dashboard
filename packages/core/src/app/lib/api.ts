@@ -2,7 +2,7 @@ import type { ParamValue, SchemaInfo } from '../../config.js'
 import type { DashboardSummary } from '../../ops/dashboards.js'
 import type { DatabaseDoc } from '../../ops/database-doc.js'
 import type { DashboardLayout, LayoutEdit } from '../../ops/layout.js'
-import type { SourceStatus } from '../../ops/sources.js'
+import type { SourceDetail, SourceStatus } from '../../ops/sources.js'
 import type { QueryRun } from '../../runtime/types.js'
 
 const BASE = '/__odd/api/'
@@ -26,6 +26,8 @@ export const api = {
   dashboards: () =>
     request<{ dashboards: DashboardSummary[] }>('dashboards').then((r) => r.dashboards),
   sources: () => request<{ sources: SourceStatus[] }>('sources').then((r) => r.sources),
+  sourceDetail: (source: string) =>
+    request<SourceDetail>(`source-detail?source=${encodeURIComponent(source)}`),
   databaseDoc: (source: string) =>
     request<DatabaseDoc>(`database-doc?source=${encodeURIComponent(source)}`),
   schema: (source: string) => request<SchemaInfo>(`schema?source=${encodeURIComponent(source)}`),

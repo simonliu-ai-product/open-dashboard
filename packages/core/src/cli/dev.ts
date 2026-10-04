@@ -40,6 +40,15 @@ export async function dev(
         : `  ${found.length} dashboard${found.length === 1 ? '' : 's'}: ${found.map((f) => f.id).join(', ')}\n\n`,
     )
   }
+  if (options.host) {
+    // The dev API has no login: on a network address, anyone who can reach it
+    // can run the dashboards' queries and read the schema.
+    out.write(
+      '  warning: --host serves this workspace to your network with no login.\n' +
+        '           Anyone who can reach it can read the dashboards and their data.\n' +
+        '           Use it on a network you trust, and stop it when you are done.\n\n',
+    )
+  }
   if (options.open) server.openBrowser()
 
   return {

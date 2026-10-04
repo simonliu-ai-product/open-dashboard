@@ -1,10 +1,12 @@
 import { basename, dirname, join, relative, sep } from 'node:path'
 import type { Connect, Plugin, ViteDevServer } from 'vite'
 import type { ParamValue } from '../config.js'
+import { redactValue } from '../datasource/redact.js'
 import { errorMessage } from '../datasource/types.js'
 import {
   addComment,
   dashboardQueries,
+  describeSource,
   docSourceOf,
   editLayout,
   getCurrent,
@@ -21,6 +23,7 @@ import {
   setCurrent,
 } from '../ops/index.js'
 import { type ConfigOverrides, loadConfig, type Workspace } from '../workspace.js'
+import { referencedFiles, requestedFile } from './file-guard.js'
 
 const PREFIX = '/__odd/api/'
 
@@ -34,12 +37,24 @@ function json(res: Res, status: number, body: unknown): void {
   res.statusCode = status
   res.setHeader('Content-Type', 'application/json')
   res.setHeader('Cache-Control', 'no-store')
-  res.end(JSON.stringify(body))
+  res.setHeader('X-Content-Type-Options', 'nosniff')
+  // Errors are masked where they are made; this is the last check before the
+  // wire. Query results are not touched: they are the user's data.
+  const safe = status >= 400 && body && typeof body === 'object' ? redactValue(body) : body
+  res.end(JSON.stringify(safe))
 }
+
+/** Notes and layout edits are small; anything bigger is refused before it is held in memory. */
+const MAX_BODY = 1024 * 1024
 
 async function readBody(req: Connect.IncomingMessage): Promise<Record<string, unknown>> {
   const chunks: Buffer[] = []
-  for await (const chunk of req) chunks.push(chunk as Buffer)
+  let size = 0
+  for await (const chunk of req) {
+    size += (chunk as Buffer).length
+    if (size > MAX_BODY) throw new OpsError('request body over 1 MB', 413)
+    chunks.push(chunk as Buffer)
+  }
   if (chunks.length === 0) return {}
   return JSON.parse(Buffer.concat(chunks).toString('utf8')) as Record<string, unknown>
 }
@@ -111,7 +126,7 @@ export function apiPlugin(workspace: Workspace, overrides: ConfigOverrides): Plu
             server.config.logger.info(`  open-dashboard: reloaded ${name}`)
             server.ws.send({ type: 'custom', event: 'odd:queries-changed', data: {} })
           } catch (error) {
-            server.config.logger.error(`  open-dashboard: ${name}: ${(error as Error).message}`)
+            server.config.logger.error(`  open-dashboard: ${name}: ${errorMessage(error)}`)
           }
         }
       }
@@ -119,6 +134,16 @@ export function apiPlugin(workspace: Workspace, overrides: ConfigOverrides): Plu
       server.watcher.on('change', onChange)
       server.watcher.on('add', onChange)
       server.watcher.on('unlink', onChange)
+
+      // A file a datasource names — its database, a key — is never a page
+      // asset, whatever it is called. Read per request, so a config reload counts.
+      server.middlewares.use((req, res, next) => {
+        const asked = requestedFile(req.url, workspace.config.root, PREFIX)
+        if (asked && referencedFiles(workspace.config).has(asked)) {
+          return json(res, 403, { error: 'this file is read through the query API only' })
+        }
+        next()
+      })
 
       server.middlewares.use(async (req, res, next) => {
         if (!req.url?.startsWith(PREFIX)) return next()
@@ -172,6 +197,11 @@ export function apiPlugin(workspace: Workspace, overrides: ConfigOverrides): Plu
           }
           if (route === 'sources' && req.method === 'GET') {
             return json(res, 200, { sources: await listSources(workspace) })
+          }
+          if (route === 'source-detail' && req.method === 'GET') {
+            const source = q('source')
+            if (!source) return json(res, 400, { error: 'source is required' })
+            return json(res, 200, await describeSource(workspace, source))
           }
           if (route === 'database-doc' && req.method === 'GET') {
             const source = q('source')

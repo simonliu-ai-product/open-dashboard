@@ -157,6 +157,57 @@ local: { type: 'sqlite', file: 'data/app.db' }
 ```
 - Opened read-only. If the file is replaced (a fresh export), it is reopened.
 
+## HTTP API — `http` (built in)
+
+A JSON API, one table per endpoint. Only GET, only these URLs.
+
+```ts
+twse: {
+  type: 'http',
+  baseUrl: 'https://openapi.twse.com.tw/v1',
+  headers: { Authorization: `Bearer ${process.env.TWSE_TOKEN}` }, // if it needs one
+  tables: {
+    market_daily: { url: '/exchangeReport/FMTQIK' },
+    stock_day: { url: '/exchangeReport/STOCK_DAY_ALL', cache: '10m' },
+    orders: { url: '/orders?since=:from', rows: 'data.items' },
+  },
+},
+```
+- `rows`: dotted path to the array in the response; default the response
+  itself, or its first array property.
+- `:name` in a URL is filled from the query's parameters, URL-encoded.
+- `cache` (default `30s`): one fetch serves every panel reading the table.
+- Values come as the API sends them — often **numbers as strings**: `CAST` in
+  SQL. Nested objects arrive as JSON text: `json_extract`, `json_each`.
+- Fetch a sample first to see the shape: `curl -s <url> | head -c 600`.
+
+## MCP — `mcp` (built in)
+
+An MCP server's tools, one table per tool call. Remote (`url`, streamable HTTP)
+or local (`command` + `args`, stdio).
+
+```ts
+hub: {
+  type: 'mcp',
+  url: 'https://example.com/mcp/',
+  headers: { Authorization: `Bearer ${process.env.HUB_TOKEN}` },
+  tables: {
+    reservoir: { tool: 'tw_rt_reservoir_live', args: { name: ':reservoir' }, rows: 'data' },
+  },
+},
+local: { type: 'mcp', command: 'npx', args: ['-y', 'some-mcp-server'], tables: { … } },
+```
+- Only tools annotated **`readOnlyHint: true`** are called; `destructiveHint`
+  tools never are. `allowUnannotated: true` lets tools that say nothing be
+  called — only when the user confirms they do not write. Tell the user that
+  MCP's read-only guarantee is the tool's own word, weaker than a database's.
+- The tool's result must be JSON: structured content, or a text block that
+  parses. `rows` points at the array inside it.
+- A string `:name` in `args` is filled from the query's parameters (a
+  `<Select>` value, `:from`).
+- List the tools and their annotations before choosing: call `tools/list`
+  (or read the server's docs).
+
 ## When `sources` shows ✗
 
 | Error | Cause |

@@ -1,6 +1,6 @@
 {
   "name": "@open-dashboard/core",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "The dashboard framework built for agents — describe the charts you want, get a live dashboard over your database.",
   "license": "MIT",
   "repository": {
@@ -74,12 +74,14 @@
     "@types/node": "^26.2.0",
     "@types/oracledb": "^7.0.3",
     "@types/pg": "^8.15.0",
+    "@types/picomatch": "^4.0.3",
     "@types/react-dom": "^19.2.4",
     "jsdom": "^30.0.1",
     "mssql": "^12.7.2",
     "mysql2": "^3.24.5",
     "oracledb": "^7.0.1",
     "pg": "^8.23.1",
+    "picomatch": "^4.0.7",
     "snowflake-sdk": "^3.4.0",
     "tsdown": "^0.22.14"
   },

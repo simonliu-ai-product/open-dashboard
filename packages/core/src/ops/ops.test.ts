@@ -1,12 +1,13 @@
 import { readFileSync } from 'node:fs'
 import { join } from 'node:path'
+import { loadConfig } from '../workspace.js'
 import { analyzeDashboard } from './analyze.js'
 import { checkDashboard } from './check.js'
 import { addComment, listComments } from './comment.js'
 import { listDashboards, runDashboardQuery, runSql } from './dashboards.js'
 import { docSourceOf, readDatabaseDoc } from './database-doc.js'
 import { type Fixture, makeFixture } from './fixture.test-helper.js'
-import { readSchema, schemaToText } from './sources.js'
+import { describeSource, readSchema, schemaToText } from './sources.js'
 
 const DASHBOARD = `import { Dashboard, Filters, Row, Select, Stat, BarChart, TimeRange, type DashboardMeta } from '@open-dashboard/core'
 
@@ -280,5 +281,26 @@ describe('database.md', () => {
     expect(docSourceOf(config, join(config.root, 'databases/db/database.md'))).toBe('db')
     expect(docSourceOf(config, join(config.root, 'databases/db/other.md'))).toBeUndefined()
     expect(docSourceOf(config, join(config.root, 'dashboards/db/database.md'))).toBeUndefined()
+  })
+})
+
+describe('source detail', () => {
+  it('shows an API source by endpoint, without header values or tokens', async () => {
+    fixture.write(
+      'open-dashboard.config.mjs',
+      `export default { datasources: { db: { type: 'sqlite', file: 'test.db' }, api: { type: 'http', baseUrl: 'https://api.example.com/v1', headers: { Authorization: 'Bearer sk-secret-123456' }, tables: { prices: { url: '/prices?date=:date&token=abc123secret', rows: 'data' } } } } }\n`,
+    )
+    await fixture.workspace.reconfigure(await loadConfig(fixture.root))
+    const detail = await describeSource(fixture.workspace, 'api')
+    expect(detail).toMatchObject({
+      kind: 'http',
+      base: 'https://api.example.com/v1',
+      headers: ['Authorization'],
+      endpoints: [{ table: 'prices', method: 'GET', rows: 'data', params: ['date'] }],
+    })
+    const text = JSON.stringify(detail)
+    expect(text).not.toContain('sk-secret-123456')
+    expect(text).not.toContain('abc123secret')
+    expect(await describeSource(fixture.workspace, 'db')).toEqual({ kind: 'database' })
   })
 })

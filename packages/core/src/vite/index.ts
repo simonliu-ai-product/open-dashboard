@@ -54,6 +54,28 @@ function realPath(path: string): string {
 }
 
 /**
+ * What the dev server must never hand out as a file. The viewer reads data
+ * only through the query API — read-only, row-capped, by name — so a database
+ * file served raw would bypass all of it, and so would a key file or the SQL
+ * and notes the API serves itself. Vite's own defaults (.env, certificates,
+ * .git) are kept; files a datasource names are refused by `api-plugin` too,
+ * whatever they are called.
+ */
+export const DENY = [
+  '.env',
+  '.env.*',
+  '*.{crt,pem}',
+  '**/.git/**',
+  '*.{key,p8,p12,pfx,jks,keystore}',
+  '*.{db,db3,sqlite,sqlite3,duckdb,wal,db-journal,db-wal,db-shm}',
+  '*.{parquet,csv,tsv,ndjson,jsonl,arrow,feather,xlsx,xls}',
+  '*.sql',
+  'open-dashboard.config.*',
+  'database.md',
+  '**/.open-dashboard/**',
+]
+
+/**
  * In the browser, dashboards and the viewer both get core from its *source*.
  * One module graph means one React context — a dashboard importing the built
  * bundle while the viewer imported source would render panels that cannot see
@@ -115,7 +137,7 @@ export function viteConfigFor(
     server: {
       port,
       strictPort: false,
-      fs: { allow: [root, realPath(core)] },
+      fs: { allow: [root, realPath(core)], deny: DENY },
     },
     ...extra,
   }

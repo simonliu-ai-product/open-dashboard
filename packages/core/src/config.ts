@@ -87,6 +87,62 @@ export interface SnowflakeSource {
   options?: Record<string, unknown>
 }
 
+/**
+ * One table of a JSON source. Its rows are an array in the response: `rows` is
+ * the dotted path to it (`data`, `result.items`); without one, the response
+ * itself when it is an array, else its first array property. Nested values
+ * arrive as JSON text — read them in SQL with `json_extract` / `json_each`.
+ */
+export interface JsonTable {
+  rows?: string
+  /** How long a fetched result is reused before fetching again. Default '30s'. */
+  cache?: string
+}
+
+export interface HttpTable extends JsonTable {
+  /** Absolute, or relative to the source's `baseUrl`. `:name` is replaced by that query parameter. */
+  url: string
+}
+
+/**
+ * A JSON HTTP API, as tables. Only GET, only the URLs written here: the page
+ * cannot point the server anywhere else.
+ */
+export interface HttpSource {
+  type: 'http'
+  baseUrl?: string
+  /** Sent with every request — put tokens in `.env` and reference them here. */
+  headers?: Record<string, string>
+  tables: Record<string, HttpTable>
+}
+
+export interface McpTable extends JsonTable {
+  /** The tool to call. It must be annotated read-only — see `McpSource.allowUnannotated`. */
+  tool: string
+  /** Its arguments. A string `:name` is replaced by that query parameter. */
+  args?: Record<string, unknown>
+}
+
+/**
+ * An MCP server's read-only tools, as tables. Remote (`url`, streamable HTTP)
+ * or local (`command`, stdio).
+ */
+export interface McpSource {
+  type: 'mcp'
+  url?: string
+  headers?: Record<string, string>
+  command?: string
+  args?: string[]
+  env?: Record<string, string>
+  tables: Record<string, McpTable>
+  /**
+   * Call tools that do not say whether they write. Default false: only tools
+   * annotated `readOnlyHint: true` are called, and a `destructiveHint: true`
+   * tool never is.
+   */
+  allowUnannotated?: boolean
+}
+
 export type DatasourceConfig =
   | SqliteSource
   | PostgresSource
@@ -97,6 +153,8 @@ export type DatasourceConfig =
   | ClickhouseSource
   | BigquerySource
   | SnowflakeSource
+  | HttpSource
+  | McpSource
 export type DatasourceType = DatasourceConfig['type']
 
 export interface OpenDashboardConfig {

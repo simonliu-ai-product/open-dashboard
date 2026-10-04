@@ -1,6 +1,8 @@
 import type { SchemaInfo } from '../config.js'
-import { errorMessage } from '../datasource/types.js'
+import { redact, redactValue } from '../datasource/redact.js'
+import { errorMessage, type ToolCatalog, type ToolSummary } from '../datasource/types.js'
 import type { Workspace } from '../workspace.js'
+import { OpsError } from './errors.js'
 
 export interface SourceStatus {
   name: string
@@ -58,4 +60,105 @@ export function schemaToText(schema: SchemaInfo): string {
     lines.push('')
   }
   return lines.join('\n')
+}
+
+/** The `:name` parameters a table's URL or arguments need. */
+function placeholders(value: unknown): string[] {
+  const text = JSON.stringify(value ?? '')
+  return [...new Set([...text.matchAll(/:([A-Za-z_][A-Za-z0-9_]*)/g)].map((m) => m[1] as string))]
+}
+
+export interface HttpEndpoint {
+  table: string
+  method: 'GET'
+  url: string
+  rows?: string
+  cache: string
+  params: string[]
+}
+
+export interface McpToolTable {
+  table: string
+  tool: string
+  args: Record<string, unknown>
+  rows?: string
+  cache: string
+  params: string[]
+  readOnly?: boolean
+  destructive?: boolean
+  title?: string
+}
+
+export type SourceDetail =
+  | { kind: 'database' }
+  | { kind: 'http'; base?: string; headers: string[]; endpoints: HttpEndpoint[] }
+  | {
+      kind: 'mcp'
+      transport: 'http' | 'stdio'
+      endpoint: string
+      headers: string[]
+      allowUnannotated: boolean
+      server?: { name?: string; version?: string }
+      tables: McpToolTable[]
+      tools: ToolSummary[]
+      error?: string
+    }
+
+/**
+ * What an API or MCP source is made of, for the data sources page. Only what
+ * is safe to show: URLs and arguments masked like any message, header names
+ * without their values, a stdio command without its environment.
+ */
+export async function describeSource(workspace: Workspace, name: string): Promise<SourceDetail> {
+  const config = workspace.config.datasources[name]
+  if (!config) throw new OpsError(`unknown datasource "${name}"`, 404)
+  if (config.type === 'http') {
+    return {
+      kind: 'http',
+      ...(config.baseUrl ? { base: redact(config.baseUrl) } : {}),
+      headers: Object.keys(config.headers ?? {}),
+      endpoints: Object.entries(config.tables ?? {}).map(([table, spec]) => ({
+        table,
+        method: 'GET',
+        url: redact(spec.url),
+        ...(spec.rows ? { rows: spec.rows } : {}),
+        cache: spec.cache ?? '30s',
+        params: placeholders(spec.url),
+      })),
+    }
+  }
+  if (config.type !== 'mcp') return { kind: 'database' }
+
+  let catalog: ToolCatalog = { tools: [] }
+  let error: string | undefined
+  try {
+    catalog = (await (await workspace.source(name)).tools?.()) ?? catalog
+  } catch (e) {
+    error = errorMessage(e)
+  }
+  const byName = new Map(catalog.tools.map((tool) => [tool.name, tool]))
+  return {
+    kind: 'mcp',
+    transport: config.url ? 'http' : 'stdio',
+    endpoint: redact(config.url ?? [config.command, ...(config.args ?? [])].join(' ')),
+    headers: Object.keys(config.headers ?? {}),
+    allowUnannotated: Boolean(config.allowUnannotated),
+    ...(catalog.server ? { server: catalog.server } : {}),
+    tables: Object.entries(config.tables ?? {}).map(([table, spec]) => {
+      const tool = byName.get(spec.tool)
+      return {
+        table,
+        tool: spec.tool,
+        args: redactValue(spec.args ?? {}),
+        ...(spec.rows ? { rows: spec.rows } : {}),
+        cache: spec.cache ?? '30s',
+        params: placeholders(spec.args),
+        ...(tool?.readOnly !== undefined ? { readOnly: tool.readOnly } : {}),
+        ...(tool?.destructive ? { destructive: true } : {}),
+        ...(tool?.title ? { title: tool.title } : {}),
+      }
+    }),
+    tools: catalog.tools,
+    ...(error ? { error } : {}),
+  }
 }

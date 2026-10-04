@@ -2,6 +2,8 @@ import type { DatasourceConfig } from '../config.js'
 import { openBigquery } from './bigquery.js'
 import { openClickhouse } from './clickhouse.js'
 import { openDuckdb } from './duckdb.js'
+import { openHttp } from './http.js'
+import { openMcp } from './mcp.js'
 import { openMssql } from './mssql.js'
 import { openMysql } from './mysql.js'
 import { openOracle } from './oracle.js'
@@ -35,6 +37,10 @@ export function openDatasource(
       return openBigquery(name, config, root)
     case 'snowflake':
       return openSnowflake(name, config, root)
+    case 'http':
+      return openHttp(name, config)
+    case 'mcp':
+      return openMcp(name, config)
     default:
       throw new DatasourceError(
         `datasource "${name}": unknown type "${(config as { type?: string }).type}" — use one of ${DRIVERS.map((d) => d.type).join(', ')}`,

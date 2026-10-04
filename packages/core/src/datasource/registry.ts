@@ -94,6 +94,24 @@ export const DRIVERS: DriverInfo[] = [
     example:
       "{ type: 'snowflake', account: process.env.SNOWFLAKE_ACCOUNT ?? '', username: process.env.SNOWFLAKE_USER ?? '', password: process.env.SNOWFLAKE_PASSWORD, warehouse: 'ANALYTICS_WH', database: 'PROD', role: 'REPORTER' }",
   },
+  {
+    type: 'http',
+    label: 'HTTP API',
+    compatible: ['REST and other JSON APIs'],
+    readOnly:
+      'GET only, to URLs written in the config; SQL runs over the response in a scratch SQLite',
+    example:
+      "{ type: 'http', baseUrl: 'https://openapi.twse.com.tw/v1', tables: { market: { url: '/exchangeReport/FMTQIK' } } }",
+  },
+  {
+    type: 'mcp',
+    label: 'MCP',
+    compatible: ['remote (streamable HTTP) and local (stdio) MCP servers'],
+    readOnly:
+      'only tools annotated readOnlyHint (never destructiveHint); SQL runs over their JSON in a scratch SQLite',
+    example:
+      "{ type: 'mcp', url: 'https://example.com/mcp/', headers: { Authorization: process.env.MCP_AUTHORIZATION ?? '' }, tables: { items: { tool: 'list_items', rows: 'data' } } }",
+  },
 ]
 
 export function driverFor(type: string): DriverInfo | undefined {

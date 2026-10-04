@@ -1,4 +1,5 @@
 import type { DatasourceType, ParamValue, QueryResult, SchemaInfo } from '../config.js'
+import { redact } from './redact.js'
 
 export interface QueryOptions {
   maxRows: number
@@ -14,7 +15,26 @@ export interface Datasource {
     options: QueryOptions,
   ): Promise<QueryResult>
   schema(): Promise<SchemaInfo>
+  /** MCP only: the server and every tool it offers, for the data sources page. */
+  tools?(): Promise<ToolCatalog>
   close(): Promise<void>
+}
+
+export interface ToolSummary {
+  name: string
+  title?: string
+  /** The first line of its description. */
+  description?: string
+  /** Words to find it by: the rest of its description, shortened. */
+  search?: string
+  /** `readOnlyHint`, as the server annotated it — undefined when it says nothing. */
+  readOnly?: boolean
+  destructive?: boolean
+}
+
+export interface ToolCatalog {
+  server?: { name?: string; version?: string }
+  tools: ToolSummary[]
 }
 
 export class DatasourceError extends Error {
@@ -22,7 +42,7 @@ export class DatasourceError extends Error {
     message: string,
     readonly status = 400,
   ) {
-    super(message)
+    super(redact(message))
   }
 }
 
@@ -31,11 +51,15 @@ export class DatasourceError extends Error {
  * host is an AggregateError with an empty message and the reasons inside.
  */
 export function errorMessage(error: unknown): string {
+  return redact(rawMessage(error))
+}
+
+function rawMessage(error: unknown): string {
   if (!(error instanceof Error)) return String(error)
   if (error.message) return error.message
   const inner = (error as { errors?: unknown[] }).errors
   if (Array.isArray(inner) && inner.length > 0)
-    return [...new Set(inner.map(errorMessage))].join('; ')
+    return [...new Set(inner.map(rawMessage))].join('; ')
   const code = (error as { code?: string }).code
   return code ?? error.name
 }

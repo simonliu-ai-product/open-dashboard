@@ -2,10 +2,11 @@ import { useEffect, useMemo, useState } from 'react'
 import type { SchemaInfo } from '../../config.js'
 import { driverFor } from '../../datasource/registry.js'
 import type { DatabaseDoc } from '../../ops/database-doc.js'
-import type { SourceStatus } from '../../ops/sources.js'
+import type { SourceDetail, SourceStatus } from '../../ops/sources.js'
 import { useLocale, useT } from '../../runtime/i18n.js'
 import { Blocks, Inline, splitDatabaseDoc } from '../../runtime/markdown.js'
 import { CommandButton } from '../components/command-button.js'
+import { SourceOrigin } from '../components/source-origin.js'
 import { api } from '../lib/api.js'
 
 function SourceError({ message }: { message: string }) {
@@ -43,6 +44,31 @@ function useDatabaseDoc(source: string | undefined): DatabaseDoc | undefined {
     }
   }, [source])
   return doc
+}
+
+function isJsonSource(type: string): boolean {
+  return type === 'http' || type === 'mcp'
+}
+
+function useSourceDetail(
+  source: string | undefined,
+  reload: unknown,
+): Exclude<SourceDetail, { kind: 'database' }> | undefined {
+  const [detail, setDetail] = useState<SourceDetail>()
+  // biome-ignore lint/correctness/useExhaustiveDependencies: refetch when the sources list reloads (config edits)
+  useEffect(() => {
+    setDetail(undefined)
+    if (!source) return
+    let live = true
+    api.sourceDetail(source).then(
+      (found) => live && setDetail(found),
+      () => live && setDetail(undefined),
+    )
+    return () => {
+      live = false
+    }
+  }, [source, reload])
+  return detail && detail.kind !== 'database' ? detail : undefined
 }
 
 /** The database.md overview and notes: the top of the page, at reading width. */
@@ -118,6 +144,20 @@ function useDataView(): [DataView, (view: DataView) => void] {
   return [view, update]
 }
 
+/** Where an API or MCP table comes from, and the parameters it waits for. */
+function TableOrigin({ origin }: { origin: { call: string; params: string[] } | undefined }) {
+  const t = useT()
+  if (!origin) return null
+  return (
+    <p className="odd-table-origin">
+      <code>{origin.call}</code>
+      {origin.params.length ? (
+        <span>{t('needs {names}', { names: origin.params.map((p) => `:${p}`).join(', ') })}</span>
+      ) : null}
+    </p>
+  )
+}
+
 function anchor(name: string): string {
   return `table-${name.replace(/[^A-Za-z0-9_-]/g, '-')}`
 }
@@ -169,6 +209,20 @@ export function DataSourcesView({
     [schema, filter],
   )
   const doc = useDatabaseDoc(current?.ok ? selected : undefined)
+  const detail = useSourceDetail(
+    current?.ok && isJsonSource(current.type) ? selected : undefined,
+    sources,
+  )
+  // JSON has no NOT NULL: on an API or MCP source "nullable" would mark every column.
+  const json = current ? isJsonSource(current.type) : false
+  const origin = useMemo(() => {
+    const out = new Map<string, { call: string; params: string[] }>()
+    if (detail?.kind === 'http')
+      for (const e of detail.endpoints) out.set(e.table, { call: `GET ${e.url}`, params: e.params })
+    if (detail?.kind === 'mcp')
+      for (const e of detail.tables) out.set(e.table, { call: e.tool, params: e.params })
+    return out
+  }, [detail])
   const ids = useMemo(
     () =>
       tables.map((table) => anchor(table.schema ? `${table.schema}.${table.name}` : table.name)),
@@ -239,9 +293,14 @@ export function DataSourcesView({
             value={filter}
             onChange={(e) => setFilter(e.target.value)}
           />
+          {detail ? <SourceOrigin detail={detail} tables={schema.tables} /> : null}
           <div className="odd-schema">
             {tables.map((table) => (
-              <section key={`${table.schema ?? ''}.${table.name}`} className="odd-schema-table">
+              <section
+                key={`${table.schema ?? ''}.${table.name}`}
+                id={anchor(table.schema ? `${table.schema}.${table.name}` : table.name)}
+                className="odd-schema-table"
+              >
                 <header>
                   <h2>
                     {table.schema && table.schema !== 'public'
@@ -256,6 +315,7 @@ export function DataSourcesView({
                       : t(table.kind === 'view' ? 'View' : 'Table')}
                   </span>
                 </header>
+                <TableOrigin origin={origin.get(table.name)} />
                 <table>
                   <tbody>
                     {table.columns.map((column) => {
@@ -270,7 +330,7 @@ export function DataSourcesView({
                           <td className="odd-muted">
                             {fk
                               ? `→ ${fk.table}.${fk.references}`
-                              : column.nullable
+                              : column.nullable || json
                                 ? ''
                                 : t('not null')}
                           </td>
@@ -286,6 +346,7 @@ export function DataSourcesView({
       ) : schema ? (
         <div className="odd-db">
           <article className="odd-db-main">
+            {detail ? <SourceOrigin detail={detail} tables={schema.tables} /> : null}
             {doc && selected ? <DatabaseIntro doc={doc} source={selected} /> : null}
             {tables.map((table) => {
               const qualified = table.schema ? `${table.schema}.${table.name}` : table.name
@@ -304,6 +365,7 @@ export function DataSourcesView({
                         : t(table.kind === 'view' ? 'View' : 'Table')}
                     </span>
                   </header>
+                  <TableOrigin origin={origin.get(table.name)} />
                   {about?.about.length ? (
                     <div className="odd-prose">
                       <Blocks blocks={about.about} />
@@ -321,7 +383,7 @@ export function DataSourcesView({
                           <dd className="odd-db-type">
                             {column.type}
                             {column.primaryKey ? <span className="odd-badge">PK</span> : null}
-                            {column.nullable ? (
+                            {column.nullable && !json ? (
                               <span className="odd-db-nullable">{t('nullable')}</span>
                             ) : null}
                           </dd>

@@ -32,10 +32,13 @@ Ask only for what you cannot see. One `AskUserQuestion` call at most:
   | ClickHouse, ClickHouse Cloud | `clickhouse` |
   | BigQuery | `bigquery` |
   | Snowflake | `snowflake` |
+  | a JSON HTTP API (REST, open data portals) | `http` |
+  | an MCP server (its read-only tools) | `mcp` |
 
-  MongoDB, Elasticsearch, DynamoDB and other non-SQL stores are not supported —
-  say so plainly; suggest a SQL layer they may already have (e.g. a warehouse
-  export, Athena, DuckDB over an export).
+  MongoDB, Elasticsearch, DynamoDB and other non-SQL stores have no driver of
+  their own. If they expose a JSON HTTP API or an MCP server, use `http` /
+  `mcp`; otherwise say so plainly and suggest a SQL layer they may already have
+  (a warehouse export, Athena, DuckDB over an export).
 - **Where** — a file path, a connection string, or (BigQuery / Snowflake) the
   project / account identifiers.
 - **A name** — short, lowercase: `shop`, `warehouse`, `billing`. It appears in

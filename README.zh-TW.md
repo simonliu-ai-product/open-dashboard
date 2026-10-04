@@ -71,6 +71,8 @@ dashboards/sales-overview/
 | `clickhouse` | ClickHouse | `pnpm add @clickhouse/client` | ClickHouse Cloud |
 | `bigquery` | BigQuery | `pnpm add @google-cloud/bigquery` | |
 | `snowflake` | Snowflake | `pnpm add snowflake-sdk` | |
+| `http` | JSON HTTP API | 內建 | REST、政府開放資料等 API，只送 GET |
+| `mcp` | MCP 伺服器 | 內建 | 遠端或本機；只呼叫唯讀工具 |
 
 可以同時設定多個資料來源，每支查詢用 `-- source:` 指定。要跨資料庫 JOIN，查詢可以用
 `-- uses:` 把其他查詢的結果當成資料表：它在一個暫時的 SQLite 裡執行，只碰得到那些結果，
@@ -92,6 +94,8 @@ dashboards/sales-overview/
   帳號，`/connect-database` 會提供各引擎的授權語法。
 - **BigQuery 有花費上限**：預估掃描量超過 `maximumBytesBilled`（預設 10 GiB）的查詢會在
   執行前就被拒絕。
+- **秘密一律遮罩**：錯誤訊息、log、CLI 輸出裡的密碼與金鑰都會換成 `••••`；dev server
+  也不會直接送出資料庫檔、金鑰、`.sql` 或 `.env`。詳見 [SECURITY.md](SECURITY.md)。
 - **參數一律綁定**，不會字串拼接。
 - 查詢結果有筆數上限（預設 5,000 筆），請在 SQL 裡先彙總。
 
