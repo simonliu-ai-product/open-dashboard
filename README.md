@@ -1,22 +1,228 @@
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset=".github/assets/preview-dark.png">
+  <img src=".github/assets/preview.png" alt="open-dashboard — the dashboard framework built for agents." width="100%">
+</picture>
+
 # open-dashboard
 
-**Describe the dashboard you want. Your coding agent builds it — live, over your own database.**
+[![npm](https://img.shields.io/npm/v/@open-dashboard/core?style=flat)](https://www.npmjs.com/package/@open-dashboard/core)
+[![GitHub stars](https://img.shields.io/github/stars/simonliu-ai-product/open-dashboard?style=flat)](https://github.com/simonliu-ai-product/open-dashboard/stargazers)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg?style=flat)](https://opensource.org/licenses/MIT)
 
-[繁體中文](README.zh-TW.md)
+**English** · [繁體中文](README.zh-TW.md)
 
-![A sales dashboard built with open-dashboard](.github/assets/screenshot.png)
+**The dashboard framework built for agents.** Describe the dashboard you want in natural language — your coding agent writes the SQL and the panels. open-dashboard runs every query read-only against your own database, renders the charts, keeps filters in the URL, and hot-reloads as the agent types.
 
-Grafana and Superset ask you to click a dashboard together. open-dashboard is
-the other way round: you tell Claude Code (or any coding agent) *"revenue by
-month, top 10 products, orders by region, filterable by region"*, and it writes
-the SQL and the panels into your workspace. The viewer hot-reloads as it types.
+Grafana and Superset ask you to click a dashboard together. open-dashboard is the other way round: you tell Claude Code (or any coding agent) *"revenue by month, top 10 products, orders by region, filterable by region"*, and it writes the files. It is the same idea as [open-slide](https://github.com/1weiho/open-slide), [open-doc](https://github.com/simonliu-ai-product/open-doc) and open-sheet: the artifact is plain files an agent is good at writing, the framework does the rendering, and the skills that ship with every workspace teach the agent the workflow.
 
-It is the same idea as open-slide, open-doc and open-sheet:
-the artifact is plain files an agent is good at writing, the framework does the
-rendering, and the skills that ship with every workspace teach the agent the
-workflow.
+```bash
+npx @open-dashboard/cli init my-dashboards
+```
 
-## Quick start
+<img src=".github/assets/viewer.png" alt="The dashboard viewer — data sources and dashboards on the left, filters top right, Preview / Edit in the header." width="100%">
+
+<sub>The dashboard viewer — data sources and dashboards on the left, filters top right, Preview / Edit in the header. Demo data is generated and fictional.</sub>
+
+## Why
+
+Dashboards are the output nobody wants to click together. Agents write excellent SQL and have nowhere good to put it: a hand-rolled web page reinvents charts, filters and layout every time and puts SQL in the browser; a BI tool has no file an agent can write. open-dashboard gives the agent two files it is already fluent in — SQL and TSX — and gives you a live, read-only dashboard over the database you already have.
+
+## Highlights
+
+### 🗂️ A dashboard is two files
+
+```
+dashboards/sales-overview/
+  queries.sql     named SQL — runnable in any SQL tool
+  index.tsx       which panels, in what order, showing which columns
+```
+
+"How the number is computed" and "how it is laid out" live apart. You can paste `queries.sql` into DBeaver to check a figure, and a pull request shows exactly which metric definition changed. Panels name a query; they never contain SQL. See [The file contract](#the-file-contract).
+
+### 🤖 Agent-native authoring
+
+Skills ship with every workspace (in `.agents/skills/` and `.claude/skills/`):
+
+- **`/connect-database`** — adds a datasource, writes `.env`, installs the driver, verifies with `sources` + `schema`, and hands you the `GRANT` for a read-only role.
+- **`/document-database`** — writes `databases/<source>/database.md`: what the tables and columns mean, values to filter on, units, traps.
+- **`/create-dashboard`** — explores the schema and real rows first, then *asks* how each metric is defined (refunds in or out? which date range? which slices?) before writing a line. It will not invent a number: a target that is not in your database is a question, not a placeholder.
+- **`/dashboard-authoring`** — the reference: query files, parameters, every component, formats, SQL per dialect.
+- **`/current-dashboard`** — resolves "this chart". The viewer publishes what you are looking at — dashboard, last inspected panel, filter values — to `node_modules/.open-dashboard/current.json`.
+- **`/apply-comments`** — applies the notes you left on panels in the inspector.
+
+After an upgrade, `open-dashboard sync-skills` refreshes them; `dev` tells you when they are out of date.
+
+### 🔒 The browser names a query; it never sends SQL
+
+The viewer can ask for *query `revenue_by_month` of dashboard `sales-overview`* and nothing else. The server reads the `.sql` file from disk, binds the parameters, and runs it. There is no endpoint, prop or option that accepts SQL text from the page — the only SQL that runs is SQL that was written to a file and can be reviewed.
+
+On top of that, every query runs read-only, by the strongest means each engine offers:
+
+| Engine | How it stays read-only |
+| --- | --- |
+| SQLite, DuckDB | file opened read-only (SQLite also `PRAGMA query_only`) |
+| PostgreSQL | every query inside `BEGIN READ ONLY … ROLLBACK`, with a statement timeout |
+| MySQL, Oracle | read-only transaction **and** a single-`SELECT` check, since DDL commits implicitly |
+| SQL Server | single-`SELECT` check, inside a transaction that is always rolled back |
+| ClickHouse | `readonly = 2` on every request |
+| BigQuery | a dry run must report `SELECT`, and scan under `maximumBytesBilled` (10 GiB by default) |
+| Snowflake | single-`SELECT` check; use the read-only role `/connect-database` gives you |
+
+Parameters are always bound, never interpolated, and results are capped (5,000 rows by default) — aggregate in SQL.
+
+### ✅ `check`, because an agent can't see the chart
+
+An agent that wrote a panel has no idea whether the column it named exists in the result. `open-dashboard check` runs every query with the filter defaults the browser would use, then reads the TSX and verifies every query name, every column a panel names, and every parameter against the filters:
+
+```
+$ open-dashboard check sales-overview
+✓ Sales overview (sales-overview)
+  params: from=2026-07-07 to=2026-10-05 region=null
+  · regions: 4 rows, 2 ms [region]
+  · kpis: 1 rows, 15 ms [revenue, revenue_prev, orders, orders_prev, aov, aov_prev]
+  · daily_revenue: 90 rows, 3 ms [day, revenue, orders]
+  · top_products: 10 rows, 2 ms [product, units, revenue]
+  · revenue_by_category: 5 rows, 2 ms [category, revenue]
+```
+
+SQL errors, unknown queries, unbound parameters and missing columns are errors, and `check` exits non-zero on any of them — so the agent runs it before saying "done", and CI can run it too. It reads only literal props: it would rather report less than guess.
+
+### 🔌 Eleven kinds of datasource
+
+| `type` | Database | Install | Also covers |
+| --- | --- | --- | --- |
+| `sqlite` | SQLite | built into Node 22.13+ | |
+| `postgres` | PostgreSQL | `pnpm add pg` | Supabase, Neon, RDS/Aurora, Cloud SQL, AlloyDB, Redshift, CockroachDB, TimescaleDB |
+| `mysql` | MySQL | `pnpm add mysql2` | MariaDB, PlanetScale, TiDB, RDS/Aurora |
+| `mssql` | SQL Server | `pnpm add mssql` | Azure SQL Database / Managed Instance |
+| `oracle` | Oracle | `pnpm add oracledb` | Autonomous Database (thin mode, no Instant Client) |
+| `duckdb` | DuckDB | `pnpm add @duckdb/node-api` | Parquet, CSV and JSON files queried in place |
+| `clickhouse` | ClickHouse | `pnpm add @clickhouse/client` | ClickHouse Cloud |
+| `bigquery` | BigQuery | `pnpm add @google-cloud/bigquery` | |
+| `snowflake` | Snowflake | `pnpm add snowflake-sdk` | |
+| `http` | JSON HTTP API | built in | REST and open-data APIs — GET only |
+| `mcp` | MCP server | built in | remote (streamable HTTP) or local (stdio); read-only tools only |
+
+Configure as many as you like; each query names its `-- source:`. Drivers are optional peers, loaded only when a datasource of that type opens. Rows are normalised once on the server — integers, decimals and timestamps come back the same way from every engine — so a chart written against SQLite renders identically against Postgres. Every engine except BigQuery and Snowflake is exercised by the cross-driver conformance suite against a real server ([`conformance.test.ts`](packages/core/src/datasource/conformance.test.ts)); those two are tested against stand-ins for their SDKs.
+
+`open-dashboard drivers` prints each one with a config example.
+
+### 🌐 HTTP APIs and MCP servers, queried with SQL
+
+Not every number lives in a database. An `http` or `mcp` source turns JSON into tables: each table is one GET endpoint or one MCP tool call, a query fetches only the tables it names, and the SQL runs over them in a scratch SQLite — so filters, `check` and cross-source joins work exactly as they do over a database.
+
+```ts
+twse: {
+  type: 'http',
+  baseUrl: 'https://openapi.twse.com.tw/v1',
+  tables: {
+    stocks: { url: '/exchangeReport/STOCK_DAY_ALL', cache: '10m' },
+  },
+},
+crm: {
+  type: 'mcp',
+  url: 'https://example.com/mcp/',
+  headers: { Authorization: `Bearer ${process.env.CRM_TOKEN ?? ''}` },
+  tables: { accounts: { tool: 'list_accounts', args: { region: ':region' }, rows: 'data' } },
+},
+```
+
+```sql
+-- name: top_value
+-- source: twse
+SELECT Code || ' ' || Name AS stock, CAST(TradeValue AS REAL) / 1e8 AS value_100m
+FROM stocks ORDER BY CAST(TradeValue AS REAL) DESC LIMIT 10;
+```
+
+<img src=".github/assets/http-source.png" alt="An HTTP datasource: each table is one GET endpoint, with its row count and columns." width="100%">
+
+<sub>An HTTP datasource: each table is one GET endpoint, with its row count and columns.</sub>
+
+- `http` sends **GET only**, and only to the URLs in the config — the page cannot point the server anywhere else.
+- `mcp` calls only tools annotated `readOnlyHint`, never a `destructiveHint` tool; a tool that says neither needs `allowUnannotated: true`. The client is built in (no SDK dependency).
+- `:name` in a URL or tool argument is filled from the query's parameters, so filters reach the API too. Nested values arrive as JSON text — read them with `json_extract` / `json_each`.
+- Each table has its own `cache` (30 s by default); a failed call is not cached, so the next refresh retries only what failed.
+
+### 🔗 Cross-database queries
+
+Ad spend in one database, revenue in another. A query can `-- uses:` other queries' results as tables:
+
+```sql
+-- name: channel_return
+-- uses: spend_by_channel, revenue_by_channel
+SELECT s.channel, s.spend, r.revenue, r.revenue / s.spend AS roas
+FROM spend_by_channel s
+LEFT JOIN revenue_by_channel r USING (channel)
+ORDER BY roas DESC;
+```
+
+Each input runs through its own driver, read-only as above; the combining SQL runs in a fresh in-memory SQLite that holds only those results. Postgres can meet ClickHouse — or an MCP server — without either side seeing the other.
+
+### 📖 `database.md`: an AGENTS.md for your database
+
+<img src=".github/assets/database-md.png" alt="The data sources page: database.md on top, each table's notes and columns below." width="100%">
+
+<sub>The data sources page: <code>database.md</code> on top, each table's notes and columns below.</sub>
+
+Column names do not say that refunded orders stay in `orders`, that prices are in cents, or that one campaign month is discounted. `databases/<source>/database.md` does: what the tables mean, which values to filter on, units, time zones, traps. Agents read it before writing SQL (`open-dashboard schema` prints its path first), and the Data sources page shows it beside the schema, live-reloading as it changes.
+
+### 📊 40 panels, hand-written SVG
+
+<img src=".github/assets/gallery.png" alt="Part of the chart gallery: dot plot, dumbbell, slope chart, bullet chart, diverging bars and marimekko." width="100%">
+
+<sub>Part of the chart gallery dashboard in <code>apps/demo</code>.</sub>
+
+| Kind | Panels |
+| --- | --- |
+| Headline | `Stat` (previous-period delta and sparkline), `Gauge`, `Text` |
+| Trend | `LineChart`, `AreaChart`, `BandChart`, `HorizonChart`, `ControlChart`, `Candlestick`, `CalendarHeatmap`, `SmallMultiples` |
+| Compare and rank | `BarChart` (grouped, stacked, horizontal), `DotPlot`, `Dumbbell`, `SlopeChart`, `BumpChart`, `BulletChart`, `DivergingBar`, `ParetoChart`, `Waterfall` |
+| Part of a whole | `PieChart` (donut), `Treemap`, `Marimekko`, `FunnelChart`, `UpSetChart` |
+| Distribution | `Histogram`, `BoxPlot`, `StripPlot`, `EcdfChart`, `ScatterChart`, `Heatmap` |
+| Flow and status | `Sankey`, `Timeline`, `StateTimeline` |
+| Maps | `ChoroplethMap`, `SymbolMap`, `TileMap` |
+| Tables | `Table` (sortable, inline bars), `PivotTable`, `CohortTable` |
+
+No chart library: the core ships to every workspace, and the visual rules are fixed in the framework rather than left to each prompt — one y-axis (there is no dual-axis option), zero always in the domain, one tick format per axis, a validated eight-colour palette with separate dark-mode steps, and a ninth category folded into "Other".
+
+### 🎛️ Filters, drill-down, and links you can share
+
+```tsx
+<Filters>
+  <TimeRange default="90d" />
+  <Select name="region" query="regions" />
+</Filters>
+```
+
+`TimeRange` binds `:from` / `:to` (`today`, `7d`, `30d`, `90d`, `6m`, `12m`, `ytd`); `Select` binds `:region` from a query of options. Filter values live in the URL, so a filtered view is a link. `drill="region"` on a panel makes clicking a bar set that filter — or open another dashboard. Auto-refresh defaults to `meta.refresh`, the reader can change it from the toolbar, and the interval is kept in the URL for a wall display.
+
+### 🖱️ Inspect any panel, leave a note for your agent
+
+<img src=".github/assets/inspect.png" alt="The inspector: the panel's query, source, row count, timing and SQL, with a note for the agent at the bottom." width="100%">
+
+<sub>The inspector: the panel's query, source, row count, timing, the file and line it is defined at, and a note for your agent.</sub>
+
+Hover a panel and open the inspector to see its SQL, parameters, rows and timing. Type a note — *"split this by channel"* — and it is written into `index.tsx` beside that panel as a `@dashboard-comment` marker. Ask your agent to `/apply-comments` and it makes each change and clears the markers. The note is anchored to the source, not to a screenshot.
+
+### ✏️ Edit mode writes source, not state
+
+<img src=".github/assets/edit.png" alt="Edit mode: resize handles, reorder grips, and a chart-type button on every panel." width="100%">
+
+<sub>Edit mode: drag a panel's edges to resize it, its grip to reorder, or the chart button to change its type.</sub>
+
+Switch the header from **Preview** to **Edit** to resize and reorder panels, move them between rows, and change a chart's type or fields. Nothing is written until **Save**, which splices the change into `index.tsx` by AST offset — and refuses if the agent edited the file in the meantime, instead of overwriting it.
+
+### ⚡ Cached, live, and careful with secrets
+
+- **Query cache** — results are cached per dashboard, query and the parameters it reads (30 s by default, `cache` in the config, `-- cache:` per query); concurrent identical requests share one run, and the refresh button always runs fresh.
+- **Live reload** — a `.sql` edit refetches only the panels that use it; `index.tsx` goes through React Fast Refresh; config and `.env` reload without a restart.
+- **Secrets are masked** in every error, log line and CLI message, and the dev server never serves a database file, key, `.sql` or `.env` raw. See [SECURITY.md](SECURITY.md).
+
+### 🌏 Five languages, two themes, any screen
+
+The viewer chrome speaks English, 繁體中文, 简体中文, 日本語 and 한국어; number formats follow the dashboard's `meta.locale`. Light and dark themes, a 12-column grid that reflows on a phone, and tables that scroll with a fixed first column.
+
+## Get started
 
 ```bash
 npx @open-dashboard/cli init my-dashboards
@@ -25,35 +231,53 @@ pnpm install
 pnpm dev                     # http://localhost:5473
 ```
 
-The workspace starts empty: the home page asks you to connect a database first,
-then to create a dashboard. In your agent:
+The workspace starts empty: the home page asks you to connect a database first, then to create a dashboard. In your agent:
 
 ```
 /connect-database  use the Postgres in WAREHOUSE_URL
 /create-dashboard  weekly signups by plan, MRR trend, and the 20 accounts with the most usage
 ```
 
-To try it without a database of your own, `init my-dashboards --sample` adds a
-small SQLite shop and a dashboard over it.
+No database to hand? `init my-dashboards --sample` adds a small generated SQLite shop and a dashboard over it.
 
-## What a dashboard is
+| Command | What it does |
+| --- | --- |
+| `open-dashboard dev [--port 5473] [--host] [--open]` | Viewer with hot reload |
+| `open-dashboard drivers` | Supported databases, the package each needs, how it stays read-only |
+| `open-dashboard sources` | List datasources and test each connection |
+| `open-dashboard schema [source] [--json]` | Tables, columns, keys and row counts |
+| `open-dashboard query "<sql>" [--source s] [--param k=v]` | Run read-only SQL against a datasource |
+| `open-dashboard query --dashboard <id> --name <query>` | Run one of a dashboard's named queries |
+| `open-dashboard check [id] [--json]` | Run every query, verify every panel; non-zero exit on errors |
+| `open-dashboard sync-skills` | Update this workspace's agent skills after an upgrade |
 
-```
-dashboards/sales-overview/
-  queries.sql     named SQL — runnable in any SQL tool
-  index.tsx       which panels, in what order, showing which columns
-```
+## The file contract
 
 ```sql
+-- dashboards/sales-overview/queries.sql
+
+-- name: regions
+SELECT DISTINCT region FROM orders ORDER BY region;
+
 -- name: revenue_by_month
+-- description: Paid orders only; shipping and refunds excluded
 SELECT strftime('%Y-%m', ordered_at) AS month, SUM(total) AS revenue
 FROM orders
 WHERE status = 'paid' AND ordered_at >= :from AND ordered_at < :to
   AND (:region IS NULL OR region = :region)
 GROUP BY month ORDER BY month;
+
+-- name: kpis
+-- …
+
+-- name: revenue_by_category
+-- …
 ```
 
 ```tsx
+// dashboards/sales-overview/index.tsx
+import { Dashboard, type DashboardMeta, Filters, LineChart, PieChart, Row, Select, Stat, TimeRange } from '@open-dashboard/core'
+
 export const meta: DashboardMeta = { title: 'Sales overview', refresh: '5m' }
 
 export default function SalesOverview() {
@@ -76,103 +300,54 @@ export default function SalesOverview() {
 }
 ```
 
-**Panels:** `Stat` (with previous-period delta and sparkline) · `LineChart` ·
-`AreaChart` · `BarChart` (grouped, stacked, horizontal) · `PieChart` (donut) ·
-`Table` (sortable, inline bars) · `Text`. **Filters:** `TimeRange`, `Select` —
-bound to `:from` / `:to` / `:name` and kept in the URL, so a filtered view is a
-shareable link. Light and dark themes, a 12-column grid, auto-refresh.
+Query annotations: `-- name:` (required), `-- source:` (default: `defaultSource`), `-- uses:`, `-- cache:`, `-- description:` (shown in the inspector — where metric definitions belong).
 
-## The loop
+```ts
+// open-dashboard.config.ts
+import type { OpenDashboardConfig } from '@open-dashboard/core'
 
-1. **Agent explores** — `open-dashboard schema` prints every table, column, key
-   and row count; `open-dashboard query "SELECT …"` shows real rows and types.
-2. **Agent writes** `queries.sql` + `index.tsx`; the viewer updates live.
-3. **Agent verifies** — `open-dashboard check` runs every query with the default
-   filters and fails on SQL errors, unknown queries, unbound parameters, and any
-   column a panel names that the result does not have.
-4. **You review** — hover a panel → inspector shows its SQL, params, rows and
-   timing. Type a note ("split this by channel") and it is written into the
-   source beside the panel. Ask the agent to `/apply-comments`.
-
-## Datasources
-
-| `type` | Database | Install | Also covers |
-| --- | --- | --- | --- |
-| `sqlite` | SQLite | built into Node 22.13+ | |
-| `postgres` | PostgreSQL | `pnpm add pg` | Supabase, Neon, RDS/Aurora, Cloud SQL, AlloyDB, Redshift, CockroachDB, TimescaleDB |
-| `mysql` | MySQL | `pnpm add mysql2` | MariaDB, PlanetScale, TiDB, RDS/Aurora |
-| `mssql` | SQL Server | `pnpm add mssql` | Azure SQL Database / Managed Instance |
-| `oracle` | Oracle | `pnpm add oracledb` | Autonomous Database (thin mode, no Instant Client) |
-| `duckdb` | DuckDB | `pnpm add @duckdb/node-api` | Parquet, CSV and JSON files queried in place |
-| `clickhouse` | ClickHouse | `pnpm add @clickhouse/client` | ClickHouse Cloud |
-| `bigquery` | BigQuery | `pnpm add @google-cloud/bigquery` | |
-| `snowflake` | Snowflake | `pnpm add snowflake-sdk` | |
-| `http` | JSON HTTP API | built in | REST and open-data APIs — GET only |
-| `mcp` | MCP server | built in | remote or local; read-only tools only |
-
-Configure as many as you like; each query names its `-- source:`. To join
-across them, a query can `-- uses:` other queries' results as tables — it runs
-in a scratch SQLite over those results, so Postgres can meet ClickHouse
-without either database seeing the other. Results are cached for 30 s by
-default (`cache` in the config, `-- cache:` per query); the refresh button
-always runs fresh.
-
-`open-dashboard drivers` prints each one with a config example. Secrets live in
-`.env`; config and `.env` reload without restarting. Every engine except
-BigQuery and Snowflake is exercised by the cross-driver test suite against a
-real server (`packages/core/src/datasource/conformance.test.ts`); those two are
-tested against stand-ins for their SDKs.
-
-## Safety
-
-- **The browser never sends SQL.** It asks for *query `x` of dashboard `y`*;
-  the server runs what is on disk. There is no raw-SQL endpoint.
-- **Every query is read-only**, by the strongest means each engine offers:
-  read-only files (SQLite, DuckDB), `READ ONLY` transactions (Postgres, Oracle,
-  MySQL), `readonly=2` (ClickHouse), a dry run that must report SELECT
-  (BigQuery). Where DDL can commit past a transaction or none exists (MySQL,
-  Oracle, SQL Server, Snowflake, DuckDB), queries must also be a single SELECT.
-  Use a read-only database role anyway — `/connect-database` gives the grant.
-- **BigQuery spend is capped**: queries over `maximumBytesBilled` (10 GiB by
-  default) are refused before they run.
-- **Secrets are masked** in every error, log line and CLI message, and the
-  dev server never serves a database file, key, `.sql` or `.env` raw. See
-  [SECURITY.md](SECURITY.md).
-- **Parameters are bound, never interpolated.**
-- Results are capped (5,000 rows by default) — aggregate in SQL.
-
-## CLI
-
-```
-open-dashboard dev [--port 5473] [--host] [--open]
-open-dashboard sources                       test every datasource
-open-dashboard schema [source] [--json]      tables, columns, keys, row counts
-open-dashboard query "<sql>" [--source s] [--param k=v]
-open-dashboard query --dashboard <id> --name <query> [--param k=v]
-open-dashboard check [id] [--json]
-open-dashboard sync-skills                   update this workspace's agent skills after an upgrade
+export default {
+  datasources: {
+    warehouse: { type: 'postgres', url: process.env.WAREHOUSE_URL },
+    events: { type: 'clickhouse', url: process.env.CLICKHOUSE_URL },
+  },
+  defaultSource: 'warehouse',
+} satisfies OpenDashboardConfig
 ```
 
-## Skills shipped to every workspace
+Secrets live in `.env`; the config and `.env` reload without restarting.
 
-| Skill | For |
+## Repo layout
+
+pnpm + Turbo monorepo.
+
+| Path | Description |
 | --- | --- |
-| `/connect-database` | add a datasource, `.env`, driver; verify with `sources` + `schema` |
-| `/document-database` | write `databases/<source>/database.md`: what tables and columns mean |
-| `/create-dashboard` | explore → pin down metric definitions → queries → panels → `check` |
-| `/dashboard-authoring` | the reference: query files, parameters, every component, formats, SQL per dialect |
-| `/current-dashboard` | resolve "this chart" from what the viewer is showing |
-| `/apply-comments` | apply notes left in the inspector |
+| [packages/core](packages/core) | `@open-dashboard/core` — datasource drivers, named-query loader, viewer, panel components, Vite plugins and dev API, the `open-dashboard` CLI, and the canonical skills. |
+| [packages/cli](packages/cli) | `@open-dashboard/cli` — `npx @open-dashboard/cli init` scaffolder and project template. |
+| [apps/demo](apps/demo) | Dogfood workspace over two seeded SQLite databases (a coffee-gear shop and its marketing spend). All demo data is generated. |
 
-## Developing
+## Development
 
 ```bash
 mise install && pnpm install
-pnpm dev        # demo over a seeded SQLite shop, port 5473
-pnpm test && pnpm typecheck && pnpm check
+pnpm dev          # seeds the demo databases if missing, runs the demo on port 5473
+pnpm build        # build all packages
+pnpm typecheck    # tsc across the monorepo
+pnpm check        # biome: format, lint, organize imports
+pnpm test         # vitest
+pnpm demo check   # open-dashboard check against the demo
 ```
 
-See [CLAUDE.md](CLAUDE.md) for the architecture and the invariants.
+Driver tests run against real servers when `ODD_TEST_<ENGINE>_URL` is set; SQLite and DuckDB always run. See [CLAUDE.md](CLAUDE.md) for the architecture and the invariants.
+
+## Contributing
+
+Bug reports, feature requests and pull requests are welcome on [GitHub](https://github.com/simonliu-ai-product/open-dashboard/issues). Security issues go through [SECURITY.md](SECURITY.md), not the public tracker.
+
+## Credits
+
+The approach — plain files an agent writes, a framework that renders them, skills as documentation shipped with every workspace — follows [open-slide](https://github.com/1weiho/open-slide) by [@1weiho](https://github.com/1weiho), by way of [open-doc](https://github.com/simonliu-ai-product/open-doc). Taiwan county boundaries in the demo come from g0v (CC0).
 
 ## License
 
