@@ -8,7 +8,7 @@ import { chartCatalog, listCharts, readChartSpec, runChartQuery } from './charts
 import { checkDashboard } from './check.js'
 import { addComment, listComments } from './comment.js'
 import { listDashboards, runDashboardQuery, runSql } from './dashboards.js'
-import { docSourceOf, readDatabaseDoc } from './database-doc.js'
+import { docSourceOf, readDatabaseDoc, writeDatabaseDoc } from './database-doc.js'
 import { type Fixture, makeFixture } from './fixture.test-helper.js'
 import { staleSkills, syncSkills } from './skills.js'
 import { describeSource, readSchema, schemaToText } from './sources.js'
@@ -364,6 +364,7 @@ describe('database.md', () => {
       source: 'db',
       file: join('databases', 'db', 'database.md'),
       markdown: null,
+      hash: '',
     })
     fixture.write('databases/db/database.md', '# db\n')
     expect(readDatabaseDoc(fixture.workspace.config, 'db').markdown).toBe('# db\n')
@@ -444,6 +445,20 @@ describe('API tables and the result cache', () => {
     } finally {
       server.close()
     }
+  })
+})
+
+describe('writing database notes', () => {
+  it('creates them, then refuses a write over a change made meanwhile', () => {
+    const config = fixture.workspace.config
+    const created = writeDatabaseDoc(config, 'db', '# db\n', '')
+    expect(readDatabaseDoc(config, 'db')).toMatchObject({ markdown: '# db\n', hash: created.hash })
+    expect(() => writeDatabaseDoc(config, 'db', '# other\n', '')).toThrow(
+      /changed since it was read/,
+    )
+    writeDatabaseDoc(config, 'db', '# db, edited\n', created.hash)
+    expect(readDatabaseDoc(config, 'db').markdown).toBe('# db, edited\n')
+    expect(() => writeDatabaseDoc(config, 'nope', 'x')).toThrow(/unknown datasource/)
   })
 })
 

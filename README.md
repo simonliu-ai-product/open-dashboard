@@ -55,6 +55,10 @@ Skills ship with every workspace (in `.agents/skills/` and `.claude/skills/`):
 
 After an upgrade, `open-dashboard sync-skills` refreshes them; `dev` tells you when they are out of date.
 
+### 🔧 An MCP server for any agent
+
+Skills teach a coding agent that edits files. An agent framework that speaks MCP gets the same workspace as tools: `pnpm add -D @open-dashboard/mcp`, then `open-dashboard dev --mcp` serves it at `http://localhost:5473/mcp`. List and read dashboards, read schemas and `database.md`, write `index.tsx` and `.sql` files, run named queries, `check` — and the page in the browser reloads as the agent writes. Every tool goes through the same code the viewer and the CLI use: the same read-only drivers, the same masking, the same hash check that refuses to overwrite an edit made meanwhile. `--allow-sql` adds `run_sql` for exploring data — read-only, and off unless asked for. Requests from another origin or host name are refused. See [packages/mcp](packages/mcp).
+
 ### 🔒 The browser names a query; it never sends SQL
 
 The viewer can ask for *query `revenue_by_month` of dashboard `sales-overview`* and nothing else. The server reads the `.sql` file from disk, binds the parameters, and runs it. There is no endpoint, prop or option that accepts SQL text from the page — the only SQL that runs is SQL that was written to a file and can be reviewed.
@@ -330,6 +334,7 @@ No database to hand? `init my-dashboards --sample` adds a small generated SQLite
 | Command | What it does |
 | --- | --- |
 | `open-dashboard dev [--port 5473] [--host] [--open]` | Viewer with hot reload |
+| `open-dashboard dev --mcp [--allow-sql]` | Also serve the MCP server at `/mcp` (needs `@open-dashboard/mcp`) |
 | `open-dashboard drivers` | Supported databases, the package each needs, how it stays read-only |
 | `open-dashboard sources` | List datasources and test each connection |
 | `open-dashboard schema [source] [--json]` | Tables, columns, keys and row counts |
@@ -413,6 +418,7 @@ pnpm + Turbo monorepo.
 | Path | Description |
 | --- | --- |
 | [packages/core](packages/core) | `@open-dashboard/core` — datasource drivers, named-query loader, viewer, panel components, Vite plugins and dev API, the `open-dashboard` CLI, and the canonical skills. |
+| [packages/mcp](packages/mcp) | `@open-dashboard/mcp` — the MCP server, mounted by `open-dashboard dev --mcp`. |
 | [packages/cli](packages/cli) | `@open-dashboard/cli` — `npx @open-dashboard/cli init` scaffolder and project template. |
 | [apps/demo](apps/demo) | Dogfood workspace over two seeded SQLite databases (a coffee-gear shop and its marketing spend). All demo data is generated. |
 

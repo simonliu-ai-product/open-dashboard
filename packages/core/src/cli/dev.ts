@@ -2,6 +2,7 @@ import { createServer } from 'vite'
 import { discoverDashboards } from '../ops/dashboards.js'
 import { staleSkills } from '../ops/skills.js'
 import { viteConfigFor } from '../vite/index.js'
+import { MCP_ENDPOINT, mcpPlugin } from '../vite/mcp-plugin.js'
 import { type ConfigOverrides, loadConfig, Workspace } from '../workspace.js'
 
 export interface DevOptions {
@@ -9,6 +10,10 @@ export interface DevOptions {
   port?: number
   host?: string
   open?: boolean
+  /** Serve the MCP endpoint at /mcp (needs @open-dashboard/mcp in the workspace). */
+  mcp?: boolean
+  /** With mcp: also offer run_sql, read-only SQL of the agent's own. */
+  allowSql?: boolean
 }
 
 export async function dev(
@@ -19,6 +24,18 @@ export async function dev(
   const workspace = new Workspace(config)
   const inline = viteConfigFor(workspace, overrides)
   if (options.host) inline.server = { ...inline.server, host: options.host }
+  let mcpMissing = false
+  if (options.mcp) {
+    inline.plugins = [
+      ...(inline.plugins ?? []),
+      mcpPlugin(workspace, {
+        allowSql: options.allowSql ?? false,
+        onMissing: () => {
+          mcpMissing = true
+        },
+      }),
+    ]
+  }
 
   const server = await createServer(inline)
   await server.listen()
@@ -28,6 +45,13 @@ export async function dev(
   const sources = Object.keys(config.datasources)
   const out = process.stdout
   out.write(`\n  open-dashboard  ${url}\n`)
+  if (options.mcp) {
+    out.write(
+      mcpMissing
+        ? '  mcp: off — run: pnpm add -D @open-dashboard/mcp\n'
+        : `  mcp: ${new URL(MCP_ENDPOINT, url).href}${options.allowSql ? '  (run_sql on)' : ''}\n`,
+    )
+  }
   // A fresh workspace is told one step at a time: a database, then a dashboard.
   if (sources.length === 0) {
     out.write('  next: connect a database — ask your agent: /connect-database\n\n')

@@ -55,6 +55,10 @@ dashboards/sales-overview/
 
 升級之後，執行 `open-dashboard sync-skills` 更新這些 Skills；`dev` 會提醒你哪些已經過期。
 
+### 🔧 給任何 Agent 用的 MCP server
+
+Skills 教的是會改檔案的 Coding Agent。支援 MCP 的 Agent 框架，則能把同一個 workspace 當成工具來用：`pnpm add -D @open-dashboard/mcp`，再執行 `open-dashboard dev --mcp`，端點就在 `http://localhost:5473/mcp`。列出與讀取 Dashboard、讀 schema 與 `database.md`、寫入 `index.tsx` 與 `.sql`、執行具名查詢、`check`——Agent 一寫，瀏覽器裡的頁面就跟著更新。每個工具走的都是檢視器與 CLI 用的同一套程式：同樣的唯讀驅動程式、同樣的遮蔽、同樣的 hash 檢查，不會覆蓋掉期間內別人做的修改。`--allow-sql` 會加上用來探索資料的 `run_sql`——唯讀，而且預設不開啟。來自其他網站或其他主機名稱的請求一律拒絕。詳見 [packages/mcp](packages/mcp/README.zh-TW.md)。
+
 ### 🔒 瀏覽器只能點名查詢，永遠不送 SQL
 
 檢視器只能要求「`sales-overview` 這張 Dashboard 的 `revenue_by_month` 查詢」，沒有其他方式。伺服器從磁碟讀取 `.sql` 檔、綁定參數後執行。沒有任何端點、屬性或選項會接受頁面送來的 SQL 文字——能被執行的，只有寫進檔案、可以被 review 的 SQL。
@@ -330,6 +334,7 @@ pnpm dev                     # http://localhost:5473
 | 指令 | 用途 |
 | --- | --- |
 | `open-dashboard dev [--port 5473] [--host] [--open]` | 啟動有熱更新的檢視器 |
+| `open-dashboard dev --mcp [--allow-sql]` | 同時在 `/mcp` 提供 MCP server（需要 `@open-dashboard/mcp`） |
 | `open-dashboard drivers` | 支援的資料庫、各自需要的套件，以及如何保持唯讀 |
 | `open-dashboard sources` | 列出資料來源並測試連線 |
 | `open-dashboard schema [source] [--json]` | 資料表、欄位、鍵與筆數 |
@@ -413,6 +418,7 @@ pnpm + Turbo monorepo。
 | 路徑 | 說明 |
 | --- | --- |
 | [packages/core](packages/core) | `@open-dashboard/core`：資料來源驅動程式、具名查詢載入、檢視器、面板元件、Vite plugins 與 dev API、`open-dashboard` CLI，以及正式版的 Skills。 |
+| [packages/mcp](packages/mcp) | `@open-dashboard/mcp`：MCP server，由 `open-dashboard dev --mcp` 掛載。 |
 | [packages/cli](packages/cli) | `@open-dashboard/cli`：`npx @open-dashboard/cli init` 的 scaffolder 與專案範本。 |
 | [apps/demo](apps/demo) | 自用的示範 workspace，建立在兩個以程式產生資料的 SQLite 資料庫上（一家咖啡器材店與它的行銷花費）。所有 demo 資料皆為程式產生。 |
 

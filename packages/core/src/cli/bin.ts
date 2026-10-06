@@ -41,6 +41,8 @@ Options:
   --port <n>             Port for dev
   --host <host>          Bind address for dev
   --open                 Open a browser (dev)
+  --mcp                  Serve an MCP endpoint at /mcp for agents (dev; needs @open-dashboard/mcp)
+  --allow-sql            With --mcp, also offer run_sql: read-only SQL of the agent's own (dev)
   --source <name>        Datasource for query/schema (default: defaultSource)
   --param <key=value>    Bind :key in the SQL; repeatable. "null" binds NULL
   --limit <n>            Rows to print for query (default 50)
@@ -114,7 +116,12 @@ export async function run(argv: string[]): Promise<number> {
   const out = (text: string) => process.stdout.write(text)
 
   if (command === 'dev') {
-    const options: Parameters<typeof dev>[0] = { root, open: argv.includes('--open') }
+    const options: Parameters<typeof dev>[0] = {
+      root,
+      open: argv.includes('--open'),
+      mcp: argv.includes('--mcp') || argv.includes('--allow-sql'),
+      allowSql: argv.includes('--allow-sql'),
+    }
     const port = flag(argv, 'port')
     if (port) options.port = Number(port)
     const host = flag(argv, 'host')

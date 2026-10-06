@@ -1,0 +1,59 @@
+{
+  "name": "@open-dashboard/mcp",
+  "version": "0.6.0",
+  "description": "MCP server for open-dashboard \u2014 lets any agent read, query, check and write dashboards over Streamable HTTP.",
+  "type": "module",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js",
+      "default": "./dist/index.js"
+    }
+  },
+  "files": [
+    "dist",
+    "README.md",
+    "README.zh-TW.md"
+  ],
+  "scripts": {
+    "build": "tsdown",
+    "typecheck": "tsc --noEmit",
+    "prepublishOnly": "pnpm build"
+  },
+  "engines": {
+    "node": ">=22.18"
+  },
+  "keywords": [
+    "mcp",
+    "model-context-protocol",
+    "dashboard",
+    "agent"
+  ],
+  "license": "MIT",
+  "homepage": "https://github.com/simonliu-ai-product/open-dashboard",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/simonliu-ai-product/open-dashboard.git",
+    "directory": "packages/mcp"
+  },
+  "bugs": {
+    "url": "https://github.com/simonliu-ai-product/open-dashboard/issues"
+  },
+  "publishConfig": {
+    "access": "public"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/node": "^2.0.0",
+    "@modelcontextprotocol/server": "^2.0.0",
+    "zod": "^4.4.3"
+  },
+  "peerDependencies": {
+    "@open-dashboard/core": "^0.6.0"
+  },
+  "devDependencies": {
+    "@open-dashboard/core": "workspace:*",
+    "@types/node": "^24.0.0",
+    "tsdown": "^0.22.14",
+    "typescript": "^5.9.3"
+  }
+}
