@@ -1,6 +1,6 @@
 {
   "name": "@open-dashboard/core",
-  "version": "0.5.0",
+  "version": "0.6.0",
   "description": "The dashboard framework built for agents — describe the charts you want, get a live dashboard over your database.",
   "license": "MIT",
   "repository": {
