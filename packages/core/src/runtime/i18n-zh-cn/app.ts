@@ -291,4 +291,6 @@ export const APP: Record<string, string> = {
   'Summarize this dashboard': '总结这张 Dashboard',
   'What changed the most?': '哪个数字变化最大？',
   'Anything unusual?': '有什么异常吗？',
+  'Thinking…': '思考中…',
+  'Thought for {n}s': '已思考 {n} 秒',
 }

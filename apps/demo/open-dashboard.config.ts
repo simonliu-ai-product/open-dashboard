@@ -10,5 +10,6 @@ export default {
     provider: 'gemini',
     model: process.env.ASSISTANT_MODEL ?? '',
     apiKey: process.env.GEMINI_API_KEY,
+    reasoningEffort: process.env.ASSISTANT_REASONING_EFFORT,
   },
 } satisfies OpenDashboardConfig

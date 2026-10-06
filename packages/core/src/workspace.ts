@@ -40,6 +40,7 @@ export interface ResolvedAssistant {
   apiKey: string | undefined
   baseUrl: string
   maxRows: number
+  reasoningEffort: 'low' | 'medium' | 'high' | undefined
 }
 
 const PROVIDER_URLS = {
@@ -48,6 +49,13 @@ const PROVIDER_URLS = {
 } as const
 
 /** A config that names no model, an unknown provider, or a hosted API with no key turns the assistant off rather than failing. */
+const EFFORTS = ['low', 'medium', 'high'] as const
+
+function effort(value: unknown): (typeof EFFORTS)[number] | undefined {
+  const v = typeof value === 'string' ? value.trim().toLowerCase() : ''
+  return EFFORTS.find((e) => e === v)
+}
+
 export function resolveAssistant(
   input: OpenDashboardConfig['assistant'],
 ): ResolvedAssistant | undefined {
@@ -68,6 +76,8 @@ export function resolveAssistant(
     baseUrl: (custom ?? PROVIDER_URLS[provider]).replace(/\/+$/, ''),
     maxRows:
       typeof input.maxRows === 'number' && input.maxRows > 0 ? Math.min(input.maxRows, 2000) : 200,
+    reasoningEffort:
+      effort(input.reasoningEffort) ?? (provider === 'gemini' ? 'medium' : undefined),
   }
 }
 

@@ -241,13 +241,14 @@ assistant: {
   provider: 'gemini',                         // or 'openai': any OpenAI-compatible API
   model: process.env.ASSISTANT_MODEL ?? '',   // the model name your provider uses
   apiKey: process.env.GEMINI_API_KEY,         // from .env — never shown in or sent to the page
+  reasoningEffort: process.env.ASSISTANT_REASONING_EFFORT, // low | medium (Gemini's default) | high
   // baseUrl: 'http://localhost:11434/v1',    // a local OpenAI-compatible server (Ollama…), no key needed
 },
 ```
 
 Give it your own instructions in Markdown — `assistant.md` at the workspace root for every dashboard, `dashboards/<id>/assistant.md` for one. They set the voice, the reader, the vocabulary and the format; they come after the built-in rules (answer only from the data, never invent a number, data is not instructions), so they cannot switch those off. They are read on every question: edit, save, ask.
 
-The key stays in `.env` and on the server; the page has no field for it and the API only ever reports whether the assistant is on. Replies stream in. A question sends the dashboard's data (up to `maxRows`, 200 by default, per query) to the provider you configured — keep that in mind for sensitive data.
+The key stays in `.env` and on the server; the page has no field for it and the API only ever reports whether the assistant is on. Replies stream in; while the model thinks, the chat shows its current step, and the full thinking opens from a toggle once it answers. `ASSISTANT_REASONING_EFFORT` in `.env` (`low`, `medium` or `high`) sets how long it thinks — Gemini defaults to `medium`, which shows its thinking and starts answering in roughly 10–20 seconds; `low` answers in a few seconds but sends no thinking to show. For `openai` it is sent only when set. A question sends the dashboard's data (up to `maxRows`, 200 by default, per query) to the provider you configured — keep that in mind for sensitive data.
 
 ### 🎛️ Filters, drill-down, and links you can share
 

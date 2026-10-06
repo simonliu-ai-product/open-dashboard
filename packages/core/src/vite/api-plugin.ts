@@ -4,6 +4,7 @@ import type { ParamValue } from '../config.js'
 import { redact, redactValue } from '../datasource/redact.js'
 import { errorMessage } from '../datasource/types.js'
 import {
+  type AnswerPiece,
   addComment,
   assistantInstructions,
   assistantStatus,
@@ -268,14 +269,18 @@ export function apiPlugin(workspace: Workspace, overrides: ConfigOverrides): Plu
             // key or an unknown model comes back as an ordinary JSON error.
             const first = await stream.next()
             res.statusCode = 200
-            res.setHeader('Content-Type', 'text/plain; charset=utf-8')
+            res.setHeader('Content-Type', 'application/x-ndjson; charset=utf-8')
             res.setHeader('Cache-Control', 'no-store')
             res.setHeader('X-Content-Type-Options', 'nosniff')
-            if (!first.done) res.write(first.value)
+            // One JSON object per line: { thought } while the model thinks, { text } for the answer.
+            const send = (line: Record<string, string>) => res.write(`${JSON.stringify(line)}\n`)
+            const write = (piece: AnswerPiece) =>
+              send(piece.kind === 'thought' ? { thought: piece.text } : { text: piece.text })
+            if (!first.done) write(first.value)
             try {
-              for await (const piece of stream) res.write(piece)
+              for await (const piece of stream) write(piece)
             } catch (error) {
-              if (!controller.signal.aborted) res.write(`\n\n⚠ ${redact(errorMessage(error))}`)
+              if (!controller.signal.aborted) send({ error: redact(errorMessage(error)) })
             }
             return res.end()
           }

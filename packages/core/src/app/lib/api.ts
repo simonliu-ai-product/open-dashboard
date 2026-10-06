@@ -59,9 +59,9 @@ export const api = {
     id: string,
     params: Record<string, ParamValue>,
     messages: { role: 'user' | 'assistant'; content: string }[],
-    onText: (text: string) => void,
+    onUpdate: (reply: { thought: string; text: string }) => void,
     signal: AbortSignal,
-  ): Promise<string> => {
+  ): Promise<{ thought: string; text: string }> => {
     const response = await fetch(`${BASE}assistant`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -74,14 +74,24 @@ export const api = {
     }
     const reader = response.body.getReader()
     const decoder = new TextDecoder()
-    let text = ''
+    const reply = { thought: '', text: '' }
+    let buffer = ''
     for (;;) {
       const { done, value } = await reader.read()
       if (done) break
-      text += decoder.decode(value, { stream: true })
-      onText(text)
+      buffer += decoder.decode(value, { stream: true })
+      const lines = buffer.split('\n')
+      buffer = lines.pop() ?? ''
+      for (const line of lines) {
+        if (!line) continue
+        const piece = JSON.parse(line) as { thought?: string; text?: string; error?: string }
+        if (piece.error) throw new Error(piece.error)
+        reply.thought += piece.thought ?? ''
+        reply.text += piece.text ?? ''
+      }
+      onUpdate({ ...reply })
     }
-    return text
+    return reply
   },
   themes: () => request<ThemeList>('themes'),
   theme: (id: string) => request<ThemeFile>(`theme?id=${encodeURIComponent(id)}`),

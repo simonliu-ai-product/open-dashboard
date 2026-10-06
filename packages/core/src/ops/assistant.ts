@@ -15,6 +15,12 @@ export interface ChatMessage {
   content: string
 }
 
+interface Delta {
+  content?: string | null
+  reasoning_content?: string | null
+  reasoning?: string | null
+}
+
 const MAX_MESSAGES = 40
 const MAX_MESSAGE = 8000
 const MAX_DOC = 20_000
@@ -112,7 +118,7 @@ export async function dashboardContext(
 
 export const SYSTEM_PROMPT = `You answer questions about one dashboard, using only the data given below — the panels' query results exactly as the reader sees them, with the filters they have set.
 
-- Reply in the language of the reader's latest message. Keep answers short: lead with the answer, then the figures that support it.
+- Reply in the language the instructions below ask for; if they name none, in the language of the reader's latest message. Keep answers short: lead with the answer, then the figures that support it.
 - Every number you state must come from the data below, or be computed from it (say how). Never invent, estimate, or assume a number that is not there.
 - If the data does not hold the answer — another period, a filter not applied, a column the dashboard does not have — say so plainly, and say which filter or panel would show it.
 - Name the panel a figure comes from.
@@ -162,13 +168,82 @@ export function systemPrompt(
   return parts.join('\n\n')
 }
 
+/** A piece of the reply: the model's thinking (summaries) or the answer itself. */
+export interface AnswerPiece {
+  kind: 'thought' | 'text'
+  text: string
+}
+
+const OPEN = '<thought>'
+const CLOSE = '</thought>'
+
+/**
+ * Gemini sends its thought summaries inside the content, wrapped in
+ * `<thought>…</thought>`; a tag can be split across two chunks.
+ */
+export function thoughtSplitter(): (chunk: string, end?: boolean) => AnswerPiece[] {
+  let inside = false
+  let pending = ''
+  return (chunk, end = false) => {
+    pending += chunk
+    const out: AnswerPiece[] = []
+    const emit = (text: string) => {
+      if (text) out.push({ kind: inside ? 'thought' : 'text', text })
+    }
+    for (;;) {
+      const tag = inside ? CLOSE : OPEN
+      const at = pending.indexOf(tag)
+      if (at !== -1) {
+        emit(pending.slice(0, at))
+        pending = pending.slice(at + tag.length)
+        inside = !inside
+        continue
+      }
+      let keep = 0
+      if (!end)
+        for (let k = Math.min(tag.length - 1, pending.length); k > 0; k--)
+          if (tag.startsWith(pending.slice(-k))) {
+            keep = k
+            break
+          }
+      emit(pending.slice(0, pending.length - keep))
+      pending = pending.slice(pending.length - keep)
+      return out
+    }
+  }
+}
+
+function requestBody(
+  assistant: ResolvedAssistant,
+  system: string,
+  messages: ChatMessage[],
+): Record<string, unknown> {
+  const body: Record<string, unknown> = {
+    model: assistant.model,
+    stream: true,
+    messages: [{ role: 'system', content: system }, ...messages],
+  }
+  // Gemini refuses `reasoning_effort` together with `include_thoughts`; its own config takes both.
+  if (assistant.provider === 'gemini')
+    body.extra_body = {
+      google: {
+        thinking_config: {
+          thinking_level: assistant.reasoningEffort ?? 'low',
+          include_thoughts: true,
+        },
+      },
+    }
+  else if (assistant.reasoningEffort) body.reasoning_effort = assistant.reasoningEffort
+  return body
+}
+
 /** The provider's reply, piece by piece, from an OpenAI-compatible chat completions stream. */
 export async function* streamAnswer(
   assistant: ResolvedAssistant,
   system: string,
   messages: ChatMessage[],
   signal?: AbortSignal,
-): AsyncGenerator<string> {
+): AsyncGenerator<AnswerPiece> {
   const headers: Record<string, string> = { 'Content-Type': 'application/json' }
   if (assistant.apiKey) headers.Authorization = `Bearer ${assistant.apiKey}`
   let response: Response
@@ -177,11 +252,7 @@ export async function* streamAnswer(
       method: 'POST',
       headers,
       signal: signal ?? null,
-      body: JSON.stringify({
-        model: assistant.model,
-        stream: true,
-        messages: [{ role: 'system', content: system }, ...messages],
-      }),
+      body: JSON.stringify(requestBody(assistant, system, messages)),
     })
   } catch (error) {
     throw new OpsError(`could not reach the assistant's API: ${errorMessage(error)}`, 502)
@@ -203,10 +274,14 @@ export async function* streamAnswer(
 
   const reader = response.body.getReader()
   const decoder = new TextDecoder()
+  const split = thoughtSplitter()
   let buffer = ''
   for (;;) {
     const { done, value } = await reader.read()
-    if (done) break
+    if (done) {
+      yield* split('', true)
+      return
+    }
     buffer += decoder.decode(value, { stream: true })
     let newline = buffer.indexOf('\n')
     while (newline !== -1) {
@@ -215,14 +290,20 @@ export async function* streamAnswer(
       newline = buffer.indexOf('\n')
       if (!line.startsWith('data:')) continue
       const data = line.slice(5).trim()
-      if (data === '[DONE]') return
+      if (data === '[DONE]') {
+        yield* split('', true)
+        return
+      }
+      let delta: Delta | undefined
       try {
-        const chunk = JSON.parse(data) as { choices?: { delta?: { content?: string | null } }[] }
-        const text = chunk.choices?.[0]?.delta?.content
-        if (text) yield text
+        delta = (JSON.parse(data) as { choices?: { delta?: Delta }[] }).choices?.[0]?.delta
       } catch {
         // a keep-alive or a partial line the provider split oddly
       }
+      // DeepSeek, vLLM, Ollama and OpenRouter send reasoning in a field of its own.
+      const reasoning = delta?.reasoning_content ?? delta?.reasoning
+      if (reasoning) yield { kind: 'thought', text: reasoning }
+      if (delta?.content) yield* split(delta.content)
     }
   }
 }

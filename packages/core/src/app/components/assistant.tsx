@@ -8,6 +8,10 @@ interface Message {
   role: 'user' | 'assistant'
   content: string
   error?: boolean
+  /** The model's thought summaries, when the provider sends them. */
+  thought?: string
+  /** Seconds from the question to the first word of the answer. */
+  seconds?: number
 }
 
 const SUGGESTIONS = ['Summarize this dashboard', 'What changed the most?', 'Anything unusual?']
@@ -52,6 +56,46 @@ function ChatIcon() {
         strokeLinecap="round"
       />
     </svg>
+  )
+}
+
+/** The latest heading in the thoughts (Gemini opens each step with a `**Title**` line), else its last line. */
+function latestStep(thought: string): string {
+  const titles = [...thought.matchAll(/^\*\*([^*\n]+)\*\*\s*$/gm)]
+  const last = titles.at(-1)?.[1] ?? thought.trim().split('\n').at(-1) ?? ''
+  return last.length > 80 ? `${last.slice(0, 80)}…` : last
+}
+
+function Thinking({ thought, seconds }: { thought: string; seconds: number | undefined }) {
+  const t = useT()
+  const [open, setOpen] = useState(false)
+  const active = seconds === undefined
+  const step = active ? latestStep(thought) : ''
+  return (
+    <div className="odd-chat-thinking" data-active={active || undefined}>
+      <button
+        type="button"
+        className="odd-chat-thinking-toggle"
+        aria-expanded={open}
+        disabled={!thought}
+        onClick={() => setOpen((v) => !v)}
+      >
+        <span className="odd-chat-thinking-label">
+          {active ? t('Thinking…') : t('Thought for {n}s', { n: seconds })}
+        </span>
+        {step ? (
+          <span key={step} className="odd-chat-thinking-step">
+            {step}
+          </span>
+        ) : null}
+        {thought ? <Icon d={open ? 'M4 10l4-4 4 4' : 'M4 6l4 4 4-4'} /> : null}
+      </button>
+      {open && thought ? (
+        <div className="odd-chat-thought">
+          <Blocks blocks={parseBlocks(thought)} />
+        </div>
+      ) : null}
+    </div>
   )
 }
 
@@ -111,7 +155,10 @@ export function Assistant({
   const ask = async (question: string) => {
     const text = question.trim()
     if (!text || busy) return
-    const history = [...messages.filter((m) => !m.error), { role: 'user' as const, content: text }]
+    const history = [
+      ...messages.filter((m) => !m.error && m.content),
+      { role: 'user' as const, content: text },
+    ]
     setMessages([...history, { role: 'assistant', content: '' }])
     setDraft('')
     setBusy(true)
@@ -119,18 +166,31 @@ export function Assistant({
     abort.current = controller
     const replace = (message: Message) =>
       setMessages((current) => [...current.slice(0, -1), message])
+    const started = performance.now()
+    let seconds: number | undefined
+    const elapsed = () => Math.max(1, Math.round((performance.now() - started) / 1000))
     try {
       await api.ask(
         dashboard,
         params(),
         history.map(({ role, content }) => ({ role, content })),
-        (reply) => replace({ role: 'assistant', content: reply }),
+        (reply) => {
+          if (reply.text && seconds === undefined) seconds = elapsed()
+          replace({ role: 'assistant', content: reply.text, thought: reply.thought, seconds })
+        },
         controller.signal,
       )
     } catch (error) {
       if (!controller.signal.aborted)
         replace({ role: 'assistant', content: (error as Error).message, error: true })
     } finally {
+      // Stopped or finished without an answer: freeze the timer; drop a reply that never began.
+      setMessages((current) => {
+        const end = current.at(-1)
+        if (end?.role !== 'assistant' || end.error || end.seconds !== undefined) return current
+        if (!end.content && !end.thought) return current.slice(0, -1)
+        return [...current.slice(0, -1), { ...end, seconds: elapsed() }]
+      })
       setBusy(false)
       abort.current = null
     }
@@ -183,14 +243,15 @@ export function Assistant({
                   data-role={message.role}
                   data-error={message.error || undefined}
                 >
-                  {message.role === 'assistant' && !message.content && busy ? (
-                    <span className="odd-chat-typing" role="status" aria-label={t('Loading…')}>
-                      <i />
-                      <i />
-                      <i />
-                    </span>
-                  ) : message.role === 'assistant' && !message.error ? (
-                    <Blocks blocks={parseBlocks(message.content)} />
+                  {message.role === 'assistant' &&
+                  !message.error &&
+                  (message.thought || message.seconds === undefined) ? (
+                    <Thinking thought={message.thought ?? ''} seconds={message.seconds} />
+                  ) : null}
+                  {message.role === 'assistant' && !message.error ? (
+                    message.content ? (
+                      <Blocks blocks={parseBlocks(message.content)} />
+                    ) : null
                   ) : (
                     message.content
                   )}

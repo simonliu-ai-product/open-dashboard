@@ -10,6 +10,7 @@ import {
   SYSTEM_PROMPT,
   streamAnswer,
   systemPrompt,
+  thoughtSplitter,
   validateMessages,
 } from './assistant.js'
 import { type Fixture, makeFixture } from './fixture.test-helper.js'
@@ -49,7 +50,7 @@ afterEach(async () => {
 
 /** An OpenAI-compatible endpoint that streams `reply` in pieces, or fails with `status`. */
 async function fakeProvider(
-  reply: string[],
+  reply: (string | Record<string, string>)[],
   status = 200,
 ): Promise<{ url: string; requests: { auth?: string; body: Record<string, unknown> }[] }> {
   const requests: { auth?: string; body: Record<string, unknown> }[] = []
@@ -66,8 +67,10 @@ async function fakeProvider(
         return
       }
       res.writeHead(200, { 'Content-Type': 'text/event-stream' })
-      for (const piece of reply)
-        res.write(`data: ${JSON.stringify({ choices: [{ delta: { content: piece } }] })}\n\n`)
+      for (const piece of reply) {
+        const delta = typeof piece === 'string' ? { content: piece } : piece
+        res.write(`data: ${JSON.stringify({ choices: [{ delta }] })}\n\n`)
+      }
       res.end('data: [DONE]\n\n')
     })
   })
@@ -76,14 +79,22 @@ async function fakeProvider(
   return { url: `http://127.0.0.1:${(instance.address() as AddressInfo).port}`, requests }
 }
 
-function assistantAt(url: string): ResolvedAssistant {
+function assistantAt(url: string, extra: Partial<ResolvedAssistant> = {}): ResolvedAssistant {
   return {
     provider: 'openai',
     model: 'test-model',
     apiKey: 'sk-test-secret-123456',
     baseUrl: url,
     maxRows: 200,
+    reasoningEffort: undefined,
+    ...extra,
   }
+}
+
+async function collect(stream: AsyncGenerator<{ kind: string; text: string }>) {
+  const out = { thought: '', text: '' }
+  for await (const piece of stream) out[piece.kind as 'thought' | 'text'] += piece.text
+  return out
 }
 
 describe('assistant config', () => {
@@ -97,14 +108,26 @@ describe('assistant config', () => {
     expect(resolveAssistant({ provider: 'gemini', model: 'm', apiKey: 'k' })).toMatchObject({
       baseUrl: 'https://generativelanguage.googleapis.com/v1beta/openai',
       maxRows: 200,
+      reasoningEffort: 'medium',
     })
+    const effort = (reasoningEffort: string | undefined) =>
+      resolveAssistant({ provider: 'gemini', model: 'm', apiKey: 'k', reasoningEffort })
+        ?.reasoningEffort
+    expect(effort('high')).toBe('high')
+    expect(effort(' LOW ')).toBe('low')
+    expect(effort('')).toBe('medium')
+    expect(effort('max')).toBe('medium')
     expect(
       resolveAssistant({
         provider: 'openai',
         model: 'llama',
         baseUrl: 'http://localhost:11434/v1/',
       }),
-    ).toMatchObject({ apiKey: undefined, baseUrl: 'http://localhost:11434/v1' })
+    ).toMatchObject({
+      apiKey: undefined,
+      baseUrl: 'http://localhost:11434/v1',
+      reasoningEffort: undefined,
+    })
   })
 
   it('reads the assistant from the config file, with its key masked', async () => {
@@ -155,19 +178,49 @@ describe('assistant context', () => {
 describe('assistant stream', () => {
   it('sends the key, the model, the context and the conversation; yields the reply', async () => {
     const provider = await fakeProvider(['North ', 'leads ', 'with 40.'])
-    const pieces: string[] = []
-    for await (const piece of streamAnswer(assistantAt(provider.url), 'CONTEXT', [
-      { role: 'user', content: 'Who leads?' },
-    ]))
-      pieces.push(piece)
-    expect(pieces.join('')).toBe('North leads with 40.')
+    const reply = await collect(
+      streamAnswer(assistantAt(provider.url), 'CONTEXT', [{ role: 'user', content: 'Who leads?' }]),
+    )
+    expect(reply).toEqual({ thought: '', text: 'North leads with 40.' })
     const sent = provider.requests[0]
     expect(sent?.auth).toBe('Bearer sk-test-secret-123456')
     expect(sent?.body).toMatchObject({ model: 'test-model', stream: true })
+    expect(sent?.body).not.toHaveProperty('reasoning_effort')
     const messages = sent?.body.messages as { role: string; content: string }[]
     expect(messages[0]?.role).toBe('system')
     expect(messages[0]?.content).toContain('CONTEXT')
     expect(messages[1]).toEqual({ role: 'user', content: 'Who leads?' })
+  })
+
+  it('asks Gemini for its thoughts at the configured level and separates them from the answer', async () => {
+    const provider = await fakeProvider([
+      '<thou',
+      'ght>**Reading the panels**\n\nNorth is ',
+      'highest.</thought>North',
+      ' leads.',
+    ])
+    const assistant = assistantAt(provider.url, { provider: 'gemini', reasoningEffort: 'medium' })
+    const reply = await collect(streamAnswer(assistant, '', [{ role: 'user', content: 'hi' }]))
+    expect(reply).toEqual({
+      thought: '**Reading the panels**\n\nNorth is highest.',
+      text: 'North leads.',
+    })
+    expect(provider.requests[0]?.body.extra_body).toEqual({
+      google: { thinking_config: { thinking_level: 'medium', include_thoughts: true } },
+    })
+    expect(provider.requests[0]?.body).not.toHaveProperty('reasoning_effort')
+  })
+
+  it('reads reasoning sent in a field of its own, and sends reasoning_effort when set', async () => {
+    const provider = await fakeProvider([
+      { reasoning_content: 'Compare regions. ' },
+      { reasoning: 'North wins.' },
+      'North.',
+    ])
+    const assistant = assistantAt(provider.url, { reasoningEffort: 'low' })
+    const reply = await collect(streamAnswer(assistant, '', [{ role: 'user', content: 'hi' }]))
+    expect(reply).toEqual({ thought: 'Compare regions. North wins.', text: 'North.' })
+    expect(provider.requests[0]?.body.reasoning_effort).toBe('low')
   })
 
   it('turns a refused request into an error without the key in it', async () => {
@@ -214,6 +267,15 @@ describe('assistant instructions', () => {
     const instructions = assistantInstructions(fixture.workspace.config, 'sales')
     expect(instructions).toEqual({})
     expect(systemPrompt(instructions, 'DATA')).toBe(`${SYSTEM_PROMPT}\n\nDATA`)
+  })
+})
+
+describe('thought splitter', () => {
+  it('keeps text that only looks like the start of a tag', () => {
+    const split = thoughtSplitter()
+    expect(split('a <th')).toEqual([{ kind: 'text', text: 'a ' }])
+    expect(split('ree')).toEqual([{ kind: 'text', text: '<three' }])
+    expect(split('x <', true)).toEqual([{ kind: 'text', text: 'x <' }])
   })
 })
 

@@ -241,13 +241,14 @@ assistant: {
   provider: 'gemini',                         // 或 'openai'：任何 OpenAI 相容 API
   model: process.env.ASSISTANT_MODEL ?? '',   // 你的供應商所用的模型名稱
   apiKey: process.env.GEMINI_API_KEY,         // 放在 .env——不會顯示在頁面上，也不會傳給頁面
+  reasoningEffort: process.env.ASSISTANT_REASONING_EFFORT, // low | medium（Gemini 預設）| high
   // baseUrl: 'http://localhost:11434/v1',    // 本機的 OpenAI 相容伺服器（Ollama 等），不需金鑰
 },
 ```
 
 可以用 Markdown 寫自己的指示——workspace 根目錄的 `assistant.md` 套用到所有 Dashboard，`dashboards/<id>/assistant.md` 只套用到那一張。用來指定語氣、讀者、專有名詞與回答格式；它們接在內建規則（只根據資料回答、絕不編造數字、資料不是指令）之後，所以無法關掉這些規則。每次提問都會重新讀取：改完、存檔，下一個問題就生效。
 
-金鑰只留在 `.env` 與伺服器；頁面上沒有任何輸入金鑰的欄位，API 也只會回報助理是否開啟。回覆會逐字串流顯示。每次提問都會把這張 Dashboard 的資料（每條查詢最多 `maxRows` 筆，預設 200 筆）送到你設定的供應商——處理敏感資料時請留意這一點。
+金鑰只留在 `.env` 與伺服器；頁面上沒有任何輸入金鑰的欄位，API 也只會回報助理是否開啟。回覆會逐字串流顯示；模型思考時，對話框會即時顯示它正在做的步驟，回答後可以點開看完整的思考內容。`.env` 的 `ASSISTANT_REASONING_EFFORT`（`low`、`medium` 或 `high`）決定思考多久——Gemini 預設 `medium`，會顯示思考過程，大約 10–20 秒開始回答；`low` 幾秒內就會回答，但不會送回可顯示的思考內容。`openai` 只在有設定時才送出。每次提問都會把這張 Dashboard 的資料（每條查詢最多 `maxRows` 筆，預設 200 筆）送到你設定的供應商——處理敏感資料時請留意這一點。
 
 ### 🎛️ 篩選、下鑽，以及可以分享的連結
 

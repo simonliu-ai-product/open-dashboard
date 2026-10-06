@@ -28,6 +28,7 @@ have not said:
 # .env (git-ignored)
 GEMINI_API_KEY=…
 ASSISTANT_MODEL=…
+# ASSISTANT_REASONING_EFFORT=medium   # low | medium | high
 ```
 
 - Ask the user to put the key there themselves, or to point you at where it
@@ -57,11 +58,14 @@ export default {
     provider: 'gemini',                        // or 'openai'
     model: process.env.ASSISTANT_MODEL ?? '',
     apiKey: process.env.GEMINI_API_KEY,
+    reasoningEffort: process.env.ASSISTANT_REASONING_EFFORT,
     // baseUrl: 'http://localhost:11434/v1',   // openai: a local server; no apiKey needed
     // maxRows: 200,                           // rows per query sent with a question (max 2000)
   },
 } satisfies OpenDashboardConfig
 ```
+
+`ASSISTANT_REASONING_EFFORT` trades speed for depth. Gemini defaults to `medium`: it starts answering in roughly 10–20 seconds, and the chat shows each thinking step meanwhile, with the full thinking behind a toggle afterwards. `low` answers in a few seconds but Gemini sends no thinking to show; `high` thinks longest. Any other value counts as unset. For `'openai'` it is sent as `reasoning_effort` only when set — leave it out for a model that does not reason, or the provider refuses the request.
 
 It stays off — silently — when the provider is unknown, the model is empty, or
 a hosted provider has no key. The config and `.env` reload on save; no restart.

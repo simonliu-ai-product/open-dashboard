@@ -41,7 +41,9 @@ export async function dev(
         : `  ${found.length} dashboard${found.length === 1 ? '' : 's'}: ${found.map((f) => f.id).join(', ')}\n`,
     )
     if (config.assistant)
-      out.write(`  assistant: ${config.assistant.provider} · ${config.assistant.model}\n`)
+      out.write(
+        `  assistant: ${[config.assistant.provider, config.assistant.model, config.assistant.reasoningEffort].filter(Boolean).join(' · ')}\n`,
+      )
     out.write('\n')
   }
   const stale = staleSkills(config.root)

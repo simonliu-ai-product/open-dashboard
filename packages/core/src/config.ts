@@ -172,6 +172,13 @@ export interface AssistantConfig {
   baseUrl?: string
   /** Rows per query sent with a question. Default 200. */
   maxRows?: number
+  /**
+   * How long the model thinks before it answers: 'low' | 'medium' | 'high'. Usually
+   * `process.env.ASSISTANT_REASONING_EFFORT`; any other value counts as unset. Gemini:
+   * default 'medium'. 'openai': sent as `reasoning_effort` only when set — leave it
+   * out for a model that does not reason.
+   */
+  reasoningEffort?: string
 }
 
 export interface OpenDashboardConfig {
