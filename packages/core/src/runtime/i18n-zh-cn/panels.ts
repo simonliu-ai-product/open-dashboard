@@ -131,4 +131,15 @@ export const PANELS: Record<string, string> = {
   Share: '占比',
   'Needs a label column and a numeric value column.': '需要一个标签字段和一个数值字段。',
   'Nothing to show: every value is zero or negative.': '没有可显示的内容：所有数值都是零或负数。',
+  'A Gantt chart needs a label column and start and end dates.':
+    '甘特图需要一个标签字段，以及开始与结束日期。',
+  'Started before a predecessor ended: {n}': '{n} 项任务在前置任务完成前就开始',
+  'Unknown predecessors: {names}': '找不到前置任务：{names}',
+  'Gantt chart': '甘特图',
+  Phase: '阶段',
+  '{n} working days': '{n} 个工作日',
+  Done: '完成度',
+  After: '前置任务',
+  'Starts too early': '开始过早',
+  'before {name} ends': '{name} 尚未完成',
 }

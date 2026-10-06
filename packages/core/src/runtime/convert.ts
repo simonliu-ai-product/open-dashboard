@@ -145,6 +145,23 @@ export const PANEL_SPECS = {
     roles: { category: 'label', group: 'series' },
     columns: ['label', 'start', 'end', 'series'],
   },
+  Gantt: {
+    props: [
+      'label',
+      'start',
+      'end',
+      'id',
+      'after',
+      'progress',
+      'milestone',
+      'group',
+      'series',
+      'holidays',
+      'now',
+    ],
+    roles: { category: 'label', group: 'series' },
+    columns: ['label', 'start', 'end', 'id', 'after', 'progress', 'milestone', 'group', 'series'],
+  },
   Candlestick: {
     props: ['x', 'open', 'high', 'low', 'close', 'convention', 'format'],
     roles: { category: 'x' },

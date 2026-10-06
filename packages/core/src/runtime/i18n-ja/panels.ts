@@ -139,4 +139,15 @@ export const PANELS: Record<string, string> = {
   'Needs a label column and a numeric value column.': 'ラベル列と数値列が必要です。',
   'Nothing to show: every value is zero or negative.':
     '表示する内容がありません：すべての値が 0 以下です。',
+  'A Gantt chart needs a label column and start and end dates.':
+    'ガントチャートにはラベル列と開始日・終了日が必要です。',
+  'Started before a predecessor ended: {n}': '{n} 件のタスクが先行タスクの完了前に始まっています',
+  'Unknown predecessors: {names}': '先行タスクが見つかりません：{names}',
+  'Gantt chart': 'ガントチャート',
+  Phase: 'フェーズ',
+  '{n} working days': '{n} 営業日',
+  Done: '進捗',
+  After: '先行タスク',
+  'Starts too early': '開始が早すぎます',
+  'before {name} ends': '{name} の完了前',
 }

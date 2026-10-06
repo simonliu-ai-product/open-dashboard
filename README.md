@@ -195,7 +195,7 @@ Each input runs through its own driver, read-only as above; the combining SQL ru
 
 Column names do not say that refunded orders stay in `orders`, that prices are in cents, or that one campaign month is discounted. `databases/<source>/database.md` does: what the tables mean, which values to filter on, units, time zones, traps. Agents read it before writing SQL (`open-dashboard schema` prints its path first), and the Data sources page shows it beside the schema, live-reloading as it changes.
 
-### 📊 40 panels, hand-written SVG
+### 📊 41 panels, hand-written SVG
 
 <img src=".github/assets/gallery.png" alt="Part of the chart gallery: dot plot, dumbbell, slope chart, bullet chart, diverging bars and marimekko." width="100%">
 
@@ -208,13 +208,13 @@ Column names do not say that refunded orders stay in `orders`, that prices are i
 | Compare and rank | `BarChart` (grouped, stacked, horizontal), `DotPlot`, `Dumbbell`, `SlopeChart`, `BumpChart`, `BulletChart`, `DivergingBar`, `ParetoChart`, `Waterfall` |
 | Part of a whole | `PieChart` (donut), `Treemap`, `Marimekko`, `FunnelChart`, `UpSetChart` |
 | Distribution | `Histogram`, `BoxPlot`, `StripPlot`, `EcdfChart`, `ScatterChart`, `Heatmap` |
-| Flow and status | `Sankey`, `Timeline`, `StateTimeline` |
+| Flow and status | `Sankey`, `Timeline`, `Gantt`, `StateTimeline` |
 | Maps | `ChoroplethMap`, `SymbolMap`, `TileMap` |
 | Tables | `Table` (sortable, inline bars), `PivotTable`, `CohortTable` |
 
 No chart library: the core ships to every workspace, and the visual rules are fixed in the framework rather than left to each prompt — one y-axis (there is no dual-axis option), zero always in the domain, one tick format per axis, a validated eight-colour palette with separate dark-mode steps, and a ninth category folded into "Other".
 
-### 🧩 Custom charts, when none of the 40 fit
+### 🧩 Custom charts, when none of the 41 fit
 
 <img src=".github/assets/custom-charts.png" alt="The Charts page: custom and built-in charts in one searchable list, with a live preview, the column props check verifies and the dashboards using each." width="100%">
 
@@ -241,7 +241,7 @@ import Radar from '../../charts/radar'
 <Radar title="Revenue by category" query="category_periods" axis="category" value="revenue" series="period" span={4} />
 ```
 
-The **Charts** page lists the 40 built-in panels and your custom charts side by side, searchable, each with the column props it takes, the dashboards using it, and a live preview — a built-in drawn from a real dashboard that uses it, a custom chart from its `sample.sql`. `open-dashboard charts` prints the same list for agents, so nobody builds a chart that already exists. Agents get a `/create-chart` skill with the contract and the house rules: colours from `color(i)` and the `--odd-*` variables, never a hex code; one y-axis; numbers through `format`.
+The **Charts** page lists the 41 built-in panels and your custom charts side by side, searchable, each with the column props it takes, the dashboards using it, and a live preview — a built-in drawn from a real dashboard that uses it, a custom chart from its `sample.sql`. `open-dashboard charts` prints the same list for agents, so nobody builds a chart that already exists. Agents get a `/create-chart` skill with the contract and the house rules: colours from `color(i)` and the `--odd-*` variables, never a hex code; one y-axis; numbers through `format`.
 
 ### 🎨 Themes
 
@@ -249,7 +249,7 @@ The **Charts** page lists the 40 built-in panels and your custom charts side by 
 
 <sub>The Themes page: edit light and dark separately, and watch a real dashboard change as you go.</sub>
 
-A theme is `themes/<id>.json` — chart palette, accent, up / down colours (red-up, green-down if that is your market's convention), page and panel backgrounds, grid, fonts and corner radius, each for light and dark. Anything left out keeps the built-in value, and the text drawn on a coloured mark picks black or white by contrast on its own. A dashboard picks one with `meta.theme` (or from the theme menu in Edit mode, which writes it into `index.tsx`); `theme` in the config sets the workspace default. Every chart draws through the `--odd-*` variables, so a theme restyles all 40 panels and every custom chart without touching them.
+A theme is `themes/<id>.json` — chart palette, accent, up / down colours (red-up, green-down if that is your market's convention), page and panel backgrounds, grid, fonts and corner radius, each for light and dark. Anything left out keeps the built-in value, and the text drawn on a coloured mark picks black or white by contrast on its own. A dashboard picks one with `meta.theme` (or from the theme menu in Edit mode, which writes it into `index.tsx`); `theme` in the config sets the workspace default. Every chart draws through the `--odd-*` variables, so a theme restyles all 41 panels and every custom chart without touching them.
 
 ### 🖼️ Download a panel — or the whole dashboard — as PNG or SVG
 
@@ -341,7 +341,7 @@ No database to hand? `init my-dashboards --sample` adds a small generated SQLite
 | `open-dashboard query "<sql>" [--source s] [--param k=v]` | Run read-only SQL against a datasource |
 | `open-dashboard query --dashboard <id> --name <query>` | Run one of a dashboard's named queries |
 | `open-dashboard check [id] [--json]` | Run every query, verify every panel; non-zero exit on errors |
-| `open-dashboard charts [--json]` | Every chart this workspace can use — the 40 built-ins and `charts/` — and the dashboards using each |
+| `open-dashboard charts [--json]` | Every chart this workspace can use — the 41 built-ins and `charts/` — and the dashboards using each |
 | `open-dashboard sync-skills` | Update this workspace's agent skills after an upgrade |
 
 ## The file contract

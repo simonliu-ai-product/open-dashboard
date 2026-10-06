@@ -195,7 +195,7 @@ ORDER BY roas DESC;
 
 欄位名稱不會告訴你退款的訂單還留在 `orders` 裡、價格以「分」為單位，或是某個月有折扣活動。`databases/<source>/database.md` 會：資料表的意義、該篩選哪些值、單位、時區、容易踩的地方。Agent 在寫 SQL 前會先讀它（`open-dashboard schema` 第一行就會印出它的路徑），資料來源頁面也會把它和 schema 並排顯示，內容更新時即時重新載入。
 
-### 📊 40 種面板，手寫 SVG
+### 📊 41 種面板，手寫 SVG
 
 <img src=".github/assets/gallery.png" alt="圖表展示的一部分：點圖、啞鈴圖、斜率圖、子彈圖、正負長條與馬賽克圖。" width="100%">
 
@@ -208,13 +208,13 @@ ORDER BY roas DESC;
 | 比較與排名 | `BarChart`（分組、堆疊、橫向）、`DotPlot`、`Dumbbell`、`SlopeChart`、`BumpChart`、`BulletChart`、`DivergingBar`、`ParetoChart`、`Waterfall` |
 | 部分與整體 | `PieChart`（甜甜圈）、`Treemap`、`Marimekko`、`FunnelChart`、`UpSetChart` |
 | 分佈 | `Histogram`、`BoxPlot`、`StripPlot`、`EcdfChart`、`ScatterChart`、`Heatmap` |
-| 流向與狀態 | `Sankey`、`Timeline`、`StateTimeline` |
+| 流向與狀態 | `Sankey`、`Timeline`、`Gantt`、`StateTimeline` |
 | 地圖 | `ChoroplethMap`、`SymbolMap`、`TileMap` |
 | 表格 | `Table`（可排序、內嵌長條）、`PivotTable`、`CohortTable` |
 
 不用任何圖表套件：core 會裝進每一個 workspace，而視覺規則寫死在框架裡，而不是交給每一次的 prompt——只有一條 Y 軸（沒有雙軸選項）、零一定在範圍內、每條軸只有一種刻度格式、經過驗證的八色色票並有獨立的深色版本，第九個類別一律收進「其他」。
 
-### 🧩 自訂圖表：40 種都不合用的時候
+### 🧩 自訂圖表：41 種都不合用的時候
 
 <img src=".github/assets/custom-charts.png" alt="圖表頁：自訂與內建圖表在同一個可搜尋的清單中，附即時預覽、check 會驗證的欄位屬性，以及使用它的 Dashboard。" width="100%">
 
@@ -241,7 +241,7 @@ import Radar from '../../charts/radar'
 <Radar title="各分類營收" query="category_periods" axis="category" value="revenue" series="period" span={4} />
 ```
 
-**圖表**頁把 40 種內建面板和你的自訂圖表並排列出，可以搜尋；每一種都附上需要的欄位屬性、使用它的 Dashboard，以及即時預覽——內建圖表取自實際使用它的 Dashboard，自訂圖表則用它自己的 `sample.sql`。`open-dashboard charts` 會把同一份清單印給 Agent，避免重複製作已經存在的圖表。Agent 另有 `/create-chart` skill，寫明契約與規則：顏色取自 `color(i)` 與 `--odd-*` 變數、絕不寫死色碼；只有一條 Y 軸；數字一律經過 `format`。
+**圖表**頁把 41 種內建面板和你的自訂圖表並排列出，可以搜尋；每一種都附上需要的欄位屬性、使用它的 Dashboard，以及即時預覽——內建圖表取自實際使用它的 Dashboard，自訂圖表則用它自己的 `sample.sql`。`open-dashboard charts` 會把同一份清單印給 Agent，避免重複製作已經存在的圖表。Agent 另有 `/create-chart` skill，寫明契約與規則：顏色取自 `color(i)` 與 `--odd-*` 變數、絕不寫死色碼；只有一條 Y 軸；數字一律經過 `format`。
 
 ### 🎨 主題
 
@@ -249,7 +249,7 @@ import Radar from '../../charts/radar'
 
 <sub>主題頁：淺色與深色分開編輯，一邊調整一邊看真實的 Dashboard 變化。</sub>
 
-一套主題就是 `themes/<id>.json`——圖表色票、強調色、上漲／下跌色（若你的市場習慣紅漲綠跌也沒問題）、頁面與面板背景、格線、字型與圓角，淺色與深色各一組。沒設定的項目沿用內建值，畫在色塊上的文字也會依對比自動選擇黑或白。Dashboard 用 `meta.theme` 指定主題（也可以在編輯模式的主題選單中選，會寫回 `index.tsx`）；設定檔中的 `theme` 是整個 workspace 的預設值。每張圖表都透過 `--odd-*` 變數繪製，所以一套主題能同時改變 40 種面板與所有自訂圖表的外觀，不必改動它們。
+一套主題就是 `themes/<id>.json`——圖表色票、強調色、上漲／下跌色（若你的市場習慣紅漲綠跌也沒問題）、頁面與面板背景、格線、字型與圓角，淺色與深色各一組。沒設定的項目沿用內建值，畫在色塊上的文字也會依對比自動選擇黑或白。Dashboard 用 `meta.theme` 指定主題（也可以在編輯模式的主題選單中選，會寫回 `index.tsx`）；設定檔中的 `theme` 是整個 workspace 的預設值。每張圖表都透過 `--odd-*` 變數繪製，所以一套主題能同時改變 41 種面板與所有自訂圖表的外觀，不必改動它們。
 
 ### 🖼️ 面板或整張 Dashboard 都能下載成 PNG 或 SVG
 
@@ -341,7 +341,7 @@ pnpm dev                     # http://localhost:5473
 | `open-dashboard query "<sql>" [--source s] [--param k=v]` | 在資料來源上執行唯讀 SQL |
 | `open-dashboard query --dashboard <id> --name <query>` | 執行某張 Dashboard 的具名查詢 |
 | `open-dashboard check [id] [--json]` | 執行每條查詢、驗證每個面板；有錯誤時以非零狀態結束 |
-| `open-dashboard charts [--json]` | 這個 workspace 能用的所有圖表——40 種內建與 `charts/`——以及使用它們的 Dashboard |
+| `open-dashboard charts [--json]` | 這個 workspace 能用的所有圖表——41 種內建與 `charts/`——以及使用它們的 Dashboard |
 | `open-dashboard sync-skills` | 升級後更新這個 workspace 的 Agent Skills |
 
 ## 檔案契約

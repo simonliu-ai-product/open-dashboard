@@ -285,6 +285,16 @@ db.exec(`
     latency_ms INTEGER NOT NULL,
     PRIMARY KEY (checked_at, service)
   );
+  CREATE TABLE project_tasks (
+    id TEXT PRIMARY KEY,
+    task TEXT NOT NULL,
+    phase TEXT NOT NULL,
+    owner TEXT NOT NULL,
+    start_date TEXT NOT NULL,
+    end_date TEXT,
+    after TEXT,
+    progress REAL NOT NULL
+  );
 `)
 db.exec('BEGIN')
 
@@ -383,6 +393,56 @@ for (let k = 0; k < 3 * 24 * 6; k += 1) {
         : Math.round(base * load * (status === 'degraded' ? 3.2 : 1) * (0.8 + random() * 0.5))
     insertCheck.run(stamp(at), service, status, latency)
   }
+}
+
+// A store relaunch plan in working days, begun three weeks ago, with one task
+// started before its predecessor finished. A task with no end is a milestone.
+const insertTask = db.prepare(
+  'INSERT INTO project_tasks (id, task, phase, owner, start_date, end_date, after, progress) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
+)
+const weekday = (d) => d.getDay() !== 0 && d.getDay() !== 6
+const shift = (d, n) => {
+  const next = new Date(d)
+  for (let left = Math.abs(n); left > 0; ) {
+    next.setDate(next.getDate() + Math.sign(n))
+    if (weekday(next)) left -= 1
+  }
+  return next
+}
+const today = new Date(end.getFullYear(), end.getMonth(), end.getDate())
+const finished = new Map()
+for (const [id, task, phase, owner, days, after, early] of [
+  ['brief', '需求確認', '規劃', 'PM', 4, '', 0],
+  ['catalog', '選品與定價', '規劃', '採購', 6, 'brief', 0],
+  ['plan-ok', '計畫定案', '規劃', 'PM', 0, 'catalog', 0],
+  ['photos', '商品攝影', '製作', '設計', 8, 'plan-ok', 0],
+  ['copy', '商品文案', '製作', '行銷', 7, 'plan-ok', 0],
+  ['pages', '頁面製作', '製作', '工程', 10, 'photos,copy', 3],
+  ['qa', '測試與修正', '上線', '工程', 5, 'pages', 0],
+  ['launch', '新版上線', '上線', 'PM', 0, 'qa', 0],
+]) {
+  let first = shift(today, -15)
+  if (after) {
+    const last = new Date(Math.max(...after.split(',').map((a) => finished.get(a))))
+    first = days ? shift(last, 1) : last
+  }
+  if (early) first = shift(first, -early)
+  const lastDay = days ? shift(first, days - 1) : null
+  finished.set(id, (lastDay ?? first).getTime())
+  let done = 0
+  for (let d = new Date(first); d <= (lastDay ?? first) && d <= today; d.setDate(d.getDate() + 1))
+    if (weekday(d)) done += 1
+  const progress = days ? Math.round((done / days) * 100) / 100 : first <= today ? 1 : 0
+  insertTask.run(
+    id,
+    task,
+    phase,
+    owner,
+    day(first),
+    lastDay && day(lastDay),
+    after || null,
+    progress,
+  )
 }
 db.exec('COMMIT')
 

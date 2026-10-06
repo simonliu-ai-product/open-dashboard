@@ -137,4 +137,15 @@ export const PANELS: Record<string, string> = {
   'Needs a label column and a numeric value column.': '레이블 열과 숫자 값 열이 필요합니다.',
   'Nothing to show: every value is zero or negative.':
     '표시할 내용이 없습니다: 모든 값이 0 이하입니다.',
+  'A Gantt chart needs a label column and start and end dates.':
+    '간트 차트에는 레이블 열과 시작일, 종료일이 필요합니다.',
+  'Started before a predecessor ended: {n}': '작업 {n}개가 선행 작업이 끝나기 전에 시작합니다',
+  'Unknown predecessors: {names}': '선행 작업을 찾을 수 없음: {names}',
+  'Gantt chart': '간트 차트',
+  Phase: '단계',
+  '{n} working days': '영업일 {n}일',
+  Done: '진행률',
+  After: '선행 작업',
+  'Starts too early': '너무 일찍 시작',
+  'before {name} ends': '{name} 완료 전',
 }

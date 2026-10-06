@@ -164,6 +164,12 @@ FROM fulfillment_jobs
 ORDER BY started_at DESC
 LIMIT 30;
 
+-- name: relaunch_plan
+-- description: The store relaunch plan, task by task (ignores the time filter)
+SELECT id, task, phase, owner, start_date, end_date, after, progress
+FROM project_tasks
+ORDER BY rowid;
+
 -- name: bean_prices
 -- description: Daily green-coffee price, open / high / low / close
 SELECT date, open, high, low, close

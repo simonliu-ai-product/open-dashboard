@@ -85,3 +85,64 @@
   stroke: var(--odd-critical);
   stroke-width: 1.5;
 }
+
+.odd-gantt {
+  overflow-y: auto;
+}
+
+.odd-gantt svg {
+  position: static;
+}
+
+.odd-gantt-off {
+  fill: var(--odd-hover);
+}
+
+.odd-gantt-holiday {
+  fill: var(--odd-surface-2);
+}
+
+.odd-gantt-group-label {
+  fill: var(--odd-ink);
+  font-weight: 600;
+}
+
+.odd-gantt-summary {
+  fill: none;
+  stroke: var(--odd-ink-2);
+  stroke-width: 2;
+}
+
+.odd-gantt-remaining {
+  fill-opacity: 0.35;
+}
+
+.odd-gantt-link {
+  fill: none;
+  stroke: var(--odd-axis);
+  stroke-width: 1.25;
+}
+
+.odd-gantt-arrowhead {
+  fill: var(--odd-axis);
+}
+
+.odd-gantt-link.odd-gantt-late {
+  stroke: var(--odd-critical);
+  stroke-dasharray: 3 2;
+}
+
+.odd-gantt-arrowhead.odd-gantt-late {
+  fill: var(--odd-critical);
+}
+
+.odd-gantt-milestone {
+  stroke: var(--odd-surface);
+  stroke-width: 1.5;
+}
+
+.odd-gantt-late-key {
+  width: 14px;
+  height: 0;
+  border-top: 1.5px dashed var(--odd-critical);
+}

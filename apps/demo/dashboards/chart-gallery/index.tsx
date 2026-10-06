@@ -15,6 +15,7 @@ import {
   Dumbbell,
   EcdfChart,
   Filters,
+  Gantt,
   Histogram,
   HorizonChart,
   Marimekko,
@@ -318,6 +319,24 @@ export default function ChartGallery() {
             value="orders"
             format="integer"
             span={4}
+          />
+        </Row>
+      </Section>
+
+      <Section title="專案時程">
+        <Row>
+          <Gantt
+            title="商店改版計畫"
+            query="relaunch_plan"
+            id="id"
+            label="task"
+            start="start_date"
+            end="end_date"
+            after="after"
+            progress="progress"
+            group="phase"
+            series="owner"
+            now
           />
         </Row>
       </Section>

@@ -296,4 +296,9 @@ export const APP: Record<string, string> = {
   'Download dashboard': '下載整張 Dashboard',
   'Thinking…': '思考中…',
   'Thought for {n}s': '已思考 {n} 秒',
+  Gantt: '甘特圖',
+  'Task (label)': '任務（標籤）',
+  'Phase (group)': '階段（群組）',
+  'Depends on (after)': '前置任務（after）',
+  'Done (progress)': '完成度（progress）',
 }

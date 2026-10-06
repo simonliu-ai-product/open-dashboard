@@ -196,7 +196,7 @@ describe('custom charts', () => {
     fixture.write('charts/radar/index.tsx', RADAR)
     fixture.write('dashboards/sales/index.tsx', withRadar('axis="region" value="amount"'))
     const catalog = await chartCatalog(fixture.workspace)
-    expect(catalog).toHaveLength(41)
+    expect(catalog).toHaveLength(42)
     expect(catalog[0]).toMatchObject({
       kind: 'custom',
       id: 'radar',

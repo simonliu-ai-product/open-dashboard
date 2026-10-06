@@ -124,6 +124,15 @@ Object.assign(FIELDS, {
     { key: 'end', label: 'End', kind: 'any' },
     { key: 'series', label: 'Colour by (series)', kind: 'category', optional: true },
   ],
+  Gantt: [
+    { key: 'label', label: 'Task (label)', kind: 'any' },
+    { key: 'start', label: 'Start', kind: 'any' },
+    { key: 'end', label: 'End', kind: 'any' },
+    { key: 'group', label: 'Phase (group)', kind: 'category', optional: true },
+    { key: 'after', label: 'Depends on (after)', kind: 'any', optional: true },
+    { key: 'progress', label: 'Done (progress)', kind: 'number', optional: true },
+    { key: 'series', label: 'Colour by (series)', kind: 'category', optional: true },
+  ],
   Candlestick: [
     { key: 'x', label: 'Date', kind: 'any' },
     { key: 'open', label: 'Open', kind: 'number' },
@@ -215,6 +224,7 @@ export const TOGGLES: Record<string, { key: string; label: string }[]> = {
   BumpChart: [{ key: 'ascending', label: 'Lowest value ranks first' }],
   SmallMultiples: [{ key: 'independent', label: 'Separate scale per chart' }],
   Timeline: [{ key: 'now', label: 'Mark the current time' }],
+  Gantt: [{ key: 'now', label: 'Mark the current time' }],
   PivotTable: [
     { key: 'totals', label: 'Totals' },
     { key: 'heat', label: 'Shade cells by value' },
@@ -235,6 +245,8 @@ const NONE_KEYS = new Set([
   'center',
   'upper',
   'lower',
+  'after',
+  'progress',
 ])
 
 const FORMATS = [

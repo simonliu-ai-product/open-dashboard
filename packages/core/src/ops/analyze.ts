@@ -244,6 +244,10 @@ export function analyzeDashboard(
     result.panels.push(panel)
     if (panel.query) result.queryRefs.push({ name: panel.query, line: panel.line, columns })
 
+    const holidays = read('holidays')
+    if (typeof holidays === 'string')
+      result.queryRefs.push({ name: holidays, line: panel.line, columns: [] })
+
     const spark = read('spark')
     if (spark && typeof spark === 'object' && !Array.isArray(spark)) {
       const s = spark as { query?: unknown; x?: unknown; y?: unknown }

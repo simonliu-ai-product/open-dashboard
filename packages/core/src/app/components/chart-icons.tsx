@@ -205,6 +205,13 @@ export const CHART_ICONS: Record<string, () => ReactNode> = {
       </>,
     ),
   Timeline: () => svg(<path d="M2 4h6M5 8h7M3 12h5" strokeWidth="2.2" />),
+  Gantt: () =>
+    svg(
+      <>
+        <path d="M2 4h5M6 8h6M10 12h4" strokeWidth="2.2" />
+        <path d="M7.5 4h1v3M12.5 8h.5v3" strokeWidth="1" />
+      </>,
+    ),
   Candlestick: () =>
     svg(
       <>

@@ -296,4 +296,9 @@ export const APP: Record<string, string> = {
   'Download dashboard': '대시보드 전체 다운로드',
   'Thinking…': '생각 중…',
   'Thought for {n}s': '{n}초 동안 생각함',
+  Gantt: '간트 차트',
+  'Task (label)': '작업 (레이블)',
+  'Phase (group)': '단계 (그룹)',
+  'Depends on (after)': '선행 작업 (after)',
+  'Done (progress)': '진행률 (progress)',
 }

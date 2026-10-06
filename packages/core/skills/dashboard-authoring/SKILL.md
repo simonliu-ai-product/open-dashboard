@@ -256,6 +256,7 @@ reorder them within a row, and change a chart's type, columns, format and
 | a trend with its spread or interval | `<BandChart>` |
 | is this process stable / which days are abnormal | `<ControlChart>` |
 | jobs, tasks or bookings in time | `<Timeline>` |
+| a project plan: phases, dependencies, progress, working days | `<Gantt>` |
 | open / high / low / close | `<Candlestick>` |
 | how values are spread | `<Histogram>`; per group → `<BoxPlot>`; small samples → `<StripPlot>`; "N % are under X" → `<EcdfChart>` |
 | how concentrated (top 20 % hold…) | `<ParetoChart>` |

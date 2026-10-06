@@ -19,7 +19,7 @@ download, edit-mode resize and move, and the dashboard's theme.
 
 ## Step 0 — Make sure a built-in will not do
 
-There are forty built-in panels, and the workspace may already have custom
+There are forty-one built-in panels, and the workspace may already have custom
 ones. List them all first:
 
 ```bash

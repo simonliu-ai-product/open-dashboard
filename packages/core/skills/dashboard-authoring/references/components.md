@@ -199,6 +199,21 @@ Values must be non-negative.
 Bars from `start` to `end` in lanes by `label` — jobs per worker, a project
 plan. `series` colours bars (with a legend); `now` draws the current time.
 
+#### `<Gantt query label start end id? after? progress? milestone? group? series? holidays? now?>`
+One row per task, in query order (`ORDER BY` the plan). A date-only `end` is
+inclusive: `2026-10-01` to `2026-10-03` is three days. `group` gathers a phase's
+tasks under a summary bar. `after` is a column of predecessor ids,
+comma-separated, matched against `id` (default `label`): it draws
+finish-to-start arrows, and a task that starts before its predecessor ends gets
+a red dashed arrow and is counted in the legend. `progress` is 0–1 (0–100 is
+read as a percentage). A row with no `end`, or a truthy `milestone` column, is a
+diamond. Weekends are shaded; `holidays` names a second query of days off —
+`date` (YYYY-MM-DD or YYYYMMDD), optional `name`, and an `isHoliday` column
+whose false rows make a weekend a working day — and the tooltip then counts
+working days. Taiwan's calendar is an `http` table:
+`https://cdn.jsdelivr.net/gh/ruyut/TaiwanCalendar/data/2026.json` (one table per
+year).
+
 #### `<Candlestick query x open high low close convention? format?>`
 Open / high / low / close per period. Rising colour follows the locale
 (red-up for zh, ja, ko); `convention="west"` or `"east"` overrides.
