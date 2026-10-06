@@ -105,6 +105,8 @@ SQL 錯誤、不存在的查詢、沒有綁定的參數、找不到的欄位都�
 | `snowflake` | Snowflake | `pnpm add snowflake-sdk` | |
 | `http` | JSON HTTP API | 內建 | REST 與開放資料 API——只送 GET |
 | `mcp` | MCP server | 內建 | 遠端（streamable HTTP）或本機（stdio）；只呼叫唯讀工具 |
+| `json` | JSON 檔案 | 內建 | workspace 裡的 JSON 與 JSON Lines；萬用字元可以把整個資料夾的檔案疊成一張表 |
+| `csv` | CSV 檔案 | 內建 | workspace 裡的 CSV 與 TSV，第一列為欄位名稱 |
 
 想設定幾個就設定幾個，每條查詢用 `-- source:` 指定來源。驅動程式是選用的 peer dependency，只有在開啟該類型的資料來源時才會載入。查詢結果在伺服器端統一正規化——整數、小數、時間在每種資料庫都以同樣的形式回傳——所以在 SQLite 上寫好的圖表，換到 Postgres 也會長得一模一樣。除了 BigQuery 與 Snowflake 之外，每種資料庫都經過跨資料庫一致性測試，在真實的伺服器上驗證過（[`conformance.test.ts`](packages/core/src/datasource/conformance.test.ts)）；這兩者則是以其 SDK 的替身進行測試。
 
@@ -145,6 +147,26 @@ FROM stocks ORDER BY CAST(TradeValue AS REAL) DESC LIMIT 10;
 - `mcp` 只呼叫標示 `readOnlyHint` 的工具，絕不呼叫標示 `destructiveHint` 的工具；兩者都沒標示的工具，需要設定 `allowUnannotated: true`。用戶端是內建的（不依賴 SDK）。
 - 網址或工具參數中的 `:name` 會由查詢參數填入，所以篩選條件也能傳到 API。巢狀值會以 JSON 文字傳入——用 `json_extract`／`json_each` 讀取。
 - 每張表有自己的 `cache`（預設 30 秒）；失敗的呼叫不會被快取，下次重新整理只會重試失敗的部分。
+
+
+### 📄 JSON 與 CSV 檔案，也能用 SQL 查
+
+別人匯出的結果、存成 CSV 的試算表、一整個資料夾的評測紀錄：`json` 或 `csv` 資料來源會把 workspace 裡的檔案當成資料表，SQL、篩選、`check` 和 `-- uses:` 跨來源查詢都和資料庫一樣。一張表可以指向一個檔案，也可以指向**萬用字元**——符合的檔案會全部疊成一張表，並多一欄 `_file` 記錄檔案路徑；新檔案丟進資料夾，資料就會自動出現。
+
+```ts
+evals: {
+  type: 'json',
+  tables: {
+    results: { file: 'data/results/**/results_*.json' },   // 一個檔案一列，_file 是它的路徑
+    models: { file: 'data/models.json', rows: 'official' },  // 取某個路徑下的陣列
+  },
+},
+sheets: { type: 'csv', tables: { budget: { file: 'data/budget.csv' } } },
+```
+
+- JSON Lines（`.jsonl`、`.ndjson`）一行一筆；巢狀的值會以 JSON 文字傳入，用 `json_extract`／`json_each` 讀取。
+- CSV 的欄位只有在每個值都是純數字時才轉成數字，所以 `0050` 這種代號會保留為文字。`.tsv` 以 Tab 分隔，也可以用 `delimiter` 指定。
+- 只讀取 workspace 裡的檔案，絕不寫入，也不會讓網頁直接下載原始檔。檔案一改，讀它的面板就會重新整理。
 
 ### 🔗 跨資料庫查詢
 
@@ -225,11 +247,11 @@ import Radar from '../../charts/radar'
 
 一套主題就是 `themes/<id>.json`——圖表色票、強調色、上漲／下跌色（若你的市場習慣紅漲綠跌也沒問題）、頁面與面板背景、格線、字型與圓角，淺色與深色各一組。沒設定的項目沿用內建值，畫在色塊上的文字也會依對比自動選擇黑或白。Dashboard 用 `meta.theme` 指定主題（也可以在編輯模式的主題選單中選，會寫回 `index.tsx`）；設定檔中的 `theme` 是整個 workspace 的預設值。每張圖表都透過 `--odd-*` 變數繪製，所以一套主題能同時改變 40 種面板與所有自訂圖表的外觀，不必改動它們。
 
-### 🖼️ 每個面板都能下載 PNG 或 SVG
+### 🖼️ 面板或整張 Dashboard 都能下載成 PNG 或 SVG
 
 <img src=".github/assets/download.png" alt="面板的下載選單，可選 PNG 或 SVG。" width="100%">
 
-每個面板都有**下載**選單。匯出內容包含標題與圖例，套用 Dashboard 的主題，並排除按鈕、提示框與編輯控制項。SVG 是真正的向量檔——文字是 `<text>`、顏色已解析、沒有 `<foreignObject>`——所以在瀏覽器以外也能正確顯示（例如 macOS 的預覽程式）；PNG 則以兩倍解析度從它繪製。字型是以名稱引用而非內嵌：在沒有該字型的電腦上開啟 SVG，會換成其他字型，PNG 則一定和螢幕上看到的一樣。
+每個面板都有**下載**選單。匯出內容包含標題與圖例，套用 Dashboard 的主題，並排除按鈕、提示框與編輯控制項。SVG 是真正的向量檔——文字是 `<text>`、顏色已解析、沒有 `<foreignObject>`——所以在瀏覽器以外也能正確顯示（例如 macOS 的預覽程式）；PNG 則以兩倍解析度從它繪製。頁首「預覽／編輯」旁的**下載按鈕**則把整張 Dashboard——標題、目前的篩選條件與所有面板——輸出成一張圖。字型是以名稱引用而非內嵌：在沒有該字型的電腦上開啟 SVG，會換成其他字型，PNG 則一定和螢幕上看到的一樣。
 
 ### 💬 選用的對話助理，只根據畫面回答
 

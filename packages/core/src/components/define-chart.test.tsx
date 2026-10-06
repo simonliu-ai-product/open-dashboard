@@ -3,6 +3,7 @@ import { act, cleanup, render } from '@testing-library/react'
 import type { ReactElement } from 'react'
 import { afterEach, describe, expect, it } from 'vitest'
 import { HostContext, type HostContextValue } from '../runtime/context.js'
+import { EditContext, useEdit } from '../runtime/edit.js'
 import { exportName, panelToSvg } from '../runtime/export-panel.js'
 import type { QueryRun } from '../runtime/types.js'
 import { defineChart } from './define-chart.js'
@@ -122,6 +123,22 @@ describe('defineChart', () => {
     }
   })
 
+  it('shows a size staged in Edit mode before it is saved', async () => {
+    function Staged() {
+      const base = useEdit()
+      return (
+        <EditContext.Provider
+          value={{ ...base, panels: { 'By region': { changes: { height: 520 } } } }}
+        >
+          <Bars title="By region" query="q" axis="axis" value="value" height={300} />
+        </EditContext.Provider>
+      )
+    }
+    const container = await draw(<Staged />)
+    const panel = container.querySelector('article') as HTMLElement
+    expect(panel.style.height).toBe('520px')
+  })
+
   it('shows no Inspect button where there is no inspector', async () => {
     const withInspector = await draw(<Bars title="A" query="q" axis="axis" value="value" />)
     const count = withInspector.querySelectorAll('.odd-panel-actions > button').length
@@ -146,5 +163,19 @@ describe('panel export', () => {
     expect(svg).not.toContain('odd-icon-button')
     expect(svg).not.toContain('var(--odd-')
     expect(svg).toMatch(/^<svg xmlns="http:\/\/www\.w3\.org\/2000\/svg"/)
+  })
+
+  it('draws a filter by the option it shows, not every option', async () => {
+    const container = await draw(
+      <section>
+        <select defaultValue="b" aria-label="Region">
+          <option value="a">North</option>
+          <option value="b">South</option>
+        </select>
+      </section>,
+    )
+    const { svg } = panelToSvg(container.querySelector('section') as HTMLElement)
+    expect(svg).toContain('>South</text>')
+    expect(svg).not.toContain('North')
   })
 })

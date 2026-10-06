@@ -1,5 +1,6 @@
 import { realpathSync } from 'node:fs'
-import { join, resolve } from 'node:path'
+import { join, relative, resolve, sep } from 'node:path'
+import { matchesTable } from '../datasource/files.js'
 import type { ResolvedConfig } from '../workspace.js'
 
 /** Absolute paths of the files the configured datasources read. */
@@ -14,6 +15,20 @@ export function referencedFiles(config: ResolvedConfig): Set<string> {
     }
   }
   return out
+}
+
+/**
+ * Whether a JSON or CSV datasource reads this file — a table's file, or one
+ * its glob matches. Checked by pattern, so a file added later is covered too.
+ */
+export function readBySource(config: ResolvedConfig, path: string): boolean {
+  const file = relative(config.root, path).split(sep).join('/')
+  if (file.startsWith('..')) return false
+  return Object.values(config.datasources).some(
+    (source) =>
+      (source.type === 'json' || source.type === 'csv') &&
+      Object.values(source.tables ?? {}).some((table) => matchesTable(table.file, file)),
+  )
 }
 
 /** The file a dev-server URL would read: `/@fs/abs/path` or a path under the root. */

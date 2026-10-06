@@ -1,6 +1,8 @@
 import { Component, type ErrorInfo, type ReactNode } from 'react'
 import type { ColumnInfo, Row } from '../config.js'
 import { seriesColor } from '../runtime/color.js'
+import { applyProps } from '../runtime/convert.js'
+import { usePanelEdit } from '../runtime/edit.js'
 import { formatValue } from '../runtime/format.js'
 import { useT } from '../runtime/i18n.js'
 import type { Format, QueryRun } from '../runtime/types.js'
@@ -112,7 +114,13 @@ function Plot<P>({
 export function defineChart<P extends object = Record<string, unknown>>(
   definition: ChartDefinition<P>,
 ) {
-  function CustomChart(props: CustomChartProps<P>) {
+  function CustomChart(source: CustomChartProps<P>) {
+    // Like editable() for built-ins: Edit mode's staged size and settings show
+    // before Save. A custom chart cannot change type, so only props apply.
+    const edit = usePanelEdit(source.title)
+    const props = edit
+      ? (applyProps(source as Record<string, unknown>, edit.changes) as CustomChartProps<P>)
+      : source
     const state = useQuery(props.query)
     return (
       <PanelFrame

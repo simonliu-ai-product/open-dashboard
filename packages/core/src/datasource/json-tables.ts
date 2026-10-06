@@ -34,10 +34,14 @@ export function pickRows(body: unknown, path: string | undefined, where: string)
   )
 }
 
-/** Rows as a result: columns in first-seen order across rows, nested values as JSON text. */
+/**
+ * Rows as a result: columns in first-seen order across rows, nested values as
+ * JSON text. SQLite column names ignore case, so `rtMessage` in one row and
+ * `rtmessage` in the next are one column, named as first seen.
+ */
 export function rowsToResult(items: unknown[], elapsedMs: number): QueryResult {
   const names: string[] = []
-  const seen = new Set<string>()
+  const seen = new Map<string, string>()
   const rows: Row[] = items.map((item) => {
     const source: Record<string, unknown> =
       item && typeof item === 'object' && !Array.isArray(item)
@@ -45,11 +49,14 @@ export function rowsToResult(items: unknown[], elapsedMs: number): QueryResult {
         : { value: item }
     const row: Row = {}
     for (const [key, value] of Object.entries(source)) {
-      if (!seen.has(key)) {
-        seen.add(key)
+      let name = seen.get(key.toLowerCase())
+      if (name === undefined) {
+        name = key
+        seen.set(key.toLowerCase(), key)
         names.push(key)
       }
-      row[key] = value !== null && typeof value === 'object' ? JSON.stringify(value) : value
+      if (name in row && row[name] !== null && row[name] !== undefined) continue
+      row[name] = value !== null && typeof value === 'object' ? JSON.stringify(value) : value
     }
     return row
   })
@@ -85,6 +92,29 @@ export function bindTableValue(
   return value
 }
 
+const PLACEHOLDER = /:([A-Za-z_][A-Za-z0-9_]*)/g
+
+/**
+ * The parameters the tables a query mentions put in their URL or arguments.
+ * They change what is fetched without appearing in the SQL, so the result
+ * cache has to key on them too.
+ */
+export function tableParams(sql: string, tables: Record<string, JsonTable>): string[] {
+  const found = new Set<string>()
+  const scan = (value: unknown): void => {
+    if (typeof value === 'string')
+      for (const match of value.matchAll(PLACEHOLDER)) found.add(match[1] as string)
+    else if (Array.isArray(value)) value.forEach(scan)
+    else if (value && typeof value === 'object') Object.values(value).forEach(scan)
+  }
+  for (const name of tablesIn(sql, Object.keys(tables))) {
+    const spec = tables[name] as JsonTable & { url?: unknown; args?: unknown }
+    scan(spec.url)
+    scan(spec.args)
+  }
+  return [...found]
+}
+
 /** The configured tables a query mentions — only those are fetched. */
 export function tablesIn(sql: string, tables: string[]): string[] {
   const words = new Set(sqlWords(sql))
@@ -96,12 +126,14 @@ export function tablesIn(sql: string, tables: string[]): string[] {
 
 export interface JsonSourceSpec<T extends JsonTable> {
   name: string
-  type: 'http' | 'mcp'
+  type: 'http' | 'mcp' | 'json' | 'csv'
   tables: Record<string, T>
   /** Fetch one table's response body for these parameters. */
   fetch(table: string, spec: T, params: Record<string, ParamValue>): Promise<unknown>
   /** A key that is the same for two fetches that would return the same thing. */
   key(table: string, spec: T, params: Record<string, ParamValue>): string
+  /** Where the rows are in what `fetch` returned. Default: the table's `rows`. */
+  rowsPath?(spec: T): string | undefined
   tools?(): Promise<ToolCatalog>
   close?(): Promise<void>
 }
@@ -128,7 +160,12 @@ export function jsonSource<T extends JsonTable>(source: JsonSourceSpec<T>): Data
     const where = `datasource "${source.name}" table "${table}"`
     const value = source
       .fetch(table, spec, params)
-      .then((body) => rowsToResult(pickRows(body, spec.rows, where), performance.now() - started))
+      .then((body) =>
+        rowsToResult(
+          pickRows(body, source.rowsPath ? source.rowsPath(spec) : spec.rows, where),
+          performance.now() - started,
+        ),
+      )
     recent.set(key, { at: Date.now(), ttl, value })
     value.catch(() => recent.delete(key))
     return value

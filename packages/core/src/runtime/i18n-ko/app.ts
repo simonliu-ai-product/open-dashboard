@@ -291,6 +291,9 @@ export const APP: Record<string, string> = {
   'Summarize this dashboard': '이 대시보드 요약',
   'What changed the most?': '가장 크게 변한 것은?',
   'Anything unusual?': '특이한 점이 있나요?',
+  Files: '파일',
+  '{n} files': '파일 {n}개',
+  'Download dashboard': '대시보드 전체 다운로드',
   'Thinking…': '생각 중…',
   'Thought for {n}s': '{n}초 동안 생각함',
 }

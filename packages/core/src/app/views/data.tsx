@@ -47,7 +47,7 @@ function useDatabaseDoc(source: string | undefined): DatabaseDoc | undefined {
 }
 
 function isJsonSource(type: string): boolean {
-  return type === 'http' || type === 'mcp'
+  return type === 'http' || type === 'mcp' || type === 'json' || type === 'csv'
 }
 
 function useSourceDetail(
@@ -221,6 +221,8 @@ export function DataSourcesView({
       for (const e of detail.endpoints) out.set(e.table, { call: `GET ${e.url}`, params: e.params })
     if (detail?.kind === 'mcp')
       for (const e of detail.tables) out.set(e.table, { call: e.tool, params: e.params })
+    if (detail?.kind === 'files')
+      for (const e of detail.tables) out.set(e.table, { call: e.file, params: [] })
     return out
   }, [detail])
   const ids = useMemo(

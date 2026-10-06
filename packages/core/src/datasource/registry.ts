@@ -112,6 +112,21 @@ export const DRIVERS: DriverInfo[] = [
     example:
       "{ type: 'mcp', url: 'https://example.com/mcp/', headers: { Authorization: process.env.MCP_AUTHORIZATION ?? '' }, tables: { items: { tool: 'list_items', rows: 'data' } } }",
   },
+  {
+    type: 'json',
+    label: 'JSON files',
+    compatible: ['JSON Lines (.jsonl, .ndjson)'],
+    readOnly: 'files under the workspace, read and never written; SQL runs in a scratch SQLite',
+    example:
+      "{ type: 'json', tables: { results: { file: 'data/results/**/*.json', rows: 'items' } } }",
+  },
+  {
+    type: 'csv',
+    label: 'CSV files',
+    compatible: ['TSV (.tsv)'],
+    readOnly: 'files under the workspace, read and never written; SQL runs in a scratch SQLite',
+    example: "{ type: 'csv', tables: { sales: { file: 'data/sales.csv' } } }",
+  },
 ]
 
 export function driverFor(type: string): DriverInfo | undefined {

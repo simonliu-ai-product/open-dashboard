@@ -1,14 +1,18 @@
 import { readFileSync } from 'node:fs'
 import { relative } from 'node:path'
 import type { ParamValue } from '../config.js'
-import { referencedParams } from '../datasource/params.js'
 import { errorMessage } from '../datasource/types.js'
 import type { NamedQuery } from '../queries/load.js'
 import { isTimePreset, timeRangeParams } from '../runtime/time-range.js'
 import type { Workspace } from '../workspace.js'
 import { analyzeDashboard, type FilterDecl } from './analyze.js'
 import { chartImports } from './charts.js'
-import { dashboardQueries, discoverDashboards, runDashboardQuery } from './dashboards.js'
+import {
+  dashboardQueries,
+  discoverDashboards,
+  queryParams,
+  runDashboardQuery,
+} from './dashboards.js'
 
 export type Severity = 'error' | 'warning'
 
@@ -213,7 +217,9 @@ export async function checkDashboard(
   const results = new Map<string, string[]>()
   for (const [name, query] of queries) {
     const entry: QueryReport = { name }
-    const unbound = referencedParams(query.sql).filter((param) => !(param in report.params))
+    const unbound = queryParams(workspace.config, query).filter(
+      (param) => !(param in report.params),
+    )
     if (unbound.length > 0) {
       entry.error = `uses ${unbound.map((p) => `:${p}`).join(', ')}, which no filter provides`
       findings.push({

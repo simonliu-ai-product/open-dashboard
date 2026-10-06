@@ -2,6 +2,7 @@ import type { DatasourceConfig } from '../config.js'
 import { openBigquery } from './bigquery.js'
 import { openClickhouse } from './clickhouse.js'
 import { openDuckdb } from './duckdb.js'
+import { openFiles } from './files.js'
 import { openHttp } from './http.js'
 import { openMcp } from './mcp.js'
 import { openMssql } from './mssql.js'
@@ -41,6 +42,9 @@ export function openDatasource(
       return openHttp(name, config)
     case 'mcp':
       return openMcp(name, config)
+    case 'json':
+    case 'csv':
+      return openFiles(name, config, root)
     default:
       throw new DatasourceError(
         `datasource "${name}": unknown type "${(config as { type?: string }).type}" — use one of ${DRIVERS.map((d) => d.type).join(', ')}`,

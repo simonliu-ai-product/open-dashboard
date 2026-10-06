@@ -143,6 +143,32 @@ export interface McpSource {
   allowUnannotated?: boolean
 }
 
+export interface FileTable {
+  /**
+   * A file under the workspace, or a glob (`results/**\/*.json`): every
+   * matching file is stacked into the table, with its path in `_file`.
+   */
+  file: string
+  /** JSON only: where the rows are — a dot path such as `data.items`. Default: the file itself, or its first array. */
+  rows?: string
+  /** How long a read is reused. Default '30s'; an edited file is read again at once either way. */
+  cache?: string
+}
+
+/** Local JSON or JSON Lines (`.jsonl`, `.ndjson`) files, as tables. */
+export interface JsonFileSource {
+  type: 'json'
+  tables: Record<string, FileTable>
+}
+
+/** Local CSV (or `.tsv`) files with a header row, as tables. */
+export interface CsvSource {
+  type: 'csv'
+  tables: Record<string, FileTable>
+  /** Default ',' — or a tab for `.tsv`. */
+  delimiter?: string
+}
+
 export type DatasourceConfig =
   | SqliteSource
   | PostgresSource
@@ -155,6 +181,8 @@ export type DatasourceConfig =
   | SnowflakeSource
   | HttpSource
   | McpSource
+  | JsonFileSource
+  | CsvSource
 export type DatasourceType = DatasourceConfig['type']
 
 /**

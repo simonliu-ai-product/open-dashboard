@@ -15,6 +15,7 @@ import type { ParamValue } from '../../config.js'
 import { HostContext, type HostContextValue } from '../../runtime/context.js'
 import { applyProps } from '../../runtime/convert.js'
 import { EditContext } from '../../runtime/edit.js'
+import { downloadDashboard, exportName } from '../../runtime/export-panel.js'
 import { useT } from '../../runtime/i18n.js'
 import type { DashboardTheme } from '../../runtime/theme.js'
 import type { DashboardMeta, PanelInfo, QueryRun } from '../../runtime/types.js'
@@ -206,6 +207,7 @@ export function DashboardView({ id, preview }: { id: string; preview?: ThemePrev
   }, [edits.length])
   const [notes, setNotes] = useState<{ line: number; text: string }[]>([])
   const params = useRef<Record<string, ParamValue>>({})
+  const page = useRef<HTMLDivElement>(null)
   const focus = useRef<{ panel?: string; query?: string }>({})
   const inflight = useRef(new Map<string, Promise<QueryRun>>())
   const meta = loaded?.meta
@@ -357,9 +359,16 @@ export function DashboardView({ id, preview }: { id: string; preview?: ThemePrev
               onTheme={(value) =>
                 editor.editState.stage({ kind: 'meta', key: 'theme', value: value || null })
               }
+              onDownload={async (format) => {
+                if (page.current) await downloadDashboard(page.current, format, exportName(id, ''))
+              }}
             />
           )}
-          <div className="odd-dashboard-page" data-editing={editor.editState.editing || undefined}>
+          <div
+            ref={page}
+            className="odd-dashboard-page"
+            data-editing={editor.editState.editing || undefined}
+          >
             <Boundary resetKey={loaded} title={t('This dashboard failed to render')}>
               {loaded.view}
             </Boundary>

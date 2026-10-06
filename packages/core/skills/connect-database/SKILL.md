@@ -34,6 +34,8 @@ Ask only for what you cannot see. One `AskUserQuestion` call at most:
   | Snowflake | `snowflake` |
   | a JSON HTTP API (REST, open data portals) | `http` |
   | an MCP server (its read-only tools) | `mcp` |
+  | JSON or JSON Lines files in the workspace (exports, logs, results) | `json` |
+  | CSV or TSV files in the workspace (spreadsheet exports) | `csv` |
 
   MongoDB, Elasticsearch, DynamoDB and other non-SQL stores have no driver of
   their own. If they expose a JSON HTTP API or an MCP server, use `http` /
@@ -77,6 +79,18 @@ export default {
 - `defaultSource` is used by queries without a `-- source:` line. With one
   datasource it is implied.
 - File paths (SQLite, DuckDB, key files) are relative to the workspace root.
+- JSON and CSV files must sit inside the workspace (put them under `data/`).
+  A table names one file or a glob; a glob stacks every match and adds
+  `_file`, its path — the way to read a folder of exports or result files:
+
+  ```ts
+  evals: { type: 'json', tables: { results: { file: 'data/results/**/*.json' } } },
+  sheets: { type: 'csv', tables: { budget: { file: 'data/budget.csv' } } },
+  ```
+
+  `rows: 'a.b'` picks the array inside a JSON document. Look at one file before
+  writing SQL: nested values arrive as JSON text (`json_extract`, `json_each`),
+  CSV columns are numbers only when every value is.
 - Keep the file plain: `import type` and `satisfies` only — it is loaded by
   Node's own TypeScript support, which does not run enums or decorators.
 - Check `.gitignore` contains `.env`. Add it if not.

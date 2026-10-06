@@ -1,4 +1,6 @@
 import { readFileSync } from 'node:fs'
+import { createServer } from 'node:http'
+import type { AddressInfo } from 'node:net'
 import { join } from 'node:path'
 import { loadConfig } from '../workspace.js'
 import { analyzeDashboard } from './analyze.js'
@@ -394,6 +396,54 @@ describe('source detail', () => {
     expect(text).not.toContain('sk-secret-123456')
     expect(text).not.toContain('abc123secret')
     expect(await describeSource(fixture.workspace, 'db')).toEqual({ kind: 'database' })
+  })
+})
+
+describe('API tables and the result cache', () => {
+  it('keys a result on parameters that only the table URL reads', async () => {
+    const server = createServer((req, res) => {
+      const stock = new URL(req.url ?? '/', 'http://x').searchParams.get('stock')
+      res.setHeader('Content-Type', 'application/json')
+      res.end(JSON.stringify([{ stock, close: stock === 'A' ? 10 : 20 }]))
+    })
+    await new Promise<void>((resolve) => server.listen(0, '127.0.0.1', resolve))
+    const port = (server.address() as AddressInfo).port
+    try {
+      fixture.write(
+        'open-dashboard.config.mjs',
+        `export default { datasources: { api: { type: 'http', tables: { prices: { url: 'http://127.0.0.1:${port}/p?stock=:stock', cache: '1h' } } } }, cache: '1h' }\n`,
+      )
+      await fixture.workspace.reconfigure(await loadConfig(fixture.root))
+      fixture.write('dashboards/quote/queries.sql', '-- name: close\nSELECT close FROM prices;\n')
+      fixture.write(
+        'dashboards/quote/index.tsx',
+        'import { Dashboard, Filters, Select, Stat } from \'@open-dashboard/core\'\nexport default function Q() { return <Dashboard><Filters><Select name="stock" options={[\'A\', \'B\']} /></Filters><Stat title="Close" query="close" /></Dashboard> }\n',
+      )
+      const a = await runDashboardQuery(fixture.workspace, 'quote', 'close', { stock: 'A' })
+      const b = await runDashboardQuery(fixture.workspace, 'quote', 'close', { stock: 'B' })
+      expect(a.result.rows).toEqual([{ close: 10 }])
+      expect(b.result.rows).toEqual([{ close: 20 }])
+      const report = await checkDashboard(
+        fixture.workspace,
+        'quote',
+        join(fixture.root, 'dashboards/quote/index.tsx'),
+      )
+      expect(report.queries.find((q) => q.name === 'close')?.error).toBeUndefined()
+      fixture.write(
+        'dashboards/quote/index.tsx',
+        'import { Dashboard, Stat } from \'@open-dashboard/core\'\nexport default function Q() { return <Dashboard><Stat title="Close" query="close" /></Dashboard> }\n',
+      )
+      const unbound = await checkDashboard(
+        fixture.workspace,
+        'quote',
+        join(fixture.root, 'dashboards/quote/index.tsx'),
+      )
+      expect(unbound.queries.find((q) => q.name === 'close')?.error).toMatch(
+        /:stock, which no filter provides/,
+      )
+    } finally {
+      server.close()
+    }
   })
 })
 

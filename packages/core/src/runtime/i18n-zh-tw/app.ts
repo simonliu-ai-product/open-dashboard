@@ -291,6 +291,9 @@ export const APP: Record<string, string> = {
   'Summarize this dashboard': '總結這張 Dashboard',
   'What changed the most?': '哪個數字變化最大？',
   'Anything unusual?': '有什麼異常嗎？',
+  Files: '檔案',
+  '{n} files': '{n} 個檔案',
+  'Download dashboard': '下載整張 Dashboard',
   'Thinking…': '思考中…',
   'Thought for {n}s': '已思考 {n} 秒',
 }

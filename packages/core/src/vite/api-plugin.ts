@@ -36,7 +36,7 @@ import {
   writeTheme,
 } from '../ops/index.js'
 import { type ConfigOverrides, loadConfig, type Workspace } from '../workspace.js'
-import { referencedFiles, requestedFile } from './file-guard.js'
+import { readBySource, referencedFiles, requestedFile } from './file-guard.js'
 
 const PREFIX = '/__odd/api/'
 
@@ -127,6 +127,12 @@ export function apiPlugin(workspace: Workspace, overrides: ConfigOverrides): Plu
           server.ws.send({ type: 'custom', event: 'odd:charts-changed', data: { id } })
           return
         }
+        // A JSON or CSV file a datasource reads: every cached result may hold it.
+        if (readBySource(workspace.config, path)) {
+          workspace.cache.clear()
+          server.ws.send({ type: 'custom', event: 'odd:queries-changed', data: {} })
+          return
+        }
         const documented = docSourceOf(workspace.config, path)
         if (documented) {
           server.ws.send({
@@ -164,7 +170,10 @@ export function apiPlugin(workspace: Workspace, overrides: ConfigOverrides): Plu
       // asset, whatever it is called. Read per request, so a config reload counts.
       server.middlewares.use((req, res, next) => {
         const asked = requestedFile(req.url, workspace.config.root, PREFIX)
-        if (asked && referencedFiles(workspace.config).has(asked)) {
+        if (
+          asked &&
+          (referencedFiles(workspace.config).has(asked) || readBySource(workspace.config, asked))
+        ) {
           return json(res, 403, { error: 'this file is read through the query API only' })
         }
         next()

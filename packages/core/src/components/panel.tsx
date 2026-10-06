@@ -141,9 +141,11 @@ export function PanelFrame(props: FrameProps) {
             </button>
           ) : null}
           <DownloadMenu
-            panel={ref}
-            name={exportName(host.id, props.title)}
-            title={props.title}
+            save={async (format) => {
+              if (ref.current)
+                await downloadPanel(ref.current, format, exportName(host.id, props.title))
+            }}
+            label={t('Download {title}', { title: props.title })}
             disabled={
               props.query
                 ? state.status !== 'ok' || !run || run.result.rows.length === 0
@@ -183,11 +185,13 @@ export function PanelFrame(props: FrameProps) {
   )
 }
 
-function DownloadMenu(props: {
-  panel: RefObject<HTMLElement | null>
-  name: string
-  title: string
-  disabled: boolean
+/** A download button with a PNG / SVG menu: a panel's, or the whole dashboard's in its header. */
+export function DownloadMenu(props: {
+  save: (format: ImageFormat) => Promise<void>
+  /** The button's accessible name. */
+  label: string
+  disabled?: boolean
+  className?: string
 }) {
   const t = useT()
   const [open, setOpen] = useState(false)
@@ -215,12 +219,10 @@ function DownloadMenu(props: {
   }, [open])
 
   const save = async (format: ImageFormat) => {
-    const panel = props.panel.current
-    if (!panel) return
     setOpen(false)
     setBusy(true)
     try {
-      await downloadPanel(panel, format, props.name)
+      await props.save(format)
     } catch (error) {
       console.error(error)
     } finally {
@@ -233,9 +235,9 @@ function DownloadMenu(props: {
       <button
         ref={trigger}
         type="button"
-        className="odd-icon-button"
+        className={props.className ?? 'odd-icon-button'}
         title={t('Download')}
-        aria-label={t('Download {title}', { title: props.title })}
+        aria-label={props.label}
         aria-haspopup="menu"
         aria-expanded={open}
         aria-controls={open ? id : undefined}

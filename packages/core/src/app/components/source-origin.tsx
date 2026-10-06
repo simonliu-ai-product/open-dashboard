@@ -165,7 +165,7 @@ function OtherTools({ detail }: { detail: Extract<Detail, { kind: 'mcp' }> }) {
   )
 }
 
-/** Where an API or MCP source's tables come from — the part a database does not have. */
+/** Where an API, MCP or file source's tables come from — the part a database does not have. */
 export function SourceOrigin({ detail, tables }: { detail: Detail; tables: TableInfo[] }) {
   const t = useT()
   const byName = new Map(tables.map((table) => [table.name, table]))
@@ -187,6 +187,36 @@ export function SourceOrigin({ detail, tables }: { detail: Detail; tables: Table
         <ul className="odd-origin-list">
           {detail.endpoints.map((endpoint) => (
             <Endpoint key={endpoint.table} endpoint={endpoint} tables={byName} />
+          ))}
+        </ul>
+      </section>
+    )
+  }
+  if (detail.kind === 'files') {
+    return (
+      <section className="odd-origin" data-kind="files">
+        <header>
+          <h2>{t('Files')}</h2>
+          <span className="odd-safety" data-tone="good">
+            {t('Read-only')}
+          </span>
+        </header>
+        <ul className="odd-origin-list">
+          {detail.tables.map((entry) => (
+            <li key={entry.table}>
+              <span className="odd-method">{detail.format.toUpperCase()}</span>
+              <code className="odd-origin-call">
+                {entry.file}
+                {entry.rows ? ` → ${entry.rows}` : ''}
+              </code>
+              <a className="odd-origin-table" href={`#table-${entry.table}`}>
+                {entry.table}
+              </a>
+              <span className="odd-origin-meta">
+                <span>{t('{n} files', { n: entry.files })}</span>
+                <Rows table={entry.table} tables={byName} />
+              </span>
+            </li>
           ))}
         </ul>
       </section>

@@ -34,10 +34,11 @@ function point(cx: number, cy: number, r: number, f: number): [number, number] {
   return [cx + r * Math.cos(a), cy + r * Math.sin(a)]
 }
 
-function arc(cx: number, cy: number, r: number, from: number, to: number): string {
+/** Part of the half circle. It never spans more than 180°, so the arc is always the short one. */
+export function arc(cx: number, cy: number, r: number, from: number, to: number): string {
   const [x0, y0] = point(cx, cy, r, from)
   const [x1, y1] = point(cx, cy, r, to)
-  return `M${x0},${y0}A${r},${r} 0 ${to - from > 0.5 ? 1 : 0} 1 ${x1},${y1}`
+  return `M${x0},${y0}A${r},${r} 0 0 1 ${x1},${y1}`
 }
 
 /**
@@ -60,7 +61,9 @@ function Meter({ run, props }: { run: QueryRun; props: GaugeProps }) {
   const stroke = Math.max(8, Math.min(size.width, size.height) * 0.06)
   const r = Math.max(0, Math.min(size.width / 2 - stroke - 36, size.height - stroke - 30))
   const cx = size.width / 2
-  const cy = r + stroke / 2 + 6
+  // Centred in the panel: the arc's top to the tick labels under its ends.
+  const drawn = r + stroke / 2 + 6 + 26
+  const cy = Math.max(0, (size.height - drawn) / 2) + r + stroke / 2 + 6
   const targetFraction =
     target === undefined || !max ? undefined : Math.max(0, Math.min(1, target / max))
 
@@ -99,16 +102,19 @@ function Meter({ run, props }: { run: QueryRun; props: GaugeProps }) {
           >
             {formatValue(value, props.format, ctx)}
           </text>
-          <text x={cx} y={cy + 14} textAnchor="middle" className="odd-gauge-caption">
-            {target !== undefined
-              ? t('{pct} of target', {
-                  pct: formatValue(target ? value / target : 0, 'percent', ctx),
-                })
-              : t('{pct} of {max}', {
-                  pct: formatValue(fraction, 'percent', ctx),
-                  max: formatValue(max, props.format, ctx),
-                })}
-          </text>
+          {/* A plain rate already reads as a share of 1: "88% of 100%" would say nothing more. */}
+          {target !== undefined || props.max !== undefined ? (
+            <text x={cx} y={cy + 14} textAnchor="middle" className="odd-gauge-caption">
+              {target !== undefined
+                ? t('{pct} of target', {
+                    pct: formatValue(target ? value / target : 0, 'percent', ctx),
+                  })
+                : t('{pct} of {max}', {
+                    pct: formatValue(fraction, 'percent', ctx),
+                    max: formatValue(max, props.format, ctx),
+                  })}
+            </text>
+          ) : null}
           <text x={cx - r} y={cy + 20} textAnchor="middle" className="odd-tick">
             {formatValue(0, props.format, ctx)}
           </text>

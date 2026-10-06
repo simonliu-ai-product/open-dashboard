@@ -90,6 +90,25 @@ describe('http source', () => {
     expect(hits.sort()).toEqual(['GET /names', 'GET /prices?date=2026%2F10%2001'])
   })
 
+  it('treats keys that differ only in case as one column, as SQLite does', async () => {
+    const { server, url } = await serve((_req, _body, res) =>
+      res.end(
+        JSON.stringify([
+          { code: 'a', rtMessage: 'OK' },
+          { code: 'b', rtmessage: 'ok' },
+        ]),
+      ),
+    )
+    servers.push(server)
+    const source = await openHttp('api', { type: 'http', tables: { t: { url: `${url}/t` } } })
+    opened.push(source)
+    const result = await source.query('SELECT code, rtMessage FROM t ORDER BY code', {}, OPTIONS)
+    expect(result.rows).toEqual([
+      { code: 'a', rtMessage: 'OK' },
+      { code: 'b', rtMessage: 'ok' },
+    ])
+  })
+
   it('reports an HTTP error with the status, and masks a token it echoes', async () => {
     registerSecrets(['Bearer sk-live-123456'])
     const { server, url } = await serve((req, _body, res) => {

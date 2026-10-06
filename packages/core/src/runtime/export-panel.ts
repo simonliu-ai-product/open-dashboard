@@ -62,6 +62,29 @@ export async function downloadPanel(
   downloadBlob(blob, `${name}.${format}`)
 }
 
+/** The whole dashboard — title, filters and every panel — as one image, on the page's background. */
+export async function downloadDashboard(
+  page: HTMLElement,
+  format: ImageFormat,
+  name: string,
+): Promise<void> {
+  const { svg, width, height } = elementToSvg(page, backgroundOf(page))
+  const blob =
+    format === 'svg'
+      ? new Blob([svg], { type: 'image/svg+xml' })
+      : await rasterise(svg, width, height)
+  downloadBlob(blob, `${name}.${format}`)
+}
+
+/** The first painted background at or above an element: what the page shows behind it. */
+function backgroundOf(element: HTMLElement): string | undefined {
+  for (let node: HTMLElement | null = element; node; node = node.parentElement) {
+    const fill = paint(getComputedStyle(node).backgroundColor)
+    if (fill) return fill
+  }
+  return undefined
+}
+
 export function exportName(dashboard: string, title: string): string {
   const slug = title
     .normalize('NFKC')
@@ -72,12 +95,20 @@ export function exportName(dashboard: string, title: string): string {
 }
 
 export function panelToSvg(panel: HTMLElement): { svg: string; width: number; height: number } {
+  return elementToSvg(panel)
+}
+
+function elementToSvg(
+  panel: HTMLElement,
+  background?: string,
+): { svg: string; width: number; height: number } {
   const origin = panel.getBoundingClientRect()
   const width = Math.ceil(origin.width)
   const height = Math.ceil(origin.height)
   const out = new Builder(origin.left, origin.top)
 
   const style = getComputedStyle(panel)
+  if (background) out.open(`<rect width="${width}" height="${height}" fill="${background}"/>`)
   out.box(style, origin)
   out.open(`<g clip-path="url(#${out.clip(0, 0, width, height, radius(style))})">`)
   for (const child of Array.from(panel.childNodes)) out.node(child)
@@ -135,6 +166,12 @@ class Builder {
       return
     const rect = element.getBoundingClientRect()
     if (rect.width === 0 && rect.height === 0 && element.childNodes.length === 0) return
+    if (element instanceof HTMLSelectElement) {
+      // A closed <select> draws its choice itself; its options have no boxes to copy.
+      this.box(style, rect)
+      this.label(element.selectedOptions[0]?.textContent ?? '', style, rect)
+      return
+    }
 
     const opacity = Number(style.opacity)
     const clipped = style.overflowX !== 'visible' || style.overflowY !== 'visible'
@@ -251,6 +288,16 @@ class Builder {
         `<text x="${n(x)}" y="${n(y)}" dominant-baseline="central" fill="${fill}" ${font}>${escapeXml(value)}</text>`,
       )
     }
+  }
+
+  label(content: string, style: CSSStyleDeclaration, rect: DOMRect) {
+    const value = content.replace(/\s+/g, ' ').trim()
+    if (!value) return
+    const x = rect.left - this.x0 + (Number.parseFloat(style.paddingLeft) || 0)
+    const y = rect.top - this.y0 + rect.height / 2
+    this.parts.push(
+      `<text x="${n(x)}" y="${n(y)}" dominant-baseline="central" fill="${paint(style.color) ?? '#000'}" font-family="${attr(style.fontFamily)}" font-size="${style.fontSize}" font-weight="${style.fontWeight}">${escapeXml(value)}</text>`,
+    )
   }
 
   svg(source: SVGSVGElement) {

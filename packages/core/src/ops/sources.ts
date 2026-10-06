@@ -1,4 +1,5 @@
 import type { SchemaInfo } from '../config.js'
+import { tableFiles } from '../datasource/files.js'
 import { redact, redactValue } from '../datasource/redact.js'
 import { errorMessage, type ToolCatalog, type ToolSummary } from '../datasource/types.js'
 import type { Workspace } from '../workspace.js'
@@ -91,6 +92,11 @@ export interface McpToolTable {
 
 export type SourceDetail =
   | { kind: 'database' }
+  | {
+      kind: 'files'
+      format: 'json' | 'csv'
+      tables: { table: string; file: string; rows?: string; files: number }[]
+    }
   | { kind: 'http'; base?: string; headers: string[]; endpoints: HttpEndpoint[] }
   | {
       kind: 'mcp'
@@ -125,6 +131,21 @@ export async function describeSource(workspace: Workspace, name: string): Promis
         cache: spec.cache ?? '30s',
         params: placeholders(spec.url),
       })),
+    }
+  }
+  if (config.type === 'json' || config.type === 'csv') {
+    return {
+      kind: 'files',
+      format: config.type,
+      tables: Object.entries(config.tables ?? {}).map(([table, spec]) => {
+        let files = 0
+        try {
+          files = tableFiles(workspace.config.root, spec.file).length
+        } catch {
+          // a pattern outside the workspace: the query reports why
+        }
+        return { table, file: spec.file, ...(spec.rows ? { rows: spec.rows } : {}), files }
+      }),
     }
   }
   if (config.type !== 'mcp') return { kind: 'database' }

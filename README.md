@@ -105,6 +105,8 @@ SQL errors, unknown queries, unbound parameters and missing columns are errors, 
 | `snowflake` | Snowflake | `pnpm add snowflake-sdk` | |
 | `http` | JSON HTTP API | built in | REST and open-data APIs — GET only |
 | `mcp` | MCP server | built in | remote (streamable HTTP) or local (stdio); read-only tools only |
+| `json` | JSON files | built in | JSON and JSON Lines under the workspace; a glob stacks a folder of files |
+| `csv` | CSV files | built in | CSV and TSV under the workspace, with a header row |
 
 Configure as many as you like; each query names its `-- source:`. Drivers are optional peers, loaded only when a datasource of that type opens. Rows are normalised once on the server — integers, decimals and timestamps come back the same way from every engine — so a chart written against SQLite renders identically against Postgres. Every engine except BigQuery and Snowflake is exercised by the cross-driver conformance suite against a real server ([`conformance.test.ts`](packages/core/src/datasource/conformance.test.ts)); those two are tested against stand-ins for their SDKs.
 
@@ -145,6 +147,26 @@ FROM stocks ORDER BY CAST(TradeValue AS REAL) DESC LIMIT 10;
 - `mcp` calls only tools annotated `readOnlyHint`, never a `destructiveHint` tool; a tool that says neither needs `allowUnannotated: true`. The client is built in (no SDK dependency).
 - `:name` in a URL or tool argument is filled from the query's parameters, so filters reach the API too. Nested values arrive as JSON text — read them with `json_extract` / `json_each`.
 - Each table has its own `cache` (30 s by default); a failed call is not cached, so the next refresh retries only what failed.
+
+
+### 📄 JSON and CSV files, queried with SQL
+
+Results someone exported, a spreadsheet saved as CSV, a folder of evaluation logs: a `json` or `csv` source reads files in the workspace as tables, with the same SQL, filters, `check` and `-- uses:` joins as any database. Point a table at one file, or at a **glob** — every matching file is stacked into one table with its path in `_file`, so dropping a new file in the folder adds its rows.
+
+```ts
+evals: {
+  type: 'json',
+  tables: {
+    results: { file: 'data/results/**/results_*.json' },   // one row per file, _file = its path
+    models: { file: 'data/models.json', rows: 'official' },  // the array at a dot path
+  },
+},
+sheets: { type: 'csv', tables: { budget: { file: 'data/budget.csv' } } },
+```
+
+- JSON Lines (`.jsonl`, `.ndjson`) is read one record per line; nested values arrive as JSON text for `json_extract` / `json_each`.
+- A CSV column becomes numbers only when every value is a plain number, so a code like `0050` stays text. `.tsv` is tab-separated; `delimiter` overrides.
+- Files are read only from inside the workspace, never written, and never served to the page as files. Edit one and the panels that read it refresh.
 
 ### 🔗 Cross-database queries
 
@@ -225,11 +247,11 @@ The **Charts** page lists the 40 built-in panels and your custom charts side by 
 
 A theme is `themes/<id>.json` — chart palette, accent, up / down colours (red-up, green-down if that is your market's convention), page and panel backgrounds, grid, fonts and corner radius, each for light and dark. Anything left out keeps the built-in value, and the text drawn on a coloured mark picks black or white by contrast on its own. A dashboard picks one with `meta.theme` (or from the theme menu in Edit mode, which writes it into `index.tsx`); `theme` in the config sets the workspace default. Every chart draws through the `--odd-*` variables, so a theme restyles all 40 panels and every custom chart without touching them.
 
-### 🖼️ Download any panel as PNG or SVG
+### 🖼️ Download a panel — or the whole dashboard — as PNG or SVG
 
 <img src=".github/assets/download.png" alt="A panel's download menu with PNG and SVG." width="100%">
 
-Every panel has a **Download** menu. The export includes the title and legend, uses the dashboard's theme, and leaves out the buttons, tooltips and edit handles. SVG is real vectors — text as `<text>`, colours resolved, no `<foreignObject>` — so it renders outside a browser too (macOS Preview, for one); PNG is drawn from it at twice the size. Fonts are referenced by name, not embedded: an SVG opened on a machine without the dashboard's font falls back to another one, while the PNG always looks exactly as it did on screen.
+Every panel has a **Download** menu. The export includes the title and legend, uses the dashboard's theme, and leaves out the buttons, tooltips and edit handles. SVG is real vectors — text as `<text>`, colours resolved, no `<foreignObject>` — so it renders outside a browser too (macOS Preview, for one); PNG is drawn from it at twice the size. The **download button in the header**, beside Preview / Edit, does the same for the whole dashboard — title, the filters as they are set, and every panel — as one image. Fonts are referenced by name, not embedded: an SVG opened on a machine without the dashboard's font falls back to another one, while the PNG always looks exactly as it did on screen.
 
 ### 💬 An optional assistant that answers from the page
 

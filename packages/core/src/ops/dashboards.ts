@@ -1,6 +1,7 @@
 import { existsSync, readdirSync, readFileSync, statSync } from 'node:fs'
 import { join, relative } from 'node:path'
 import type { ParamValue, QueryResult } from '../config.js'
+import { tableParams } from '../datasource/json-tables.js'
 import { referencedParams } from '../datasource/params.js'
 import { loadQueries, type NamedQuery } from '../queries/load.js'
 import type { ResolvedConfig, Workspace } from '../workspace.js'
@@ -123,8 +124,19 @@ export interface RunOptions {
   fresh?: boolean
 }
 
+/** The parameters one query reads: in its SQL, and in the URLs or arguments of the API tables it names. */
+export function queryParams(config: ResolvedConfig, query: NamedQuery): string[] {
+  const own = referencedParams(query.sql)
+  if (query.uses?.length) return own
+  const name = query.source ?? config.defaultSource
+  const source = name ? config.datasources[name] : undefined
+  if (source?.type !== 'http' && source?.type !== 'mcp') return own
+  return [...new Set([...own, ...tableParams(query.sql, source.tables)])]
+}
+
 /** Every parameter a query reads, its inputs' included. */
 function readsOf(
+  config: ResolvedConfig,
   queries: Map<string, NamedQuery>,
   name: string,
   seen = new Set<string>(),
@@ -133,8 +145,8 @@ function readsOf(
   if (!query || seen.has(name)) return []
   seen.add(name)
   return [
-    ...referencedParams(query.sql),
-    ...(query.uses ?? []).flatMap((used) => readsOf(queries, used, seen)),
+    ...queryParams(config, query),
+    ...(query.uses ?? []).flatMap((used) => readsOf(config, queries, used, seen)),
   ]
 }
 
@@ -194,7 +206,7 @@ async function runNamed(
       400,
     )
   }
-  const key = cacheKey(id, name, params, readsOf(queries, name))
+  const key = cacheKey(id, name, params, readsOf(workspace.config, queries, name))
   if (!options.fresh && ttl > 0) {
     const hit = workspace.cache.get(key)
     if (hit) {

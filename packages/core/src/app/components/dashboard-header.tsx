@@ -1,4 +1,6 @@
 import { useEffect, useState } from 'react'
+import { DownloadMenu } from '../../components/panel.js'
+import type { ImageFormat } from '../../runtime/export-panel.js'
 import { useT } from '../../runtime/i18n.js'
 import { intervalLabel } from '../lib/refresh.js'
 import { linkProps } from '../lib/router.js'
@@ -19,6 +21,8 @@ export interface DashboardHeaderProps {
   themes?: { id: string; name: string }[]
   theme?: string
   onTheme?: (id: string) => void
+  /** The whole dashboard as one image. */
+  onDownload?: (format: ImageFormat) => Promise<void>
 }
 
 /**
@@ -143,6 +147,13 @@ export function DashboardHeader(props: DashboardHeaderProps) {
             <span>{t('Edit')}</span>
           </button>
         </fieldset>
+        {props.onDownload ? (
+          <DownloadMenu
+            save={props.onDownload}
+            label={t('Download dashboard')}
+            className="odd-icon-button odd-header-icon"
+          />
+        ) : null}
       </div>
     </header>
   )
