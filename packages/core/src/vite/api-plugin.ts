@@ -5,6 +5,7 @@ import { redactValue } from '../datasource/redact.js'
 import { errorMessage } from '../datasource/types.js'
 import {
   addComment,
+  chartCatalog,
   dashboardQueries,
   describeSource,
   docSourceOf,
@@ -14,13 +15,18 @@ import {
   listComments,
   listDashboards,
   listSources,
+  listThemes,
   OpsError,
   readDatabaseDoc,
   readLayout,
   readSchema,
+  readTheme,
+  runChartQuery,
   runDashboardQuery,
   schemaToText,
   setCurrent,
+  themeIdOf,
+  writeTheme,
 } from '../ops/index.js'
 import { type ConfigOverrides, loadConfig, type Workspace } from '../workspace.js'
 import { referencedFiles, requestedFile } from './file-guard.js'
@@ -107,6 +113,13 @@ export function apiPlugin(workspace: Workspace, overrides: ConfigOverrides): Plu
           server.ws.send({ type: 'custom', event: 'odd:queries-changed', data: { id } })
           return
         }
+        const charts = join(root, workspace.config.chartsDir) + sep
+        if (path.startsWith(charts) && path.endsWith('.sql')) {
+          const id = relative(charts, dirname(path)).split(sep)[0]
+          workspace.cache.clear(`chart:${id}`)
+          server.ws.send({ type: 'custom', event: 'odd:charts-changed', data: { id } })
+          return
+        }
         const documented = docSourceOf(workspace.config, path)
         if (documented) {
           server.ws.send({
@@ -114,6 +127,11 @@ export function apiPlugin(workspace: Workspace, overrides: ConfigOverrides): Plu
             event: 'odd:database-doc-changed',
             data: { source: documented },
           })
+          return
+        }
+        const theme = themeIdOf(workspace.config, path)
+        if (theme) {
+          server.ws.send({ type: 'custom', event: 'odd:themes-changed', data: { id: theme } })
           return
         }
         const name = basename(path)
@@ -222,6 +240,36 @@ export function apiPlugin(workspace: Workspace, overrides: ConfigOverrides): Plu
           }
           if (route === 'current' && req.method === 'POST') {
             return json(res, 200, setCurrent(config, await readBody(req), new Date().toISOString()))
+          }
+          if (route === 'charts' && req.method === 'GET') {
+            return json(res, 200, { charts: await chartCatalog(workspace) })
+          }
+          if (route === 'chart-query' && req.method === 'GET') {
+            const id = q('id')
+            const name = q('name')
+            if (!id || !name) return json(res, 400, { error: 'id and name are required' })
+            return json(
+              res,
+              200,
+              await runChartQuery(workspace, id, name, parseParams(q('params')), {
+                fresh: q('fresh') === '1',
+              }),
+            )
+          }
+          if (route === 'themes' && req.method === 'GET') {
+            return json(res, 200, listThemes(config))
+          }
+          if (route === 'theme' && req.method === 'GET') {
+            const id = q('id')
+            if (!id) return json(res, 400, { error: 'id is required' })
+            return json(res, 200, readTheme(config, id))
+          }
+          if (route === 'theme' && req.method === 'POST') {
+            const body = await readBody(req)
+            if (typeof body.id !== 'string' || typeof body.hash !== 'string' || !body.theme) {
+              return json(res, 400, { error: 'id, hash and theme are required' })
+            }
+            return json(res, 200, writeTheme(config, body.id, body.theme, body.hash))
           }
           if (route === 'comments' && req.method === 'GET') {
             const id = q('id')

@@ -10,6 +10,7 @@ import {
   TimeRange,
   Treemap,
 } from '@open-dashboard/core'
+import Radar from '../../charts/radar'
 
 export const meta: DashboardMeta = {
   title: '商品分析',
@@ -50,7 +51,7 @@ export default function ProductAnalysis() {
         />
       </Row>
 
-      <Row height={300}>
+      <Row height={340}>
         <Heatmap
           title="各分類每月營收"
           query="category_by_month"
@@ -59,6 +60,15 @@ export default function ProductAnalysis() {
           value="revenue"
           format="currency"
           drill={{ filter: 'category', column: 'category' }}
+          span={8}
+        />
+        <Radar
+          title="各分類營收：本期與上一期"
+          query="category_periods"
+          axis="category"
+          value="revenue"
+          series="period"
+          span={4}
         />
       </Row>
 

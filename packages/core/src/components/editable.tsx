@@ -5,6 +5,13 @@ import { usePanelEdit } from '../runtime/edit.js'
 // biome-ignore lint/suspicious/noExplicitAny: panels take differing props; each registers its own
 const IMPLEMENTATIONS: Record<string, ComponentType<any>> = {}
 
+/** A built-in panel's implementation by name — the Charts page draws examples with it. */
+export function panelImplementation(
+  name: string,
+): ComponentType<Record<string, unknown>> | undefined {
+  return IMPLEMENTATIONS[name]
+}
+
 /**
  * A panel as the dashboard source declares it, with the page's staged edits on
  * top — including a change of type, which renders the other panel's

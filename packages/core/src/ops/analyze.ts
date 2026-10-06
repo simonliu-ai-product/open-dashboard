@@ -161,7 +161,11 @@ export function readMeta(code: string): Record<string, string | number | boolean
  * here, which is fine: this feeds `check` and the dashboard list, and both say
  * less rather than guess.
  */
-export function analyzeDashboard(code: string): DashboardAnalysis {
+export function analyzeDashboard(
+  code: string,
+  /** Custom charts by the name the dashboard uses, and the props of each that name columns. */
+  custom: ReadonlyMap<string, readonly string[]> = new Map(),
+): DashboardAnalysis {
   const ast = parseSource(code)
   const result: DashboardAnalysis = { meta: {}, filters: [], panels: [], queryRefs: [] }
 
@@ -200,10 +204,11 @@ export function analyzeDashboard(code: string): DashboardAnalysis {
       return
     }
 
-    if (!PANEL_NAMES.has(name)) return
+    const customColumns = custom.get(name)
+    if (!PANEL_NAMES.has(name) && !customColumns) return
     const query = read('query')
     const columns: string[] = []
-    for (const prop of columnProps(name)) columns.push(...columnsIn(read(prop)))
+    for (const prop of customColumns ?? columnProps(name)) columns.push(...columnsIn(read(prop)))
     const tableColumns = read('columns')
     if (Array.isArray(tableColumns)) {
       for (const column of tableColumns) {

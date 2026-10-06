@@ -16,11 +16,13 @@ import { HostContext, type HostContextValue } from '../../runtime/context.js'
 import { applyProps } from '../../runtime/convert.js'
 import { EditContext } from '../../runtime/edit.js'
 import { useT } from '../../runtime/i18n.js'
+import type { DashboardTheme } from '../../runtime/theme.js'
 import type { DashboardMeta, PanelInfo, QueryRun } from '../../runtime/types.js'
 import { DashboardHeader } from '../components/dashboard-header.js'
 import { SaveBar } from '../components/save-bar.js'
 import { api } from '../lib/api.js'
 import { parseInterval, REFRESH_OPTIONS, readRefresh, writeRefresh } from '../lib/refresh.js'
+import { ThemeStyle, useThemeFile, useThemeList } from '../lib/themes.js'
 import { useLayoutEdit } from '../lib/use-layout-edit.js'
 import { Inspector, type InspectorTab } from './inspector.js'
 
@@ -100,6 +102,34 @@ function useDashboardModule(id: string): { loaded?: Loaded; error?: string } {
   return state
 }
 
+/**
+ * `meta.theme` as the file has it now. The module's `meta` is read once and a
+ * saved theme change does not swap it, so the source is asked again after a
+ * save (`version`: the file's hash) and after a hot update (an agent's edit).
+ */
+function useSavedTheme(id: string, version: string | undefined): { theme?: string } | undefined {
+  const [saved, setSaved] = useState<{ theme?: string }>()
+  // biome-ignore lint/correctness/useExhaustiveDependencies: version re-reads the file after a save
+  useEffect(() => {
+    let live = true
+    const load = () =>
+      api.dashboards().then(
+        (list) => {
+          const found = list.find((d) => d.id === id)
+          if (live && found) setSaved(found.theme ? { theme: found.theme } : {})
+        },
+        () => {},
+      )
+    load()
+    import.meta.hot?.on('vite:afterUpdate', load)
+    return () => {
+      live = false
+      import.meta.hot?.off?.('vite:afterUpdate', load)
+    }
+  }, [id, version])
+  return saved
+}
+
 function timeOf(date: Date): string {
   return date.toLocaleTimeString(undefined, {
     hour: '2-digit',
@@ -108,7 +138,13 @@ function timeOf(date: Date): string {
   })
 }
 
-export function DashboardView({ id }: { id: string }) {
+export interface ThemePreview {
+  id: string
+  theme: DashboardTheme
+}
+
+/** `preview` renders the dashboard alone, under a draft theme, for the theme editor. */
+export function DashboardView({ id, preview }: { id: string; preview?: ThemePreview }) {
   const t = useT()
   const { loaded, error } = useDashboardModule(id)
   const [tick, setTick] = useState(0)
@@ -172,6 +208,13 @@ export function DashboardView({ id }: { id: string }) {
   const focus = useRef<{ panel?: string; query?: string }>({})
   const inflight = useRef(new Map<string, Promise<QueryRun>>())
   const meta = loaded?.meta
+  const themes = useThemeList()
+  const staged = editor.edits.findLast((edit) => edit.kind === 'meta' && edit.key === 'theme')
+  const saved = useSavedTheme(id, editor.status.kind === 'saved' ? editor.layout?.hash : undefined)
+  const chosen = staged?.kind === 'meta' ? staged.value : saved ? saved.theme : meta?.theme
+  const themeId = chosen ?? themes?.default
+  const file = useThemeFile(preview ? undefined : themeId).file
+  const theme = preview ?? (file ? { id: file.id, theme: file.theme } : undefined)
 
   // The tick a reader asked for with the refresh button: it skips the server's
   // cache. Auto-refresh and live reload may be served from it.
@@ -231,8 +274,8 @@ export function DashboardView({ id }: { id: string }) {
   }, [interval, refresh])
 
   useEffect(() => {
-    if (meta) document.title = `${meta.title} · open-dashboard`
-  }, [meta])
+    if (meta && !preview) document.title = `${meta.title} · open-dashboard`
+  }, [meta, preview])
 
   const host: HostContextValue | undefined = useMemo(() => {
     if (!meta) return undefined
@@ -241,6 +284,7 @@ export function DashboardView({ id }: { id: string }) {
       meta,
       tick,
       refresh,
+      inspectable: !preview,
       inspect: (panel, run) => {
         setInspecting({ panel, run })
         focus.current = { panel: panel.title, ...(panel.query ? { query: panel.query } : {}) }
@@ -275,7 +319,7 @@ export function DashboardView({ id }: { id: string }) {
         return pending
       },
     }
-  }, [id, meta, tick, refresh])
+  }, [id, meta, tick, refresh, preview])
 
   if (error) {
     return (
@@ -289,23 +333,37 @@ export function DashboardView({ id }: { id: string }) {
   return (
     <HostContext.Provider value={host}>
       <EditContext.Provider value={editor.editState}>
-        <DashboardHeader
-          title={meta?.title ?? id}
-          updatedAt={timeOf(updatedAt)}
-          refreshSetting={refreshSetting ?? 'off'}
-          refreshChoices={refreshChoices}
-          onRefreshSetting={chooseRefresh}
-          onRefresh={refreshNow}
-          notes={notes}
-          mode={mode}
-          onMode={editor.setMode}
-        />
-        <div className="odd-dashboard-page" data-editing={editor.editState.editing || undefined}>
-          <Boundary resetKey={loaded} title={t('This dashboard failed to render')}>
-            {loaded.view}
-          </Boundary>
+        {theme ? <ThemeStyle id={theme.id} theme={theme.theme} /> : null}
+        <div
+          className="odd-themed"
+          data-odd-theme={theme?.id}
+          data-preview={preview ? '' : undefined}
+        >
+          {preview ? null : (
+            <DashboardHeader
+              title={meta?.title ?? id}
+              updatedAt={timeOf(updatedAt)}
+              refreshSetting={refreshSetting ?? 'off'}
+              refreshChoices={refreshChoices}
+              onRefreshSetting={chooseRefresh}
+              onRefresh={refreshNow}
+              notes={notes}
+              mode={mode}
+              onMode={editor.setMode}
+              themes={themes?.themes}
+              theme={chosen ?? ''}
+              onTheme={(value) =>
+                editor.editState.stage({ kind: 'meta', key: 'theme', value: value || null })
+              }
+            />
+          )}
+          <div className="odd-dashboard-page" data-editing={editor.editState.editing || undefined}>
+            <Boundary resetKey={loaded} title={t('This dashboard failed to render')}>
+              {loaded.view}
+            </Boundary>
+          </div>
         </div>
-        {mode === 'edit' ? (
+        {mode === 'edit' && !preview && (edits.length > 0 || editor.status.kind !== 'idle') ? (
           <SaveBar
             file={editor.layout?.file}
             count={edits.length}
@@ -316,7 +374,7 @@ export function DashboardView({ id }: { id: string }) {
             onReload={editor.reload}
           />
         ) : null}
-        {inspecting ? (
+        {inspecting && !preview ? (
           <Inspector
             id={id}
             panel={inspecting.panel}

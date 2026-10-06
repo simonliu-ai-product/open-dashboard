@@ -8,6 +8,7 @@ function shell(entry: string): string {
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>open-dashboard</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 20 20'%3E%3Crect x='2' y='10' width='4' height='8' rx='1' fill='%232a78d6'/%3E%3Crect x='8' y='5' width='4' height='13' rx='1' fill='%231baf7a'/%3E%3Crect x='14' y='2' width='4' height='16' rx='1' fill='%23eb6834'/%3E%3C/svg%3E">
 <script>try{var t=localStorage.getItem('odd:theme');if(t)document.documentElement.dataset.theme=t}catch(e){}</script>
 </head>
 <body>

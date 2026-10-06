@@ -3,11 +3,14 @@ import {
   type ReactNode,
   type RefObject,
   useEffect,
+  useId,
   useRef,
   useState,
 } from 'react'
 import { useHost } from '../runtime/context.js'
+import { isPanelType } from '../runtime/convert.js'
 import { useEdit } from '../runtime/edit.js'
+import { downloadPanel, exportName, type ImageFormat } from '../runtime/export-panel.js'
 import type { FormatContext } from '../runtime/format.js'
 import { useLocale, useT } from '../runtime/i18n.js'
 import type { QueryRun } from '../runtime/types.js'
@@ -118,7 +121,7 @@ export function PanelFrame(props: FrameProps) {
         </div>
         {run && props.aside ? <div className="odd-panel-aside">{props.aside(run)}</div> : null}
         <div className="odd-panel-actions">
-          {chrome.enabled ? (
+          {chrome.enabled && (isPanelType(props.component) || props.component === 'Text') ? (
             <button
               type="button"
               className="odd-icon-button"
@@ -137,34 +140,130 @@ export function PanelFrame(props: FrameProps) {
               </svg>
             </button>
           ) : null}
-          <button
-            type="button"
-            className="odd-icon-button"
-            title={t('Inspect query and data')}
-            aria-label={t('Inspect {title}', { title: props.title })}
-            onClick={() =>
-              host.inspect(
-                { title: props.title, component: props.component, query: props.query },
-                run,
-              )
+          <DownloadMenu
+            panel={ref}
+            name={exportName(host.id, props.title)}
+            title={props.title}
+            disabled={
+              props.query
+                ? state.status !== 'ok' || !run || run.result.rows.length === 0
+                : state.status === 'error'
             }
-          >
-            <svg viewBox="0 0 16 16" width="14" height="14" aria-hidden="true">
-              <path
-                d="M2 4h12M2 8h12M2 12h7"
-                stroke="currentColor"
-                strokeWidth="1.5"
-                strokeLinecap="round"
-                fill="none"
-              />
-            </svg>
-          </button>
+          />
+          {host.inspectable === false ? null : (
+            <button
+              type="button"
+              className="odd-icon-button"
+              title={t('Inspect query and data')}
+              aria-label={t('Inspect {title}', { title: props.title })}
+              onClick={() =>
+                host.inspect(
+                  { title: props.title, component: props.component, query: props.query },
+                  run,
+                )
+              }
+            >
+              <svg viewBox="0 0 16 16" width="14" height="14" aria-hidden="true">
+                <path
+                  d="M2 4h12M2 8h12M2 12h7"
+                  stroke="currentColor"
+                  strokeWidth="1.5"
+                  strokeLinecap="round"
+                  fill="none"
+                />
+              </svg>
+            </button>
+          )}
         </div>
       </header>
       <div className="odd-panel-body">{body}</div>
       {state.refreshing ? <div className="odd-panel-progress" aria-hidden="true" /> : null}
       {chrome.handles}
     </article>
+  )
+}
+
+function DownloadMenu(props: {
+  panel: RefObject<HTMLElement | null>
+  name: string
+  title: string
+  disabled: boolean
+}) {
+  const t = useT()
+  const [open, setOpen] = useState(false)
+  const [busy, setBusy] = useState(false)
+  const root = useRef<HTMLDivElement>(null)
+  const trigger = useRef<HTMLButtonElement>(null)
+  const id = useId()
+
+  useEffect(() => {
+    if (!open) return
+    const onPointer = (event: PointerEvent) => {
+      if (!root.current?.contains(event.target as Node)) setOpen(false)
+    }
+    const onKey = (event: KeyboardEvent) => {
+      if (event.key !== 'Escape') return
+      setOpen(false)
+      trigger.current?.focus()
+    }
+    document.addEventListener('pointerdown', onPointer)
+    document.addEventListener('keydown', onKey)
+    return () => {
+      document.removeEventListener('pointerdown', onPointer)
+      document.removeEventListener('keydown', onKey)
+    }
+  }, [open])
+
+  const save = async (format: ImageFormat) => {
+    const panel = props.panel.current
+    if (!panel) return
+    setOpen(false)
+    setBusy(true)
+    try {
+      await downloadPanel(panel, format, props.name)
+    } catch (error) {
+      console.error(error)
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  return (
+    <div className="odd-download" ref={root} data-export-skip="">
+      <button
+        ref={trigger}
+        type="button"
+        className="odd-icon-button"
+        title={t('Download')}
+        aria-label={t('Download {title}', { title: props.title })}
+        aria-haspopup="menu"
+        aria-expanded={open}
+        aria-controls={open ? id : undefined}
+        disabled={props.disabled || busy}
+        onClick={() => setOpen((value) => !value)}
+      >
+        <svg viewBox="0 0 16 16" width="14" height="14" aria-hidden="true">
+          <path
+            d="M8 2.5v7.5M4.5 6.8 8 10.3l3.5-3.5M3 13h10"
+            stroke="currentColor"
+            strokeWidth="1.5"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            fill="none"
+          />
+        </svg>
+      </button>
+      {open ? (
+        <div className="odd-download-menu" id={id} role="menu">
+          <button type="button" role="menuitem" onClick={() => save('png')}>
+            PNG
+          </button>
+          <button type="button" role="menuitem" onClick={() => save('svg')}>
+            SVG
+          </button>
+        </div>
+      ) : null}
+    </div>
   )
 }
 

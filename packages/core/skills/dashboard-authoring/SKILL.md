@@ -145,6 +145,7 @@ export const meta: DashboardMeta = {
   refresh: '5m',          // default auto-refresh: '30s' | '1m' | '5m' | '1h' — the reader can change it
   currency: 'USD',        // for 'currency' formats
   locale: 'en-US',        // numbers and dates; e.g. 'zh-TW', 'ja-JP'
+  // theme: 'brand',      // a themes/<id>.json; omit for the workspace default
   createdAt: '2026-10-02T00:00:00.000Z',
 }
 
@@ -260,6 +261,7 @@ reorder them within a row, and change a chart's type, columns, format and
 | how concentrated (top 20 % hold…) | `<ParetoChart>` |
 | flows between stages | `<Sankey>` (a single path of drop-off → `<FunnelChart>`) |
 | retention by cohort | `<CohortTable>` |
+| none of the above, truly | a custom chart under `charts/` — the `create-chart` skill |
 | overlaps between sets | `<UpSetChart>` |
 | values by region | `<ChoroplethMap>` (needs GeoJSON); every region equally visible → `<TileMap>`; points → `<SymbolMap>` |
 | up / down / degraded over time | `<StateTimeline>` |

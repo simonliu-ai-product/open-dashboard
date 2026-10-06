@@ -11,6 +11,8 @@ export type LayoutEdit =
   | { kind: 'order'; titles: string[] }
   | { kind: 'move'; title: string; row: number; index: number }
   | { kind: 'moveRow'; from: number; to: number }
+  /** `meta.theme`: a theme id, or null to drop it and use the workspace default. */
+  | { kind: 'meta'; key: 'theme'; value: string | null }
 
 /** What a panel's props mean: which prop holds its category, its measure and its grouping. */
 export interface Roles {

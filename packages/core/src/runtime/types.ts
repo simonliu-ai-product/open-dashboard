@@ -9,6 +9,8 @@ export interface DashboardMeta {
   locale?: string
   /** ISO 4217 code used by the 'currency' formats. Default 'USD'. */
   currency?: string
+  /** A theme in `themes/<id>.json`. Default: the workspace's `theme`, else the built-in look. */
+  theme?: string
   createdAt?: string
 }
 

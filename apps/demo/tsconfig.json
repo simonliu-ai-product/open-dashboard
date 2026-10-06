@@ -5,5 +5,5 @@
     "types": [],
     "jsxImportSource": "@open-dashboard/core"
   },
-  "include": ["dashboards/**/*", "open-dashboard.config.ts"]
+  "include": ["dashboards/**/*", "charts/**/*", "open-dashboard.config.ts"]
 }

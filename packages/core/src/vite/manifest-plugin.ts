@@ -1,5 +1,6 @@
 import { join } from 'node:path'
 import type { Plugin, ViteDevServer } from 'vite'
+import { discoverCharts } from '../ops/charts.js'
 import { discoverDashboards } from '../ops/dashboards.js'
 import type { Workspace } from '../workspace.js'
 
@@ -15,19 +16,25 @@ export function manifestPlugin(workspace: Workspace): Plugin {
   let server: ViteDevServer | undefined
 
   const generate = (): string => {
-    const { root, dashboardsDir } = workspace.config
-    const entries = discoverDashboards(root, dashboardsDir)
-      .map(
-        ({ id, file }) =>
-          `  { id: ${JSON.stringify(id)}, load: () => import(${JSON.stringify(file)}) }`,
-      )
-      .join(',\n')
-    return `export const dashboards = [\n${entries}\n]\n`
+    const { root, dashboardsDir, chartsDir } = workspace.config
+    const list = (found: { id: string; file: string }[]) =>
+      found
+        .map(
+          ({ id, file }) =>
+            `  { id: ${JSON.stringify(id)}, load: () => import(${JSON.stringify(file)}) }`,
+        )
+        .join(',\n')
+    return (
+      `export const dashboards = [\n${list(discoverDashboards(root, dashboardsDir))}\n]\n` +
+      `export const charts = [\n${list(discoverCharts(root, chartsDir))}\n]\n`
+    )
   }
 
   const invalidate = (path: string): void => {
     if (!server) return
-    if (!path.startsWith(join(workspace.config.root, workspace.config.dashboardsDir))) return
+    const { root, dashboardsDir, chartsDir } = workspace.config
+    if (!path.startsWith(join(root, dashboardsDir)) && !path.startsWith(join(root, chartsDir)))
+      return
     const module = server.moduleGraph.getModuleById(RESOLVED_ID)
     if (!module) return
     server.moduleGraph.invalidateModule(module)

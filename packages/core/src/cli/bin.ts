@@ -2,6 +2,8 @@ import type { ParamValue } from '../config.js'
 import { DRIVERS } from '../datasource/registry.js'
 import { errorMessage } from '../datasource/types.js'
 import {
+  type CatalogEntry,
+  chartCatalog,
   checkWorkspace,
   listSources,
   readDatabaseDoc,
@@ -30,6 +32,7 @@ Commands:
   query --dashboard <id> --name <query>
                             Run one of a dashboard's named queries
   check [id]                Run every query of every dashboard, verify panels
+  charts                    Every chart you can use — built-in and charts/ — and where each is used
   sync-skills               Update the agent skills in this workspace to the installed version
 
 Options:
@@ -41,7 +44,7 @@ Options:
   --source <name>        Datasource for query/schema (default: defaultSource)
   --param <key=value>    Bind :key in the SQL; repeatable. "null" binds NULL
   --limit <n>            Rows to print for query (default 50)
-  --json                 Machine-readable output (schema, query, check, sources)
+  --json                 Machine-readable output (schema, query, check, sources, charts)
 `
 
 function flag(argv: string[], name: string): string | undefined {
@@ -141,7 +144,7 @@ export async function run(argv: string[]): Promise<number> {
     return 0
   }
 
-  const known = ['sources', 'schema', 'query', 'check']
+  const known = ['sources', 'schema', 'query', 'check', 'charts']
   if (!known.includes(command)) {
     process.stderr.write(`unknown command: ${command}\n\n${USAGE}`)
     return 1
@@ -149,6 +152,35 @@ export async function run(argv: string[]): Promise<number> {
 
   const workspace = new Workspace(await loadConfig(root))
   try {
+    if (command === 'charts') {
+      const catalog = await chartCatalog(workspace)
+      if (json) {
+        out(`${JSON.stringify(catalog, null, 2)}\n`)
+        return 0
+      }
+      const line = (entry: CatalogEntry) => {
+        const columns = entry.columns.length ? `  columns: ${entry.columns.join(', ')}` : ''
+        const used = entry.usedBy.length
+          ? `  used by: ${[...new Set(entry.usedBy.map((u) => u.dashboard))].join(', ')}`
+          : ''
+        const name = entry.kind === 'custom' ? `${entry.name} (${entry.file})` : entry.name
+        out(`  ${name}${columns}${used}\n`)
+      }
+      const custom = catalog.filter((entry) => entry.kind === 'custom')
+      out(`custom — ${workspace.config.chartsDir}/\n`)
+      if (custom.length) custom.forEach(line)
+      else out('  none\n')
+      let group: string | undefined
+      for (const entry of catalog.filter((e) => e.kind === 'built-in')) {
+        if (entry.group !== group) {
+          group = entry.group
+          out(`\nbuilt-in — ${group}\n`)
+        }
+        line(entry)
+      }
+      return 0
+    }
+
     if (command === 'sources') {
       const sources = await listSources(workspace)
       if (json) out(`${JSON.stringify(sources, null, 2)}\n`)

@@ -17,7 +17,7 @@ const svg = (children: ReactNode) => (
 )
 
 const dot = (cx: number, cy: number, r = 1.4) => (
-  <circle cx={cx} cy={cy} r={r} fill="currentColor" stroke="none" />
+  <circle key={`${cx},${cy}`} cx={cx} cy={cy} r={r} fill="currentColor" stroke="none" />
 )
 
 /** One small glyph per chart type, drawn in the chart's own shape. */
@@ -41,6 +41,7 @@ export const CHART_ICONS: Record<string, () => ReactNode> = {
       </>,
     ),
   Stat: () => svg(<path d="M3 11.5h3.5M3 8.5h10M3 5h6" />),
+  Text: () => svg(<path d="M3.5 4h9M8 4v8.5M6 12.5h4" />),
   ScatterChart: () => svg(<>{[dot(4, 11), dot(7.5, 7), dot(11, 9), dot(12.5, 4)]}</>),
   Heatmap: () =>
     svg(
@@ -307,42 +308,4 @@ export const CHART_ICONS: Record<string, () => ReactNode> = {
     ),
 }
 
-/** The type picker's sections, by the job the chart does. */
-export const CHART_GROUPS: { label: string; types: string[] }[] = [
-  { label: 'Basics', types: ['LineChart', 'AreaChart', 'BarChart', 'PieChart', 'Table', 'Stat'] },
-  {
-    label: 'Compare and rank',
-    types: [
-      'DotPlot',
-      'Dumbbell',
-      'BulletChart',
-      'DivergingBar',
-      'Marimekko',
-      'SlopeChart',
-      'BumpChart',
-    ],
-  },
-  {
-    label: 'Over time',
-    types: [
-      'Waterfall',
-      'CalendarHeatmap',
-      'SmallMultiples',
-      'BandChart',
-      'ControlChart',
-      'HorizonChart',
-      'Timeline',
-      'Candlestick',
-    ],
-  },
-  {
-    label: 'Distribution and relationship',
-    types: ['Histogram', 'BoxPlot', 'StripPlot', 'EcdfChart', 'ParetoChart', 'ScatterChart'],
-  },
-  {
-    label: 'Flow and composition',
-    types: ['Sankey', 'CohortTable', 'UpSetChart', 'FunnelChart', 'Treemap', 'Heatmap'],
-  },
-  { label: 'Maps', types: ['ChoroplethMap', 'SymbolMap', 'TileMap'] },
-  { label: 'Status and tables', types: ['Gauge', 'StateTimeline', 'PivotTable'] },
-]
+export { CHART_GROUPS } from '../../runtime/catalog.js'

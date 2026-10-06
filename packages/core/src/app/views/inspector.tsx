@@ -4,6 +4,7 @@ import { useEdit } from '../../runtime/edit.js'
 import { useT } from '../../runtime/i18n.js'
 import type { PanelInfo, QueryRun } from '../../runtime/types.js'
 import { ChartSettings } from '../components/chart-settings.js'
+import { CheckIcon } from '../components/icons.js'
 import { api } from '../lib/api.js'
 
 export type InspectorTab = 'chart' | 'data' | 'sql' | 'params'
@@ -37,6 +38,7 @@ export function Inspector(props: {
   }, [props.tab, panel])
   const [note, setNote] = useState('')
   const [saved, setSaved] = useState<string>()
+  const [failed, setFailed] = useState<string>()
   const [saving, setSaving] = useState(false)
 
   useEffect(() => {
@@ -60,16 +62,13 @@ export function Inspector(props: {
     setSaving(true)
     try {
       const where = await api.comment(id, panel.title, note)
-      setSaved(
-        t('Saved beside the panel in {file}:{line}. Ask your agent to /apply-comments.', {
-          file: where.file,
-          line: where.line,
-        }),
-      )
+      setFailed(undefined)
+      setSaved(`${where.file}:${where.line}`)
       setNote('')
       onNote()
     } catch (e) {
-      setSaved(t('Could not save: {error}', { error: (e as Error).message }))
+      setSaved(undefined)
+      setFailed(t('Could not save: {error}', { error: (e as Error).message }))
     } finally {
       setSaving(false)
     }
@@ -208,6 +207,7 @@ export function Inspector(props: {
           rows={3}
           value={note}
           placeholder={t('e.g. show this per week instead, and split by channel')}
+          aria-describedby={saved ? 'odd-note-saved' : undefined}
           onChange={(e) => setNote(e.target.value)}
           onKeyDown={(e) => {
             if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) submit()
@@ -215,9 +215,16 @@ export function Inspector(props: {
         />
         <div className="odd-note-actions">
           {saved ? (
-            <span className="odd-muted">{saved}</span>
+            <span className="odd-note-saved" id="odd-note-saved" role="status">
+              <CheckIcon />
+              <code>{saved}</code>
+            </span>
+          ) : failed ? (
+            <span className="odd-field-error" role="alert">
+              {failed}
+            </span>
           ) : (
-            <span className="odd-muted">{t('Written into the source beside the panel')}</span>
+            <span />
           )}
           <button
             type="submit"

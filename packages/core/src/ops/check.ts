@@ -7,6 +7,7 @@ import type { NamedQuery } from '../queries/load.js'
 import { isTimePreset, timeRangeParams } from '../runtime/time-range.js'
 import type { Workspace } from '../workspace.js'
 import { analyzeDashboard, type FilterDecl } from './analyze.js'
+import { chartImports } from './charts.js'
 import { dashboardQueries, discoverDashboards, runDashboardQuery } from './dashboards.js'
 
 export type Severity = 'error' | 'warning'
@@ -38,7 +39,7 @@ export interface DashboardReport {
  * The params the dashboard opens with, worked out from the filters as written —
  * the same defaults the browser applies on first load.
  */
-async function defaultParams(
+export async function defaultParams(
   workspace: Workspace,
   id: string,
   filters: FilterDecl[],
@@ -108,7 +109,14 @@ export async function checkDashboard(
 ): Promise<DashboardReport> {
   const rel = relative(workspace.config.root, file)
   const findings: Finding[] = []
-  const analysis = analyzeDashboard(readFileSync(file, 'utf8'))
+  const code = readFileSync(file, 'utf8')
+  const custom = new Map(
+    [...chartImports(workspace.config, file, code)].map(([name, chart]) => [
+      name,
+      chart.spec.columns,
+    ]),
+  )
+  const analysis = analyzeDashboard(code, custom)
   const title = typeof analysis.meta.title === 'string' ? analysis.meta.title : id
   const report: DashboardReport = { id, title, params: {}, queries: [], findings }
 

@@ -12,6 +12,7 @@
   },
   "include": [
     "dashboards/**/*",
+    "charts/**/*",
     "open-dashboard.config.ts"
   ]
 }

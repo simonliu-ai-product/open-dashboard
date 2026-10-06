@@ -93,6 +93,15 @@ query. The usual shape, top to bottom:
 5. **Detail** — a `<Table>` for top-N lists or recent records.
 
 Pick the form by the data's job (see `dashboard-authoring` → *Choosing a panel*).
+Then list what this workspace already has — the built-in panels and any custom
+charts under `charts/`, with the dashboards that use each:
+
+```bash
+pnpm exec open-dashboard charts          # --json for machine-readable output
+```
+
+A custom chart in that list is used like a built-in. Only when nothing fits,
+write one with the `create-chart` skill.
 Six to ten panels is a good dashboard; twenty is a wall nobody reads.
 
 ## Step 5 — Write the queries first

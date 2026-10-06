@@ -67,6 +67,9 @@ export function foldStructure(rows: RowShape[], edits: LayoutEdit[]): RowShape[]
 
 /** Consecutive prop edits to one panel are one step: a drag is one undo, not forty. */
 export function stageEdit(edits: LayoutEdit[], next: LayoutEdit): LayoutEdit[] {
+  if (next.kind === 'meta') {
+    return [...edits.filter((e) => !(e.kind === 'meta' && e.key === next.key)), next]
+  }
   const last = edits[edits.length - 1]
   if (last?.kind === 'props' && next.kind === 'props' && last.title === next.title) {
     return [...edits.slice(0, -1), { ...last, set: { ...last.set, ...next.set } }]
@@ -97,6 +100,8 @@ export interface EditState {
   setLiveOrder(titles: string[] | undefined): void
   /** Open the inspector on a panel's visualization settings. */
   configure(title: string): void
+  /** Switch the dashboard to Edit. */
+  enterEdit(): void
 }
 
 const store = globalThis as typeof globalThis & { __openDashboardEdit?: Context<EditState> }
@@ -111,6 +116,7 @@ store.__openDashboardEdit ??= createContext<EditState>({
   stage: () => {},
   setLiveOrder: () => {},
   configure: () => {},
+  enterEdit: () => {},
 })
 export const EditContext = store.__openDashboardEdit
 

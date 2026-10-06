@@ -1543,6 +1543,13 @@ button {
   padding: 20px 24px 96px;
 }
 
+.odd-themed {
+  min-height: 100vh;
+  background: var(--odd-page);
+  color: var(--odd-ink);
+  font-family: var(--odd-font);
+}
+
 /* Dashboard header: where you are, what you can do, and the mode switch */
 
 .odd-header {
@@ -2293,11 +2300,88 @@ body.odd-dragging * {
 }
 
 .odd-notes-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
   padding: 3px 10px;
+  border: 0;
   border-radius: 999px;
   background: var(--odd-warning-bg);
   color: var(--odd-ink);
+  font: inherit;
   font-size: 12px;
+  cursor: pointer;
+}
+
+.odd-notes-pill code {
+  font-family: var(--odd-mono);
+  font-size: 11.5px;
+}
+
+.odd-notes-pill svg {
+  width: 13px;
+  height: 13px;
+  color: var(--odd-muted);
+}
+
+.odd-note-saved {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--odd-good);
+}
+
+.odd-note-saved code {
+  color: var(--odd-ink-2);
+  font-family: var(--odd-mono);
+  font-size: 11.5px;
+}
+
+.odd-chart-settings-edit {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  align-self: flex-start;
+}
+
+/* Entering Edit: the grips and corners show themselves once, instead of a caption explaining them. */
+@keyframes odd-hint {
+  0%,
+  100% {
+    color: var(--odd-muted);
+    background: none;
+  }
+  40% {
+    color: var(--odd-accent);
+    background: color-mix(in srgb, var(--odd-accent) 14%, transparent);
+  }
+}
+
+@keyframes odd-hint-corner {
+  0%,
+  100% {
+    border-color: var(--odd-muted);
+    transform: none;
+  }
+  40% {
+    border-color: var(--odd-accent);
+    transform: translate(2px, 2px);
+  }
+}
+
+.odd-dashboard-page[data-editing] .odd-grip {
+  animation: odd-hint 900ms ease-in-out 200ms 2;
+}
+
+.odd-dashboard-page[data-editing] .odd-handle-se::after {
+  animation: odd-hint-corner 900ms ease-in-out 200ms 2;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .odd-dashboard-page[data-editing] .odd-grip,
+  .odd-dashboard-page[data-editing] .odd-handle-se::after {
+    animation: none;
+  }
 }
 
 .odd-dash-header {
@@ -2442,9 +2526,55 @@ body.odd-dragging * {
 }
 
 .odd-panel-actions {
+  display: flex;
+  align-items: center;
   margin: -4px -6px 0 0;
   opacity: 0;
   transition: opacity 120ms ease;
+}
+
+.odd-download {
+  position: relative;
+}
+
+.odd-icon-button:disabled {
+  opacity: 0.35;
+  cursor: default;
+  background: none;
+}
+
+.odd-download-menu {
+  position: absolute;
+  top: calc(100% + 4px);
+  right: 0;
+  z-index: 30;
+  display: flex;
+  flex-direction: column;
+  min-width: 96px;
+  padding: 4px;
+  border-radius: 8px;
+  background: var(--odd-surface);
+  box-shadow:
+    0 0 0 1px var(--odd-border-strong),
+    var(--odd-shadow);
+  animation: odd-pop 140ms ease-out;
+}
+
+.odd-download-menu button {
+  padding: 6px 10px;
+  border: 0;
+  border-radius: 5px;
+  background: none;
+  color: var(--odd-ink);
+  font: inherit;
+  font-size: 12.5px;
+  text-align: left;
+  cursor: pointer;
+}
+
+.odd-download-menu button:hover,
+.odd-download-menu button:focus-visible {
+  background: var(--odd-hover);
 }
 
 .odd-panel:hover .odd-panel-actions,
@@ -3224,5 +3354,715 @@ body.odd-dragging * {
 
   .odd-facts {
     grid-template-columns: repeat(2, auto);
+  }
+}
+
+/* Themes and custom charts */
+
+.odd-studio-page {
+  max-width: none;
+  padding-bottom: 96px;
+}
+
+.odd-studio-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 24px;
+}
+
+.odd-studio-head h1 {
+  margin: 0;
+  font-size: 26px;
+  font-weight: 650;
+  letter-spacing: -0.018em;
+  line-height: 1.2;
+}
+
+.odd-studio-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.odd-studio-select select,
+.odd-studio-panel .odd-field select {
+  min-width: 160px;
+  height: 32px;
+  padding: 0 28px 0 10px;
+  border: 0;
+  border-radius: 7px;
+  background: var(--odd-surface)
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6'%3E%3Cpath d='M1 1l4 4 4-4' stroke='%23898781' stroke-width='1.5' fill='none' stroke-linecap='round'/%3E%3C/svg%3E")
+    no-repeat right 10px center;
+  box-shadow: 0 0 0 1px var(--odd-border-strong);
+  color: var(--odd-ink);
+  font: inherit;
+  font-size: 13px;
+  appearance: none;
+  cursor: pointer;
+}
+
+.odd-studio-panel .odd-field select {
+  width: 100%;
+  background-color: var(--odd-page);
+}
+
+.odd-studio-actions .odd-button {
+  height: 32px;
+  padding: 0 14px;
+}
+
+.odd-button:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+
+.odd-popover-anchor {
+  position: relative;
+}
+
+.odd-popover {
+  position: absolute;
+  top: calc(100% + 6px);
+  right: 0;
+  z-index: 30;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  width: 260px;
+  padding: 14px;
+  border-radius: 10px;
+  background: var(--odd-surface);
+  box-shadow:
+    0 0 0 1px var(--odd-border-strong),
+    var(--odd-shadow);
+  animation: odd-pop 140ms ease-out;
+}
+
+.odd-popover .odd-button {
+  align-self: flex-end;
+}
+
+.odd-field input[type="text"],
+.odd-field select {
+  width: 100%;
+  padding: 7px 10px;
+  border: 0;
+  border-radius: 7px;
+  background: var(--odd-page);
+  box-shadow: 0 0 0 1px var(--odd-border-strong);
+  color: var(--odd-ink);
+  font: inherit;
+  font-size: 13px;
+}
+
+.odd-field input[type="text"]:focus-visible,
+.odd-field select:focus-visible {
+  outline: 2px solid var(--odd-accent);
+  outline-offset: 1px;
+}
+
+.odd-field input[aria-invalid="true"] {
+  box-shadow: 0 0 0 1px var(--odd-bad);
+}
+
+.odd-field-error {
+  margin: 0;
+  color: var(--odd-bad);
+  font-size: 12px;
+}
+
+.odd-studio {
+  display: grid;
+  grid-template-columns: 320px minmax(0, 1fr);
+  gap: 24px;
+  align-items: start;
+}
+
+.odd-studio-panel {
+  position: sticky;
+  top: 16px;
+  display: flex;
+  flex-direction: column;
+  max-height: calc(100vh - 32px);
+  overflow: auto;
+  border-radius: 12px;
+  background: var(--odd-surface);
+  box-shadow: 0 0 0 1px var(--odd-border);
+}
+
+.odd-studio-section {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 16px 18px;
+  border-bottom: 1px solid var(--odd-border);
+}
+
+.odd-studio-section h2 {
+  margin: 0;
+  color: var(--odd-muted);
+  font-size: 12px;
+  font-weight: 650;
+  letter-spacing: 0.02em;
+}
+
+.odd-studio-section-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.odd-text-button {
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--odd-accent-ink);
+  font: inherit;
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.odd-text-button:hover {
+  text-decoration: underline;
+}
+
+.odd-studio-mode {
+  margin: 0;
+  border: 0;
+  min-width: 0;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 3px;
+  padding: 3px;
+  border-radius: 9px;
+  background: var(--odd-hover);
+}
+
+.odd-studio-mode button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 6px 8px;
+  border: 0;
+  border-radius: 7px;
+  background: none;
+  color: var(--odd-muted);
+  font: inherit;
+  font-size: 12.5px;
+  cursor: pointer;
+  transition:
+    background 120ms ease,
+    color 120ms ease;
+}
+
+.odd-studio-mode button:hover {
+  color: var(--odd-ink);
+}
+
+.odd-studio-mode button[aria-pressed="true"] {
+  background: var(--odd-surface);
+  color: var(--odd-ink);
+  font-weight: 560;
+  box-shadow: 0 0 0 1px var(--odd-border);
+}
+
+.odd-palette {
+  display: grid;
+  grid-template-columns: repeat(8, minmax(0, 1fr));
+  gap: 6px;
+}
+
+.odd-palette-chip {
+  position: relative;
+  display: flex;
+  align-items: flex-end;
+  aspect-ratio: 1;
+  padding: 3px 5px;
+  border-radius: 8px;
+  box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.08);
+  cursor: pointer;
+  transition: transform 120ms ease;
+}
+
+.odd-palette-chip:hover {
+  transform: translateY(-1px);
+}
+
+.odd-palette-chip:focus-within {
+  outline: 2px solid var(--odd-accent);
+  outline-offset: 2px;
+}
+
+.odd-palette-chip input,
+.odd-color-swatch input {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  opacity: 0;
+  cursor: pointer;
+}
+
+.odd-palette-chip span {
+  color: rgba(255, 255, 255, 0.92);
+  font-size: 10px;
+  font-weight: 650;
+  text-shadow: 0 0 3px rgba(0, 0, 0, 0.45);
+}
+
+.odd-color-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  min-height: 32px;
+}
+
+.odd-color-label {
+  color: var(--odd-ink-2);
+  font-size: 13px;
+}
+
+.odd-color-control {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.odd-color-swatch {
+  position: relative;
+  flex: none;
+  width: 26px;
+  height: 26px;
+  border-radius: 7px;
+  box-shadow: inset 0 0 0 1px var(--odd-border-strong);
+  cursor: pointer;
+}
+
+.odd-color-swatch:focus-within {
+  outline: 2px solid var(--odd-accent);
+  outline-offset: 2px;
+}
+
+.odd-color-hex {
+  width: 80px;
+  padding: 4px 8px;
+  border: 0;
+  border-radius: 6px;
+  background: var(--odd-page);
+  box-shadow: 0 0 0 1px var(--odd-border);
+  color: var(--odd-muted);
+  font-family: var(--odd-mono);
+  font-size: 12px;
+}
+
+.odd-color-row[data-set] .odd-color-hex {
+  color: var(--odd-ink);
+  box-shadow: 0 0 0 1px var(--odd-border-strong);
+}
+
+.odd-color-reset {
+  width: 22px;
+  height: 22px;
+  font-size: 13px;
+}
+
+.odd-color-reset:disabled {
+  visibility: hidden;
+}
+
+.odd-range {
+  width: 100%;
+  accent-color: var(--odd-accent);
+}
+
+.odd-studio-foot {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 14px 18px 18px;
+}
+
+.odd-studio-foot code {
+  color: var(--odd-muted);
+  font-family: var(--odd-mono);
+  font-size: 11.5px;
+}
+
+.odd-studio-preview {
+  min-width: 0;
+  border-radius: 14px;
+  background: var(--odd-surface);
+  box-shadow: 0 0 0 1px var(--odd-border);
+  overflow: hidden;
+}
+
+.odd-studio-preview-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 10px 14px;
+  border-bottom: 1px solid var(--odd-border);
+}
+
+.odd-studio-preview-label {
+  color: var(--odd-muted);
+  font-size: 12px;
+  font-weight: 650;
+}
+
+.odd-themed[data-preview] {
+  min-height: 0;
+}
+
+.odd-studio-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 14px;
+  padding: 72px 24px;
+  border: 1px dashed var(--odd-border-strong);
+  border-radius: 14px;
+  color: var(--odd-muted);
+  text-align: center;
+}
+
+.odd-studio-empty p {
+  margin: 0;
+}
+
+.odd-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.odd-chips code,
+.odd-chips a {
+  padding: 2px 8px;
+  border-radius: 6px;
+  background: var(--odd-hover);
+  color: var(--odd-ink-2);
+  font-size: 12px;
+  text-decoration: none;
+}
+
+.odd-chips code {
+  font-family: var(--odd-mono);
+}
+
+.odd-chips a:hover {
+  color: var(--odd-ink);
+  background: var(--odd-border);
+}
+
+.odd-gallery {
+  display: grid;
+  grid-template-columns: 220px minmax(0, 1fr);
+  gap: 24px;
+  align-items: start;
+}
+
+.odd-gallery-list {
+  position: sticky;
+  top: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  max-height: calc(100vh - 32px);
+  overflow: auto;
+  padding: 2px 4px 16px 2px;
+}
+
+.odd-gallery-list a {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 5px 8px;
+  border-radius: 8px;
+  color: var(--odd-ink-2);
+  text-decoration: none;
+}
+
+.odd-gallery-list a:hover {
+  background: var(--odd-hover);
+}
+
+.odd-gallery-list a[aria-current="page"] {
+  background: var(--odd-surface);
+  box-shadow: 0 0 0 1px var(--odd-border);
+  color: var(--odd-ink);
+}
+
+.odd-gallery-name {
+  font-size: 13px;
+}
+
+.odd-gallery-list a[aria-current="page"] .odd-gallery-name {
+  font-weight: 600;
+}
+
+.odd-gallery-head .odd-chart-icon {
+  align-self: center;
+}
+
+.odd-gallery-list code {
+  color: var(--odd-muted);
+  font-family: var(--odd-mono);
+  font-size: 11.5px;
+}
+
+.odd-gallery-detail {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  min-width: 0;
+}
+
+.odd-gallery-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 12px;
+}
+
+.odd-gallery-head h2 {
+  margin: 0;
+  font-size: 20px;
+  font-weight: 650;
+  letter-spacing: -0.01em;
+}
+
+.odd-gallery-head code {
+  color: var(--odd-muted);
+  font-family: var(--odd-mono);
+  font-size: 12px;
+}
+
+.odd-gallery-stage {
+  display: grid;
+  padding: 24px;
+  border-radius: 14px;
+  background: var(--odd-page);
+  background-image: radial-gradient(var(--odd-border) 1px, transparent 1px);
+  background-size: 16px 16px;
+  box-shadow: 0 0 0 1px var(--odd-border);
+}
+
+.odd-gallery-facts {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  gap: 12px;
+  margin: 0;
+}
+
+.odd-gallery-facts > div {
+  padding: 12px 14px;
+  border-radius: 10px;
+  background: var(--odd-surface);
+  box-shadow: 0 0 0 1px var(--odd-border);
+}
+
+.odd-gallery-facts dt {
+  margin-bottom: 8px;
+  color: var(--odd-muted);
+  font-size: 12px;
+  font-weight: 650;
+}
+
+.odd-gallery-facts dd {
+  margin: 0;
+}
+
+.odd-code-block {
+  position: relative;
+  border-radius: 10px;
+  background: var(--odd-surface);
+  box-shadow: 0 0 0 1px var(--odd-border);
+}
+
+.odd-code-block pre {
+  margin: 0;
+  padding: 14px 48px 14px 16px;
+  overflow-x: auto;
+  font-family: var(--odd-mono);
+  font-size: 12.5px;
+  line-height: 1.7;
+  white-space: pre;
+}
+
+.odd-code-block .odd-icon-button {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+}
+
+.odd-copy-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 12px;
+  border: 0;
+  border-radius: 8px;
+  background: var(--odd-surface);
+  box-shadow: 0 0 0 1px var(--odd-border-strong);
+  color: var(--odd-ink-2);
+  cursor: pointer;
+}
+
+.odd-copy-chip:hover {
+  color: var(--odd-ink);
+}
+
+.odd-copy-chip code {
+  font-family: var(--odd-mono);
+  font-size: 13px;
+}
+
+.odd-gallery-search {
+  width: 100%;
+  margin-bottom: 8px;
+  padding: 7px 10px;
+  border: 0;
+  border-radius: 8px;
+  background: var(--odd-surface);
+  box-shadow: 0 0 0 1px var(--odd-border-strong);
+  color: var(--odd-ink);
+  font: inherit;
+  font-size: 13px;
+}
+
+.odd-gallery-search:focus-visible {
+  outline: 2px solid var(--odd-accent);
+  outline-offset: 1px;
+}
+
+.odd-gallery-group {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  margin-top: 12px;
+}
+
+.odd-gallery-group h2 {
+  margin: 0 0 4px;
+  padding: 0 12px;
+  color: var(--odd-muted);
+  font-size: 11.5px;
+  font-weight: 650;
+}
+
+.odd-gallery-group .odd-command {
+  margin: 2px 0;
+}
+
+.odd-chart-icon {
+  display: inline-grid;
+  flex: none;
+  place-items: center;
+  width: 26px;
+  height: 26px;
+  border-radius: 7px;
+  background: var(--odd-hover);
+  color: var(--odd-ink-2);
+}
+
+.odd-gallery-count {
+  margin-left: auto;
+  padding: 0 6px;
+  border-radius: 999px;
+  background: var(--odd-hover);
+  color: var(--odd-muted);
+  font-size: 11px;
+  font-variant-numeric: tabular-nums;
+}
+
+.odd-gallery-placeholder {
+  display: grid;
+  place-items: center;
+  min-height: 240px;
+}
+
+.odd-gallery-placeholder .odd-chart-icon {
+  width: 88px;
+  height: 88px;
+  border-radius: 22px;
+  color: var(--odd-muted);
+}
+
+.odd-gallery-placeholder .odd-chart-icon svg {
+  width: 44px;
+  height: 44px;
+}
+
+/* The Charts page fits the window: the list and the detail scroll on their own,
+   and reaching the end of one never drags the other along with the page. */
+.odd-charts-page {
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
+  padding-bottom: 24px;
+  box-sizing: border-box;
+}
+
+.odd-charts-page .odd-gallery {
+  flex: 1;
+  min-height: 0;
+  align-items: stretch;
+}
+
+.odd-charts-page .odd-gallery-list {
+  position: static;
+  max-height: none;
+  min-height: 0;
+  overflow: auto;
+  overscroll-behavior: contain;
+}
+
+.odd-charts-page .odd-gallery-search {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  box-shadow:
+    0 0 0 1px var(--odd-border-strong),
+    0 -4px 0 4px var(--odd-page),
+    0 6px 8px 2px var(--odd-page);
+}
+
+.odd-charts-page .odd-gallery-detail {
+  min-height: 0;
+  overflow: auto;
+  overscroll-behavior: contain;
+  padding: 2px 4px 2px 2px;
+}
+
+@media (max-width: 960px) {
+  .odd-studio,
+  .odd-gallery {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .odd-studio-panel,
+  .odd-gallery-list {
+    position: static;
+    max-height: none;
+  }
+
+  .odd-charts-page {
+    height: auto;
+  }
+
+  .odd-charts-page .odd-gallery-list {
+    max-height: 320px;
+  }
+
+  .odd-charts-page .odd-gallery-detail {
+    overflow: visible;
   }
 }

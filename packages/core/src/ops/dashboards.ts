@@ -5,12 +5,13 @@ import { referencedParams } from '../datasource/params.js'
 import { loadQueries, type NamedQuery } from '../queries/load.js'
 import type { ResolvedConfig, Workspace } from '../workspace.js'
 import { analyzeDashboard } from './analyze.js'
+import { chartImports } from './charts.js'
 import { combineResults } from './combine.js'
 import { OpsError } from './errors.js'
 import { cacheKey, parseDuration } from './query-cache.js'
 
 const ENTRY_NAMES = ['index.tsx', 'index.jsx']
-const VALID_ID = /^[A-Za-z0-9][A-Za-z0-9_-]*$/
+export const VALID_ID = /^[A-Za-z0-9][A-Za-z0-9_-]*$/
 
 export interface DashboardEntry {
   id: string
@@ -27,6 +28,8 @@ export interface DashboardSummary {
   sources: string[]
   /** `meta.refresh`, when the dashboard sets a default auto-refresh. */
   refresh?: string
+  /** `meta.theme`, when the dashboard picks one. */
+  theme?: string
   file: string
 }
 
@@ -62,7 +65,11 @@ export function dashboardFile(config: ResolvedConfig, id: string): string {
 
 export function listDashboards(config: ResolvedConfig): DashboardSummary[] {
   return discoverDashboards(config.root, config.dashboardsDir).map(({ id, file }) => {
-    const { meta, panels } = analyzeDashboard(readFileSync(file, 'utf8'))
+    const code = readFileSync(file, 'utf8')
+    const custom = new Map(
+      [...chartImports(config, file, code)].map(([name, chart]) => [name, chart.spec.columns]),
+    )
+    const { meta, panels } = analyzeDashboard(code, custom)
     let queries = 0
     const sources = new Set<string>()
     try {
@@ -85,6 +92,7 @@ export function listDashboards(config: ResolvedConfig): DashboardSummary[] {
     }
     if (typeof meta.description === 'string') summary.description = meta.description
     if (typeof meta.refresh === 'string') summary.refresh = meta.refresh
+    if (typeof meta.theme === 'string') summary.theme = meta.theme
     return summary
   })
 }
@@ -142,6 +150,18 @@ export async function runDashboardQuery(
   options: RunOptions = {},
 ): Promise<QueryRun> {
   return runNamed(workspace, id, dashboardQueries(workspace.config, id), name, params, options, [])
+}
+
+/** A named query from any folder of `.sql` files — a custom chart's sample, say — run like a dashboard's. */
+export async function runQueryIn(
+  workspace: Workspace,
+  scope: string,
+  queries: Map<string, NamedQuery>,
+  name: string,
+  params: Record<string, ParamValue> = {},
+  options: RunOptions = {},
+): Promise<QueryRun> {
+  return runNamed(workspace, scope, queries, name, params, options, [])
 }
 
 async function runNamed(

@@ -48,6 +48,7 @@ Skills ship with every workspace (in `.agents/skills/` and `.claude/skills/`):
 - **`/create-dashboard`** — explores the schema and real rows first, then *asks* how each metric is defined (refunds in or out? which date range? which slices?) before writing a line. It will not invent a number: a target that is not in your database is a question, not a placeholder.
 - **`/dashboard-authoring`** — the reference: query files, parameters, every component, formats, SQL per dialect.
 - **`/current-dashboard`** — resolves "this chart". The viewer publishes what you are looking at — dashboard, last inspected panel, filter values — to `node_modules/.open-dashboard/current.json`.
+- **`/create-chart`** — writes a chart no built-in panel draws under `charts/<id>/`, with `defineChart`, following the same visual rules as the built-ins.
 - **`/apply-comments`** — applies the notes you left on panels in the inspector.
 
 After an upgrade, `open-dashboard sync-skills` refreshes them; `dev` tells you when they are out of date.
@@ -185,6 +186,49 @@ Column names do not say that refunded orders stay in `orders`, that prices are i
 
 No chart library: the core ships to every workspace, and the visual rules are fixed in the framework rather than left to each prompt — one y-axis (there is no dual-axis option), zero always in the domain, one tick format per axis, a validated eight-colour palette with separate dark-mode steps, and a ninth category folded into "Other".
 
+### 🧩 Custom charts, when none of the 40 fit
+
+<img src=".github/assets/custom-charts.png" alt="The Charts page: custom and built-in charts in one searchable list, with a live preview, the column props check verifies and the dashboards using each." width="100%">
+
+<sub>The Charts page: custom and built-in charts in one searchable list, each with a live preview, its column props and the dashboards that use it.</sub>
+
+Write the chart once under `charts/<id>/` and use it like a built-in panel. `defineChart` gives it the panel frame — loading and error states, the inspector, notes for the agent, download, edit-mode resize and move, and the dashboard's theme — so `render` only draws the data:
+
+```tsx
+// charts/radar/index.tsx
+import { defineChart } from '@open-dashboard/core'
+
+export default defineChart<{ axis: string; value: string; series?: string }>({
+  name: 'Radar',
+  columns: ['axis', 'value', 'series'],          // check verifies these against the query
+  sample: { query: 'sample', props: { axis: 'category', value: 'revenue' } },
+  render: ({ rows, props, width, height, color, format }) => <svg width={width} height={height}>…</svg>,
+})
+```
+
+```tsx
+// dashboards/product-analysis/index.tsx
+import Radar from '../../charts/radar'
+
+<Radar title="Revenue by category" query="category_periods" axis="category" value="revenue" series="period" span={4} />
+```
+
+The **Charts** page lists the 40 built-in panels and your custom charts side by side, searchable, each with the column props it takes, the dashboards using it, and a live preview — a built-in drawn from a real dashboard that uses it, a custom chart from its `sample.sql`. `open-dashboard charts` prints the same list for agents, so nobody builds a chart that already exists. Agents get a `/create-chart` skill with the contract and the house rules: colours from `color(i)` and the `--odd-*` variables, never a hex code; one y-axis; numbers through `format`.
+
+### 🎨 Themes
+
+<img src=".github/assets/themes.png" alt="The Themes page: chart palette, accent, up and down colours, backgrounds, grid, fonts and corner radius, with a live preview of a dashboard." width="100%">
+
+<sub>The Themes page: edit light and dark separately, and watch a real dashboard change as you go.</sub>
+
+A theme is `themes/<id>.json` — chart palette, accent, up / down colours (red-up, green-down if that is your market's convention), page and panel backgrounds, grid, fonts and corner radius, each for light and dark. Anything left out keeps the built-in value, and the text drawn on a coloured mark picks black or white by contrast on its own. A dashboard picks one with `meta.theme` (or from the theme menu in Edit mode, which writes it into `index.tsx`); `theme` in the config sets the workspace default. Every chart draws through the `--odd-*` variables, so a theme restyles all 40 panels and every custom chart without touching them.
+
+### 🖼️ Download any panel as PNG or SVG
+
+<img src=".github/assets/download.png" alt="A panel's download menu with PNG and SVG." width="100%">
+
+Every panel has a **Download** menu. The export includes the title and legend, uses the dashboard's theme, and leaves out the buttons, tooltips and edit handles. SVG is real vectors — text as `<text>`, colours resolved, no `<foreignObject>` — so it renders outside a browser too (macOS Preview, for one); PNG is drawn from it at twice the size. Fonts are referenced by name, not embedded: an SVG opened on a machine without the dashboard's font falls back to another one, while the PNG always looks exactly as it did on screen.
+
 ### 🎛️ Filters, drill-down, and links you can share
 
 ```tsx
@@ -210,7 +254,7 @@ Hover a panel and open the inspector to see its SQL, parameters, rows and timing
 
 <sub>Edit mode: drag a panel's edges to resize it, its grip to reorder, or the chart button to change its type.</sub>
 
-Switch the header from **Preview** to **Edit** to resize and reorder panels, move them between rows, and change a chart's type or fields. Nothing is written until **Save**, which splices the change into `index.tsx` by AST offset — and refuses if the agent edited the file in the meantime, instead of overwriting it.
+Switch the header from **Preview** to **Edit** to resize and reorder panels, move them between rows, and change a chart's type or fields. Nothing is written until **Save**, which splices the change into `index.tsx` by AST offset — and refuses if the agent edited the file in the meantime, instead of overwriting it. Leaving the page with unsaved changes is blocked, not silently dropped.
 
 ### ⚡ Cached, live, and careful with secrets
 
@@ -218,9 +262,9 @@ Switch the header from **Preview** to **Edit** to resize and reorder panels, mov
 - **Live reload** — a `.sql` edit refetches only the panels that use it; `index.tsx` goes through React Fast Refresh; config and `.env` reload without a restart.
 - **Secrets are masked** in every error, log line and CLI message, and the dev server never serves a database file, key, `.sql` or `.env` raw. See [SECURITY.md](SECURITY.md).
 
-### 🌏 Five languages, two themes, any screen
+### 🌏 Five languages, light and dark, any screen
 
-The viewer chrome speaks English, 繁體中文, 简体中文, 日本語 and 한국어; number formats follow the dashboard's `meta.locale`. Light and dark themes, a 12-column grid that reflows on a phone, and tables that scroll with a fixed first column.
+The viewer chrome speaks English, 繁體中文, 简体中文, 日本語 and 한국어; number formats follow the dashboard's `meta.locale`. Light and dark mode, a 12-column grid that reflows on a phone, and tables that scroll with a fixed first column.
 
 ## Get started
 
@@ -249,6 +293,7 @@ No database to hand? `init my-dashboards --sample` adds a small generated SQLite
 | `open-dashboard query "<sql>" [--source s] [--param k=v]` | Run read-only SQL against a datasource |
 | `open-dashboard query --dashboard <id> --name <query>` | Run one of a dashboard's named queries |
 | `open-dashboard check [id] [--json]` | Run every query, verify every panel; non-zero exit on errors |
+| `open-dashboard charts [--json]` | Every chart this workspace can use — the 40 built-ins and `charts/` — and the dashboards using each |
 | `open-dashboard sync-skills` | Update this workspace's agent skills after an upgrade |
 
 ## The file contract
@@ -312,6 +357,7 @@ export default {
     events: { type: 'clickhouse', url: process.env.CLICKHOUSE_URL },
   },
   defaultSource: 'warehouse',
+  theme: 'brand',             // themes/brand.json, for dashboards whose meta.theme names none
 } satisfies OpenDashboardConfig
 ```
 
@@ -337,6 +383,7 @@ pnpm typecheck    # tsc across the monorepo
 pnpm check        # biome: format, lint, organize imports
 pnpm test         # vitest
 pnpm demo check   # open-dashboard check against the demo
+node scripts/pages.mjs   # drive the Charts and Themes pages of a running viewer
 ```
 
 Driver tests run against real servers when `ODD_TEST_<ENGINE>_URL` is set; SQLite and DuckDB always run. See [CLAUDE.md](CLAUDE.md) for the architecture and the invariants.

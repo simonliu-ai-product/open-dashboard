@@ -7,20 +7,7 @@ import { CheckIcon } from '../components/icons.js'
 import { intervalLabel } from '../lib/refresh.js'
 import { linkProps } from '../lib/router.js'
 
-const COMMANDS = [
-  {
-    command: '/create-dashboard',
-    text: 'Describe what you want to see. Your agent writes the SQL and the panels, and they appear here as it works.',
-  },
-  {
-    command: '/connect-database',
-    text: 'Connect Postgres, MySQL, SQL Server, Oracle, ClickHouse, BigQuery, Snowflake, DuckDB or SQLite.',
-  },
-  {
-    command: '/apply-comments',
-    text: 'Apply the notes you left on panels in the inspector.',
-  },
-]
+const COMMANDS = ['/create-dashboard', '/create-chart', '/connect-database', '/apply-comments']
 
 function DashboardRow({ dashboard }: { dashboard: DashboardSummary }) {
   const t = useT()
@@ -130,11 +117,7 @@ export function HomeView({
               {sources === undefined ? (
                 <p className="odd-muted">{t('Checking connections…')}</p>
               ) : null}
-              {sources?.length === 0 ? (
-                <p className="odd-muted">
-                  {t('None configured yet. Ask your agent: /connect-database')}
-                </p>
-              ) : null}
+              {sources?.length === 0 ? <CommandButton command="/connect-database" /> : null}
               <ul className="odd-sources">
                 {sources?.map((s) => (
                   <li key={s.name}>
@@ -163,9 +146,9 @@ export function HomeView({
                 <h2 id="odd-agent-heading">{t('Ask your agent')}</h2>
               </header>
               <ul className="odd-commands">
-                {COMMANDS.map((c) => (
-                  <li key={c.command}>
-                    <CommandButton {...c} />
+                {COMMANDS.map((command) => (
+                  <li key={command}>
+                    <CommandButton command={command} />
                   </li>
                 ))}
               </ul>

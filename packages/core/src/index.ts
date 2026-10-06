@@ -7,6 +7,12 @@ export { Candlestick, type CandlestickProps } from './components/candlestick.js'
 export { ChoroplethMap, type ChoroplethMapProps } from './components/choropleth-map.js'
 export { CohortTable, type CohortTableProps } from './components/cohort-table.js'
 export { ControlChart, type ControlChartProps } from './components/control-chart.js'
+export {
+  type ChartContext,
+  type ChartDefinition,
+  type CustomChartProps,
+  defineChart,
+} from './components/define-chart.js'
 export { DivergingBar, type DivergingBarProps } from './components/diverging-bar.js'
 export { DotPlot, type DotPlotProps } from './components/dot-plot.js'
 export { Dumbbell, type DumbbellProps } from './components/dumbbell.js'
@@ -28,6 +34,7 @@ export {
 } from './components/layout.js'
 export { Marimekko, type MarimekkoProps } from './components/marimekko.js'
 export type { PanelProps } from './components/panel.js'
+export { useFormatContext, useSize } from './components/panel.js'
 export { ParetoChart, type ParetoChartProps } from './components/pareto-chart.js'
 export { PieChart, type PieChartProps } from './components/pie-chart.js'
 export { PivotTable, type PivotTableProps } from './components/pivot-table.js'
@@ -43,6 +50,7 @@ export { Table, type TableColumn, type TableProps } from './components/table.js'
 export { Text, type TextProps } from './components/text.js'
 export { TileMap, type TileMapProps } from './components/tile-map.js'
 export { Timeline, type TimelineProps } from './components/timeline.js'
+export { ChartTooltip, type TipRow } from './components/tooltip.js'
 export { Treemap, type TreemapProps } from './components/treemap.js'
 export { UpSetChart, type UpSetChartProps } from './components/upset-chart.js'
 export { Waterfall, type WaterfallProps } from './components/waterfall.js'
@@ -66,8 +74,10 @@ export type {
   Row as ResultRow,
   SqliteSource,
 } from './config.js'
+export { diverging, sequential, seriesColor } from './runtime/color.js'
 export { HostContext, type HostContextValue, useFilters, useHost } from './runtime/context.js'
-export { formatValue } from './runtime/format.js'
+export { formatValue, tickFormatter } from './runtime/format.js'
+export { linear, niceDomain } from './runtime/scale.js'
 export { TIME_PRESETS, type TimePreset } from './runtime/time-range.js'
 export type { DashboardMeta, Format, NamedFormat, PanelInfo, QueryRun } from './runtime/types.js'
 export { type QueryState, useQuery } from './runtime/use-query.js'

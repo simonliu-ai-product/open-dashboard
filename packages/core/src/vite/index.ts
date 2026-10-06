@@ -86,7 +86,7 @@ export function viteConfigFor(
   overrides: ConfigOverrides = {},
   extra: Partial<InlineConfig> = {},
 ): InlineConfig {
-  const { root, port, dashboardsDir } = workspace.config
+  const { root, port, dashboardsDir, chartsDir } = workspace.config
   const core = packageRoot()
   return {
     root,
@@ -99,6 +99,7 @@ export function viteConfigFor(
         include: [
           new RegExp(`^${escapeRegExp(join(realPath(core), 'src'))}/.*\\.[jt]sx?$`),
           new RegExp(`^${escapeRegExp(join(root, dashboardsDir))}/.*\\.[jt]sx?$`),
+          new RegExp(`^${escapeRegExp(join(root, chartsDir))}/.*\\.[jt]sx?$`),
         ],
       }),
       manifestPlugin(workspace),

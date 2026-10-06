@@ -160,6 +160,8 @@ export type DatasourceType = DatasourceConfig['type']
 export interface OpenDashboardConfig {
   /** Where dashboards live. Default `dashboards`. */
   dashboardsDir?: string
+  /** Where custom charts live (`charts/<id>/index.tsx`). Default `charts`. */
+  chartsDir?: string
   datasources: Record<string, DatasourceConfig>
   /** The source a query uses when it names none. Defaults to the only one, if there is only one. */
   defaultSource?: string
@@ -173,6 +175,8 @@ export interface OpenDashboardConfig {
    * its own with `-- cache:`, and the refresh button always runs fresh.
    */
   cache?: string | false
+  /** The theme in `themes/<id>.json` for dashboards that do not pick one with `meta.theme`. */
+  theme?: string
 }
 
 export type ColumnType = 'number' | 'string' | 'date' | 'boolean' | 'unknown'

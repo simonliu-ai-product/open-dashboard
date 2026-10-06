@@ -38,10 +38,11 @@ a team — behind a login — is out of scope for 0.1.
 | Another website using the API through your browser | Same-origin check on every API request; Vite's host check against DNS rebinding | 8.20 Networks security · 8.26 | `api-plugin` `sameOrigin` | probed: 403 |
 | A cross-database query reaching a real database | `-- uses:` runs in a fresh in-memory SQLite holding only the inputs' results, `query_only`, single SELECT | 8.3 · 8.22 Segregation | `ops/combine.ts` | `combine.test.ts` |
 | An API or MCP source writing, or reaching somewhere it should not | `http`: GET only, to URLs in the config (a parameter fills a `:name`, URL-encoded); `mcp`: only tools annotated `readOnlyHint`, never `destructiveHint`, unannotated only with `allowUnannotated`; SQL runs over their JSON in a scratch SQLite | 8.3 · 8.22 · 8.26 | `datasource/http.ts`, `mcp.ts`, `json-tables.ts` | `json-sources.test.ts` |
+| A theme injecting CSS, or a theme/chart id escaping its folder | Theme fields are validated one by one — `#rgb`/`#rrggbb` colours, a font-family list of letters, quotes and commas, a numeric radius — before they reach a stylesheet; unknown fields are refused. Theme and chart ids must match `[A-Za-z0-9][A-Za-z0-9_-]*`, and a theme write carries the hash it read (a changed file is refused, not overwritten). A chart's sample runs only its own `.sql` files, read-only like any query | 8.26 · 8.28 | `runtime/theme.ts`, `ops/themes.ts`, `ops/charts.ts` | `theme.test.ts`, `themes.test.ts`, `ops.test.ts` |
 | Markdown in `database.md` injecting script | Rendered as React elements, never HTML; links only `http(s)` | 8.28 | `runtime/markdown.tsx` | `markdown.test.ts` |
 | Large request bodies, runaway queries | Bodies over 1 MB refused; per-query timeout; row cap | 8.6 Capacity management | `api-plugin` `readBody`, drivers | — |
 | Exposure on a network | Binds to localhost; `--host` prints a warning that the API has no login | 8.20 | `cli/dev.ts` | — |
-| Vulnerable dependencies | `pnpm audit --prod` before a release; drivers are optional peers, not bundled | 8.8 Technical vulnerabilities | release checklist | 0.2.1: no known vulnerabilities |
+| Vulnerable dependencies | `pnpm audit --prod` before a release; drivers are optional peers, not bundled | 8.8 Technical vulnerabilities | release checklist | 0.3.0: no known vulnerabilities |
 
 ## Known limits
 

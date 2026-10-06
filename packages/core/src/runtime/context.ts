@@ -9,6 +9,8 @@ export interface HostContextValue {
   tick: number
   refresh(): void
   inspect(panel: PanelInfo, run: QueryRun | undefined): void
+  /** False where there is no inspector to open (previews): panels then show no Inspect button. */
+  inspectable?: boolean
   onParams(params: Record<string, ParamValue>): void
   fetchQuery(name: string, params: Record<string, ParamValue>): Promise<QueryRun>
 }

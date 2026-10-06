@@ -3,6 +3,7 @@ import type { DashboardLayout } from '../../ops/layout.js'
 import type { LayoutEdit } from '../../runtime/convert.js'
 import { type EditState, foldEdits, foldStructure, stageEdit } from '../../runtime/edit.js'
 import { api } from './api.js'
+import { setNavigationGuard } from './router.js'
 
 export type Mode = 'view' | 'edit'
 
@@ -79,6 +80,14 @@ export function useLayoutEdit(id: string, onConfigure: (title: string) => void) 
     [edits.length],
   )
 
+  useEffect(() => {
+    if (edits.length === 0) return
+    return setNavigationGuard(() => {
+      setStatus({ kind: 'blocked' })
+      return true
+    })
+  }, [edits.length])
+
   const stage = useCallback((edit: LayoutEdit) => {
     setEdits((current) => stageEdit(current, edit))
     setStatus({ kind: 'idle' })
@@ -145,8 +154,9 @@ export function useLayoutEdit(id: string, onConfigure: (title: string) => void) 
       stage,
       setLiveOrder,
       configure: onConfigure,
+      enterEdit: () => setMode('edit'),
     }),
-    [mode, layout, panels, rows, byTitle, liveOrder, stage, onConfigure],
+    [mode, layout, panels, rows, byTitle, liveOrder, stage, onConfigure, setMode],
   )
 
   return { mode, setMode, layout, edits, status, stage, undo, discard, save, reload, editState }

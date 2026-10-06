@@ -20,15 +20,11 @@ export function SaveBar(props: SaveBarProps) {
   let message: string
   if (status.kind === 'saving') message = t('Saving…')
   else if (status.kind === 'error') message = status.message
-  else if (status.kind === 'blocked')
-    message = t('Save or discard your changes before switching to Preview.')
+  else if (status.kind === 'blocked') message = t('Save or discard your changes first.')
   else if (count > 0)
     message = t(count === 1 ? '1 unsaved change' : '{n} unsaved changes', { n: count })
   else if (status.kind === 'saved') message = t('Saved to {file}', { file: props.file ?? '' })
-  else
-    message = t(
-      'Drag a panel’s edges to resize it, its grip to reorder, or the chart button to change it.',
-    )
+  else message = ''
 
   return (
     <div

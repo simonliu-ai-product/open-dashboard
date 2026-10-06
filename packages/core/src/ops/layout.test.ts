@@ -192,6 +192,67 @@ describe('moving between rows', () => {
   })
 })
 
+describe('custom charts in the layout', () => {
+  const CUSTOM = SOURCE.replace(
+    '<Stat title="Orders" query="kpis" column="orders" />',
+    '<Stat title="Orders" query="kpis" column="orders" />\n        <Radar title="Shape" query="kpis" axis="a" value="b" />',
+  )
+
+  it('counts a custom chart as a panel of its row, like the page does', () => {
+    const layout = describeLayout(CUSTOM)
+    expect(layout.rows[0]?.titles).toEqual(['Revenue', 'Orders', 'Shape'])
+    expect(layout.panels.find((p) => p.title === 'Shape')?.component).toBe('Radar')
+  })
+
+  it('resizes and moves it, but never changes its type', () => {
+    const resized = applyEdits(CUSTOM, [{ kind: 'props', title: 'Shape', set: { span: 4 } }])
+    expect(resized).toContain('<Radar title="Shape" query="kpis" axis="a" value="b" span={4} />')
+    const moved = applyEdits(CUSTOM, [{ kind: 'move', title: 'Shape', row: 1, index: 0 }])
+    expect(describeLayout(moved).rows[1]?.titles[0]).toBe('Shape')
+    expect(() =>
+      applyEdits(CUSTOM, [{ kind: 'component', title: 'Shape', component: 'BarChart' }]),
+    ).toThrow(/cannot change type/)
+  })
+})
+
+describe('meta theme', () => {
+  const META = `export const meta: DashboardMeta = {
+  title: 'Sales',
+  refresh: '5m',
+}
+`
+  it('adds, replaces and removes meta.theme, keeping the layout', () => {
+    const added = applyEdits(META, [{ kind: 'meta', key: 'theme', value: 'brand' }])
+    expect(added).toBe(`export const meta: DashboardMeta = {
+  title: 'Sales',
+  refresh: '5m',
+  theme: 'brand',
+}
+`)
+    const replaced = applyEdits(added, [{ kind: 'meta', key: 'theme', value: 'night' }])
+    expect(replaced).toContain(`theme: 'night',`)
+    expect(applyEdits(replaced, [{ kind: 'meta', key: 'theme', value: null }])).toBe(META)
+  })
+
+  it('handles one-line objects and satisfies', () => {
+    const code = `export const meta = { title: 'A' } satisfies DashboardMeta\n`
+    const added = applyEdits(code, [{ kind: 'meta', key: 'theme', value: 'brand' }])
+    expect(added).toBe(
+      `export const meta = { title: 'A', theme: 'brand' } satisfies DashboardMeta\n`,
+    )
+    expect(applyEdits(added, [{ kind: 'meta', key: 'theme', value: null }])).toBe(code)
+  })
+
+  it('refuses a theme id that is not one, and a dashboard without meta', () => {
+    expect(() => applyEdits(META, [{ kind: 'meta', key: 'theme', value: "x'; alert(1)" }])).toThrow(
+      /not a theme id/,
+    )
+    expect(() =>
+      applyEdits('export default 1\n', [{ kind: 'meta', key: 'theme', value: 'brand' }]),
+    ).toThrow(/no `export const meta/)
+  })
+})
+
 describe('editLayout', () => {
   let root: string
   let config: ResolvedConfig

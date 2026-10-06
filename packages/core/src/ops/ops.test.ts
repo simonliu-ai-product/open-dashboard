@@ -2,6 +2,7 @@ import { readFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { loadConfig } from '../workspace.js'
 import { analyzeDashboard } from './analyze.js'
+import { chartCatalog, listCharts, readChartSpec, runChartQuery } from './charts.js'
 import { checkDashboard } from './check.js'
 import { addComment, listComments } from './comment.js'
 import { listDashboards, runDashboardQuery, runSql } from './dashboards.js'
@@ -131,6 +132,96 @@ describe('analyze', () => {
       ['Stat', 'Total', 'total', ['amount']],
       ['BarChart', 'By region', 'by_region', ['region', 'amount']],
     ])
+  })
+})
+
+const RADAR = `import { defineChart } from '@open-dashboard/core'
+
+export default defineChart({
+  name: 'Radar',
+  columns: ['axis', 'value'],
+  sample: { query: 'sample', props: { axis: 'region', value: 'amount' } },
+  render: () => null,
+})
+`
+
+describe('custom charts', () => {
+  const file = () => join(fixture.root, 'dashboards/sales/index.tsx')
+  const withRadar = (props: string) =>
+    DASHBOARD.replace(
+      "from '@open-dashboard/core'\n",
+      "from '@open-dashboard/core'\nimport Radar from '../../charts/radar'\n",
+    ).replace('</Row>', `  <Radar title="Shape" query="by_region" ${props} />\n      </Row>`)
+
+  it('reads what defineChart says about itself, without running it', () => {
+    expect(readChartSpec(RADAR, 'radar')).toEqual({
+      name: 'Radar',
+      columns: ['axis', 'value'],
+      sample: { query: 'sample', props: { axis: 'region', value: 'amount' } },
+    })
+  })
+
+  it('lists charts with their queries and the dashboards that use them', () => {
+    fixture.write('charts/radar/index.tsx', RADAR)
+    fixture.write(
+      'charts/radar/sample.sql',
+      '-- name: sample\nSELECT region, SUM(amount) AS amount FROM sales GROUP BY region\n',
+    )
+    fixture.write('dashboards/sales/index.tsx', withRadar('axis="region" value="amount"'))
+    expect(listCharts(fixture.workspace.config)).toEqual([
+      expect.objectContaining({
+        id: 'radar',
+        name: 'Radar',
+        queries: ['sample'],
+        usedBy: ['sales'],
+      }),
+    ])
+    expect(listDashboards(fixture.workspace.config)[0]?.panels).toBe(3)
+  })
+
+  it('checks the columns a custom chart names', async () => {
+    fixture.write('charts/radar/index.tsx', RADAR)
+    fixture.write('dashboards/sales/index.tsx', withRadar('axis="region" value="revenue"'))
+    const messages = (await checkDashboard(fixture.workspace, 'sales', file())).findings.map(
+      (f) => f.message,
+    )
+    expect(messages).toContain(
+      'column "revenue" is not in the result of "by_region" (has: region, amount)',
+    )
+  })
+
+  it('catalogs built-ins and custom charts with their uses and a real example', async () => {
+    fixture.write('charts/radar/index.tsx', RADAR)
+    fixture.write('dashboards/sales/index.tsx', withRadar('axis="region" value="amount"'))
+    const catalog = await chartCatalog(fixture.workspace)
+    expect(catalog).toHaveLength(41)
+    expect(catalog[0]).toMatchObject({
+      kind: 'custom',
+      id: 'radar',
+      usedBy: [{ dashboard: 'sales', title: 'Shape' }],
+    })
+    const bar = catalog.find((entry) => entry.name === 'BarChart')
+    expect(bar).toMatchObject({ kind: 'built-in', group: 'Basics', columns: ['x', 'y', 'series'] })
+    expect(bar?.example).toMatchObject({
+      dashboard: 'sales',
+      title: 'By region',
+      props: { query: 'by_region', x: 'region', y: 'amount' },
+      params: { region: null },
+    })
+    expect(catalog.find((entry) => entry.name === 'Sankey')?.usedBy).toEqual([])
+  })
+
+  it('runs a chart sample from its own folder only', async () => {
+    fixture.write('charts/radar/index.tsx', RADAR)
+    fixture.write('charts/radar/sample.sql', '-- name: sample\nSELECT COUNT(*) AS n FROM sales\n')
+    const run = await runChartQuery(fixture.workspace, 'radar', 'sample')
+    expect(run.result.rows).toEqual([{ n: 3 }])
+    await expect(runChartQuery(fixture.workspace, '../dashboards', 'sample')).rejects.toThrow(
+      /not a chart id/,
+    )
+    await expect(runChartQuery(fixture.workspace, 'radar', 'by_region')).rejects.toThrow(
+      /no query "by_region"/,
+    )
   })
 })
 

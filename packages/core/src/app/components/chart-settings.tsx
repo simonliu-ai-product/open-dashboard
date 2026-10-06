@@ -1,51 +1,11 @@
 import type { ReactNode } from 'react'
 import type { ColumnInfo } from '../../config.js'
+import { TYPE_LABELS } from '../../runtime/catalog.js'
 import { applyProps, isPanelType, PANEL_PROPS, type PropValue } from '../../runtime/convert.js'
 import { useEdit } from '../../runtime/edit.js'
 import { useT } from '../../runtime/i18n.js'
 import { CHART_GROUPS, CHART_ICONS } from './chart-icons.js'
-
-const TYPE_LABELS: Record<string, string> = {
-  LineChart: 'Line',
-  AreaChart: 'Area',
-  BarChart: 'Bar',
-  PieChart: 'Pie',
-  Table: 'Table view',
-  Stat: 'Number',
-  ScatterChart: 'Scatter',
-  Heatmap: 'Heatmap',
-  FunnelChart: 'Funnel',
-  Gauge: 'Gauge',
-  Treemap: 'Treemap',
-  DotPlot: 'Dot plot',
-  Dumbbell: 'Dumbbell',
-  BulletChart: 'Bullet',
-  DivergingBar: 'Diverging bar',
-  Marimekko: 'Marimekko',
-  SlopeChart: 'Slope',
-  BumpChart: 'Bump',
-  Waterfall: 'Waterfall',
-  CalendarHeatmap: 'Calendar',
-  SmallMultiples: 'Small multiples',
-  BandChart: 'Band',
-  ControlChart: 'Control chart',
-  HorizonChart: 'Horizon',
-  Timeline: 'Timeline',
-  Candlestick: 'Candlestick',
-  Histogram: 'Histogram',
-  BoxPlot: 'Box plot',
-  StripPlot: 'Strip plot',
-  EcdfChart: 'Cumulative',
-  ParetoChart: 'Concentration',
-  Sankey: 'Sankey',
-  CohortTable: 'Cohort',
-  UpSetChart: 'Set overlaps',
-  ChoroplethMap: 'Region map',
-  SymbolMap: 'Point map',
-  TileMap: 'Tile map',
-  StateTimeline: 'State timeline',
-  PivotTable: 'Pivot table',
-}
+import { PencilIcon } from './icons.js'
 
 type Kind = 'any' | 'number' | 'category'
 
@@ -315,6 +275,14 @@ export function ChartSettings({ title, columns }: { title: string; columns: Colu
   const t = useT()
   const edit = useEdit()
   const source = edit.layout[title]
+  if (!edit.editing) {
+    return (
+      <button type="button" className="odd-button odd-chart-settings-edit" onClick={edit.enterEdit}>
+        <PencilIcon />
+        {t('Edit')}
+      </button>
+    )
+  }
   if (!source) {
     return (
       <p className="odd-muted">
@@ -381,7 +349,14 @@ export function ChartSettings({ title, columns }: { title: string; columns: Colu
   return (
     <div className="odd-chart-settings" aria-disabled={disabled}>
       {disabled ? (
-        <p className="odd-callout">{t('Switch to Edit in the header to change this chart.')}</p>
+        <button
+          type="button"
+          className="odd-button odd-chart-settings-edit"
+          onClick={edit.enterEdit}
+        >
+          <PencilIcon />
+          {t('Edit')}
+        </button>
       ) : null}
 
       {isPanelType(component) ? (

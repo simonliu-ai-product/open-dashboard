@@ -8,9 +8,11 @@ import { SettingsMenu } from './components/settings-menu.js'
 import { api } from './lib/api.js'
 import { linkProps, useRoute } from './lib/router.js'
 import { useTheme } from './lib/theme.js'
+import { ChartsView } from './views/charts.js'
 import { DashboardView } from './views/dashboard.js'
 import { DataSourcesView } from './views/data.js'
 import { HomeView } from './views/home.js'
+import { ThemesView } from './views/themes.js'
 
 function useDashboards(): { list: DashboardSummary[] | undefined; error: string | undefined } {
   const [list, setList] = useState<DashboardSummary[]>()
@@ -159,6 +161,12 @@ function Shell() {
               ))}
             </div>
           ) : null}
+          <a {...linkProps('/charts')} aria-current={route.name === 'charts' ? 'page' : undefined}>
+            {t('Charts')}
+          </a>
+          <a {...linkProps('/themes')} aria-current={route.name === 'themes' ? 'page' : undefined}>
+            {t('Themes')}
+          </a>
           <h2 className="odd-nav-heading">
             {t('Dashboards')}
             {dashboards.list ? <span className="odd-count">{dashboards.list.length}</span> : null}
@@ -178,6 +186,14 @@ function Shell() {
       <main className="odd-main">
         {route.name === 'dashboard' ? (
           <DashboardView key={route.id} id={route.id} />
+        ) : route.name === 'charts' ? (
+          <ChartsView dashboards={dashboards.list} {...(route.id ? { id: route.id } : {})} />
+        ) : route.name === 'themes' ? (
+          <ThemesView
+            key={route.id ?? ''}
+            dashboards={dashboards.list}
+            {...(route.id ? { id: route.id } : {})}
+          />
         ) : route.name === 'data' ? (
           <DataSourcesView sources={sources} {...(route.source ? { source: route.source } : {})} />
         ) : (

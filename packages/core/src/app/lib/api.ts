@@ -1,8 +1,11 @@
 import type { ParamValue, SchemaInfo } from '../../config.js'
+import type { CatalogEntry } from '../../ops/charts.js'
 import type { DashboardSummary } from '../../ops/dashboards.js'
 import type { DatabaseDoc } from '../../ops/database-doc.js'
 import type { DashboardLayout, LayoutEdit } from '../../ops/layout.js'
 import type { SourceDetail, SourceStatus } from '../../ops/sources.js'
+import type { ThemeFile, ThemeList } from '../../ops/themes.js'
+import type { DashboardTheme } from '../../runtime/theme.js'
 import type { QueryRun } from '../../runtime/types.js'
 
 const BASE = '/__odd/api/'
@@ -45,4 +48,13 @@ export const api = {
   layout: (id: string) => request<DashboardLayout>(`layout?id=${encodeURIComponent(id)}`),
   saveLayout: (id: string, hash: string, edits: LayoutEdit[]) =>
     post<{ hash: string }>('layout', { id, hash, edits }),
+  charts: () => request<{ charts: CatalogEntry[] }>('charts').then((r) => r.charts),
+  chartQuery: (id: string, name: string, params: Record<string, ParamValue>, fresh = false) =>
+    request<QueryRun>(
+      `chart-query?id=${encodeURIComponent(id)}&name=${encodeURIComponent(name)}&params=${encodeURIComponent(JSON.stringify(params))}${fresh ? '&fresh=1' : ''}`,
+    ),
+  themes: () => request<ThemeList>('themes'),
+  theme: (id: string) => request<ThemeFile>(`theme?id=${encodeURIComponent(id)}`),
+  saveTheme: (id: string, hash: string, theme: DashboardTheme) =>
+    post<{ hash: string }>('theme', { id, hash, theme }),
 }

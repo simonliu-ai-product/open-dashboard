@@ -18,6 +18,8 @@ const CONFIG_NAMES = [
 export interface ResolvedConfig {
   root: string
   dashboardsDir: string
+  /** Where custom charts live. Default `charts`. */
+  chartsDir: string
   port: number
   datasources: Record<string, DatasourceConfig>
   defaultSource: string | undefined
@@ -25,6 +27,8 @@ export interface ResolvedConfig {
   timeoutMs: number
   /** Default result reuse, in ms. 0: off. */
   cacheMs: number
+  /** `themes/<id>.json` used by a dashboard whose `meta.theme` names none. */
+  theme: string | undefined
   configFile: string | undefined
 }
 
@@ -108,12 +112,14 @@ export async function loadConfig(
   return {
     root,
     dashboardsDir: user.dashboardsDir ?? 'dashboards',
+    chartsDir: user.chartsDir ?? 'charts',
     port: overrides.port ?? DEFAULT_PORT,
     datasources,
     defaultSource: user.defaultSource ?? (names.length === 1 ? names[0] : undefined),
     maxRows: user.maxRows ?? 5000,
     timeoutMs: user.timeoutMs ?? 15_000,
     cacheMs: resolveCache(user.cache),
+    theme: user.theme,
     configFile: file,
   }
 }

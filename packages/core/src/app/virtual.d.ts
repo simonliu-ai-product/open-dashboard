@@ -3,6 +3,10 @@ declare module 'virtual:open-dashboard/manifest' {
     id: string
     load: () => Promise<{ default: unknown; meta?: import('../runtime/types.js').DashboardMeta }>
   }[]
+  export const charts: {
+    id: string
+    load: () => Promise<{ default: unknown }>
+  }[]
 }
 
 interface ImportMeta {

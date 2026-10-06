@@ -3,7 +3,7 @@ import { useT } from '../../runtime/i18n.js'
 import { intervalLabel } from '../lib/refresh.js'
 import { linkProps } from '../lib/router.js'
 import type { Mode } from '../lib/use-layout-edit.js'
-import { CheckIcon, EyeIcon, LinkIcon, PencilIcon, RefreshIcon } from './icons.js'
+import { CheckIcon, CopyIcon, EyeIcon, LinkIcon, PencilIcon, RefreshIcon } from './icons.js'
 
 export interface DashboardHeaderProps {
   title: string
@@ -15,6 +15,10 @@ export interface DashboardHeaderProps {
   notes: { line: number; text: string }[]
   mode: Mode
   onMode: (mode: Mode) => void
+  /** Shown in edit mode: the themes to pick from, and `meta.theme` as staged ('' for the workspace default). */
+  themes?: { id: string; name: string }[]
+  theme?: string
+  onTheme?: (id: string) => void
 }
 
 /**
@@ -25,11 +29,15 @@ export interface DashboardHeaderProps {
 export function DashboardHeader(props: DashboardHeaderProps) {
   const t = useT()
   const [copied, setCopied] = useState(false)
+  const [notesCopied, setNotesCopied] = useState(false)
   useEffect(() => {
-    if (!copied) return
-    const timer = window.setTimeout(() => setCopied(false), 1600)
+    if (!copied && !notesCopied) return
+    const timer = window.setTimeout(() => {
+      setCopied(false)
+      setNotesCopied(false)
+    }, 1600)
     return () => window.clearTimeout(timer)
-  }, [copied])
+  }, [copied, notesCopied])
 
   return (
     <header className="odd-header" data-mode={props.mode}>
@@ -41,17 +49,23 @@ export function DashboardHeader(props: DashboardHeaderProps) {
 
       <div className="odd-header-actions">
         {props.notes.length > 0 ? (
-          <span
+          <button
+            type="button"
             className="odd-notes-pill"
             title={props.notes.map((n) => `${n.line}: ${n.text}`).join('\n')}
+            onClick={() =>
+              navigator.clipboard?.writeText('/apply-comments ').then(
+                () => setNotesCopied(true),
+                () => {},
+              )
+            }
           >
-            {t(
-              props.notes.length === 1
-                ? '1 note for your agent: /apply-comments'
-                : '{n} notes for your agent: /apply-comments',
-              { n: props.notes.length },
-            )}
-          </span>
+            <span>
+              {t(props.notes.length === 1 ? '1 note' : '{n} notes', { n: props.notes.length })}
+            </span>
+            <code>/apply-comments</code>
+            {notesCopied ? <CheckIcon /> : <CopyIcon />}
+          </button>
         ) : null}
         <span className="odd-header-updated">{t('Updated {time}', { time: props.updatedAt })}</span>
         <label className="odd-refresh">
@@ -91,13 +105,30 @@ export function DashboardHeader(props: DashboardHeaderProps) {
         >
           {copied ? <CheckIcon /> : <LinkIcon />}
         </button>
+        {props.mode === 'edit' && props.themes && props.onTheme ? (
+          <label className="odd-refresh">
+            <span className="odd-sr-only">{t('Themes')}</span>
+            <select
+              value={props.theme ?? ''}
+              title={t('Themes')}
+              onChange={(event) => props.onTheme?.(event.target.value)}
+            >
+              <option value="">{t('Default')}</option>
+              {props.themes.map((theme) => (
+                <option key={theme.id} value={theme.id}>
+                  {theme.name}
+                </option>
+              ))}
+            </select>
+          </label>
+        ) : null}
         <fieldset className="odd-mode">
           <legend className="odd-sr-only">{t('Mode')}</legend>
           <button
             type="button"
             aria-pressed={props.mode === 'view'}
             onClick={() => props.onMode('view')}
-            title={t('Preview: read the dashboard')}
+            title={t('Preview')}
           >
             <EyeIcon />
             <span>{t('Preview')}</span>
@@ -106,7 +137,7 @@ export function DashboardHeader(props: DashboardHeaderProps) {
             type="button"
             aria-pressed={props.mode === 'edit'}
             onClick={() => props.onMode('edit')}
-            title={t('Edit: resize, reorder and change charts')}
+            title={t('Edit')}
           >
             <PencilIcon />
             <span>{t('Edit')}</span>

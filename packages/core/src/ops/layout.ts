@@ -5,19 +5,28 @@ import {
   convertProps,
   isPanelType,
   type LayoutEdit,
-  PANEL_NAMES,
   type PanelType,
   type PropValue,
 } from '../runtime/convert.js'
 import { applyStructure, type RowShape, StructureError } from '../runtime/structure.js'
 import type { ResolvedConfig } from '../workspace.js'
 import { analyzeDashboard, attributes, elementName, literal, parseSource, walk } from './analyze.js'
-import { dashboardFile } from './dashboards.js'
+import { dashboardFile, VALID_ID } from './dashboards.js'
 import { OpsError } from './errors.js'
 
 type Node = Parameters<typeof walk>[0]
 
-export const EDITABLE_PANELS = PANEL_NAMES
+/** Elements that hold panels rather than being one. */
+const STRUCTURE = new Set(['Dashboard', 'Row', 'Section', 'Filters', 'TimeRange', 'Select'])
+
+/**
+ * A panel is any component element that is not structure — a built-in or a
+ * custom chart alike. The page keys panels the same way (by a `title` prop), so
+ * the server and the page always agree on what a row holds.
+ */
+export function isPanelElement(name: string | undefined): name is string {
+  return Boolean(name && /^[A-Z]/.test(name) && !STRUCTURE.has(name))
+}
 
 export type { LayoutEdit }
 
@@ -158,7 +167,7 @@ function sites(ast: Node): Site[] {
   walk(ast, (node, parent) => {
     if (node.type !== 'JSXElement') return
     const component = elementName(node)
-    if (!component || !EDITABLE_PANELS.has(component)) return
+    if (!isPanelElement(component)) return
     const title = literal(attributes(node).get('title'))
     if (typeof title === 'string') found.push({ node, parent, title, component })
   })
@@ -186,7 +195,10 @@ function attrName(attr: Node): string | undefined {
 
 function siblingPanels(parent: Node | undefined): Node[] {
   return ((parent?.children as Node[]) ?? []).filter(
-    (child) => child.type === 'JSXElement' && EDITABLE_PANELS.has(elementName(child) ?? ''),
+    (child) =>
+      child.type === 'JSXElement' &&
+      isPanelElement(elementName(child)) &&
+      typeof literal(attributes(child).get('title')) === 'string',
   )
 }
 
@@ -575,6 +587,81 @@ function moveRow(code: string, from: number, to: number): string {
   )
 }
 
+function metaObject(ast: Node): Node {
+  let found: Node | undefined
+  walk(ast, (node) => {
+    if (found || node.type !== 'VariableDeclarator' || (node.id as Node).name !== 'meta') return
+    let init = node.init as Node | undefined
+    while (init && (init.type === 'TSSatisfiesExpression' || init.type === 'TSAsExpression'))
+      init = init.expression as Node
+    if (init?.type === 'ObjectExpression') found = init
+  })
+  if (!found)
+    throw new OpsError('this dashboard has no `export const meta = { … }` object to set a theme in')
+  return found
+}
+
+function keyName(property: Node): string | undefined {
+  const key = property.key as Node | undefined
+  if (!key) return undefined
+  if (key.type === 'Identifier') return key.name as string
+  if (key.type === 'StringLiteral') return key.value as string
+  return undefined
+}
+
+/** Sets, replaces or removes one string field of `meta`, keeping the object's own layout. */
+function setMeta(code: string, key: string, value: string | null): string {
+  const object = metaObject(strictParse(code))
+  const properties = (object.properties as Node[]).filter((p) => p.type === 'ObjectProperty')
+  const existing = properties.find((p) => keyName(p) === key)
+  const text = `${key}: '${value}'`
+  if (existing) {
+    if (value !== null) {
+      const node = existing.value as Node
+      return splice(code, [
+        { start: node.start as number, end: node.end as number, text: `'${value}'` },
+      ])
+    }
+    const start = existing.start as number
+    let end = existing.end as number
+    const after = /^\s*,/.exec(code.slice(end))
+    if (after) end += after[0].length
+    const ownLine =
+      /^[ \t]*$/.test(code.slice(code.lastIndexOf('\n', start - 1) + 1, start)) &&
+      /^[ \t]*(\n|$)/.test(code.slice(end))
+    if (ownLine) return splice(code, [{ ...lineSpan(code, start, end), text: '' }])
+    const before = /,\s*$/.exec(code.slice(0, start))
+    return splice(code, [
+      after
+        ? { start, end: end + (/^\s*/.exec(code.slice(end))?.[0].length ?? 0), text: '' }
+        : { start: start - (before?.[0].length ?? 0), end, text: '' },
+    ])
+  }
+  if (value === null) return code
+  const last = properties.at(-1) ?? (object.properties as Node[]).at(-1)
+  if (!last) {
+    return splice(code, [
+      { start: object.start as number, end: object.end as number, text: `{ ${text} }` },
+    ])
+  }
+  const lastEnd = last.end as number
+  const between = code.slice(lastEnd, (object.end as number) - 1)
+  const trailing = /^\s*,/.exec(between)
+  const multiline = code.slice(object.start as number, object.end as number).includes('\n')
+  if (multiline) {
+    const indent = lineIndent(code, last.start as number)
+    const at = trailing ? lastEnd + trailing[0].length : lastEnd
+    return splice(code, [
+      {
+        start: at,
+        end: at,
+        text: `${trailing ? '' : ','}\n${indent}${text}${trailing ? ',' : ''}`,
+      },
+    ])
+  }
+  return splice(code, [{ start: lastEnd, end: lastEnd, text: `, ${text}` }])
+}
+
 export function applyEdit(code: string, edit: LayoutEdit): string {
   switch (edit.kind) {
     case 'props':
@@ -588,6 +675,11 @@ export function applyEdit(code: string, edit: LayoutEdit): string {
       return move(code, edit.title, edit.row, edit.index)
     case 'moveRow':
       return moveRow(code, edit.from, edit.to)
+    case 'meta':
+      if (edit.key !== 'theme') throw new OpsError(`meta.${edit.key} cannot be edited here`)
+      if (edit.value !== null && (typeof edit.value !== 'string' || !VALID_ID.test(edit.value)))
+        throw new OpsError(`"${edit.value}" is not a theme id`)
+      return setMeta(code, edit.key, edit.value)
     default:
       throw new OpsError(`unknown edit "${(edit as { kind?: string }).kind}"`)
   }

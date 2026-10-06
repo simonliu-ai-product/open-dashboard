@@ -287,7 +287,12 @@ Children are ordinary JSX: `<p>`, `<strong>`, `<ul>`, `<a>`.
 
 ## Hooks (advanced)
 
-For a custom panel: `useQuery(name)` returns `{ status, run, error, refreshing }`
-with `run.result.rows` / `run.result.columns`; `useFilters()` returns the
-current values and params. Prefer the built-in panels — `check` cannot verify
-what a custom component reads.
+For a chart no built-in panel draws, write a custom chart with `defineChart`
+under `charts/<id>/` — see the **`create-chart`** skill. It gets the panel
+frame, the inspector, download and the theme, and `check` verifies the columns
+it declares.
+
+`useQuery(name)` returns `{ status, run, error, refreshing }` with
+`run.result.rows` / `run.result.columns`; `useFilters()` returns the current
+values and params. Prefer `defineChart` over a bare component built on these —
+`check` cannot verify what an undeclared component reads.
