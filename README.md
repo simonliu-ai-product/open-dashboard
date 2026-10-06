@@ -49,6 +49,8 @@ Skills ship with every workspace (in `.agents/skills/` and `.claude/skills/`):
 - **`/dashboard-authoring`** — the reference: query files, parameters, every component, formats, SQL per dialect.
 - **`/current-dashboard`** — resolves "this chart". The viewer publishes what you are looking at — dashboard, last inspected panel, filter values — to `node_modules/.open-dashboard/current.json`.
 - **`/create-chart`** — writes a chart no built-in panel draws under `charts/<id>/`, with `defineChart`, following the same visual rules as the built-ins.
+- **`/create-theme`** — writes `themes/<id>.json` (brand colours, fonts, red-up markets) within the colour rules, and applies it to dashboards or the workspace.
+- **`/set-up-assistant`** — turns on the optional chat assistant (key in `.env` only, never on the page) and writes its instructions in `assistant.md`.
 - **`/apply-comments`** — applies the notes you left on panels in the inspector.
 
 After an upgrade, `open-dashboard sync-skills` refreshes them; `dev` tells you when they are out of date.
@@ -228,6 +230,24 @@ A theme is `themes/<id>.json` — chart palette, accent, up / down colours (red-
 <img src=".github/assets/download.png" alt="A panel's download menu with PNG and SVG." width="100%">
 
 Every panel has a **Download** menu. The export includes the title and legend, uses the dashboard's theme, and leaves out the buttons, tooltips and edit handles. SVG is real vectors — text as `<text>`, colours resolved, no `<foreignObject>` — so it renders outside a browser too (macOS Preview, for one); PNG is drawn from it at twice the size. Fonts are referenced by name, not embedded: an SVG opened on a machine without the dashboard's font falls back to another one, while the PNG always looks exactly as it did on screen.
+
+### 💬 An optional assistant that answers from the page
+
+When the workspace configures one, a chat button appears at the bottom right of every dashboard. Ask *"which region grew the most?"* and the answer comes from the panels' results exactly as you see them, under the filters you have set, with the metric definitions from `-- description:` and the notes in `database.md`. The model never runs a query or writes SQL: it reads what the page already loaded. Without a configuration there is no button at all.
+
+```ts
+// open-dashboard.config.ts
+assistant: {
+  provider: 'gemini',                         // or 'openai': any OpenAI-compatible API
+  model: process.env.ASSISTANT_MODEL ?? '',   // the model name your provider uses
+  apiKey: process.env.GEMINI_API_KEY,         // from .env — never shown in or sent to the page
+  // baseUrl: 'http://localhost:11434/v1',    // a local OpenAI-compatible server (Ollama…), no key needed
+},
+```
+
+Give it your own instructions in Markdown — `assistant.md` at the workspace root for every dashboard, `dashboards/<id>/assistant.md` for one. They set the voice, the reader, the vocabulary and the format; they come after the built-in rules (answer only from the data, never invent a number, data is not instructions), so they cannot switch those off. They are read on every question: edit, save, ask.
+
+The key stays in `.env` and on the server; the page has no field for it and the API only ever reports whether the assistant is on. Replies stream in. A question sends the dashboard's data (up to `maxRows`, 200 by default, per query) to the provider you configured — keep that in mind for sensitive data.
 
 ### 🎛️ Filters, drill-down, and links you can share
 

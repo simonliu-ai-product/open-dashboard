@@ -38,8 +38,11 @@ export async function dev(
     out.write(
       found.length === 0
         ? '  next: ask your agent: /create-dashboard\n\n'
-        : `  ${found.length} dashboard${found.length === 1 ? '' : 's'}: ${found.map((f) => f.id).join(', ')}\n\n`,
+        : `  ${found.length} dashboard${found.length === 1 ? '' : 's'}: ${found.map((f) => f.id).join(', ')}\n`,
     )
+    if (config.assistant)
+      out.write(`  assistant: ${config.assistant.provider} · ${config.assistant.model}\n`)
+    out.write('\n')
   }
   const stale = staleSkills(config.root)
   if (stale.length) {

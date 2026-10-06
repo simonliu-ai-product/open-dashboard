@@ -1,11 +1,14 @@
 import { basename, dirname, join, relative, sep } from 'node:path'
 import type { Connect, Plugin, ViteDevServer } from 'vite'
 import type { ParamValue } from '../config.js'
-import { redactValue } from '../datasource/redact.js'
+import { redact, redactValue } from '../datasource/redact.js'
 import { errorMessage } from '../datasource/types.js'
 import {
   addComment,
+  assistantInstructions,
+  assistantStatus,
   chartCatalog,
+  dashboardContext,
   dashboardQueries,
   describeSource,
   docSourceOf,
@@ -25,7 +28,10 @@ import {
   runDashboardQuery,
   schemaToText,
   setCurrent,
+  streamAnswer,
+  systemPrompt,
   themeIdOf,
+  validateMessages,
   writeTheme,
 } from '../ops/index.js'
 import { type ConfigOverrides, loadConfig, type Workspace } from '../workspace.js'
@@ -240,6 +246,38 @@ export function apiPlugin(workspace: Workspace, overrides: ConfigOverrides): Plu
           }
           if (route === 'current' && req.method === 'POST') {
             return json(res, 200, setCurrent(config, await readBody(req), new Date().toISOString()))
+          }
+          if (route === 'assistant' && req.method === 'GET') {
+            return json(res, 200, assistantStatus(workspace))
+          }
+          if (route === 'assistant' && req.method === 'POST') {
+            const assistant = workspace.config.assistant
+            if (!assistant) return json(res, 404, { error: 'the assistant is not configured' })
+            const body = await readBody(req)
+            if (typeof body.id !== 'string') return json(res, 400, { error: 'id is required' })
+            const params = parseParams(body.params ? JSON.stringify(body.params) : null)
+            const messages = validateMessages(body.messages)
+            const context = await dashboardContext(workspace, body.id, params, assistant.maxRows)
+            const controller = new AbortController()
+            res.on('close', () => {
+              if (!res.writableEnded) controller.abort()
+            })
+            const system = systemPrompt(assistantInstructions(config, body.id), context)
+            const stream = streamAnswer(assistant, system, messages, controller.signal)
+            // The first piece is awaited before any header goes out, so a refused
+            // key or an unknown model comes back as an ordinary JSON error.
+            const first = await stream.next()
+            res.statusCode = 200
+            res.setHeader('Content-Type', 'text/plain; charset=utf-8')
+            res.setHeader('Cache-Control', 'no-store')
+            res.setHeader('X-Content-Type-Options', 'nosniff')
+            if (!first.done) res.write(first.value)
+            try {
+              for await (const piece of stream) res.write(piece)
+            } catch (error) {
+              if (!controller.signal.aborted) res.write(`\n\n⚠ ${redact(errorMessage(error))}`)
+            }
+            return res.end()
           }
           if (route === 'charts' && req.method === 'GET') {
             return json(res, 200, { charts: await chartCatalog(workspace) })

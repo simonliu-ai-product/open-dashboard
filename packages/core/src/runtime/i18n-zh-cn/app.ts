@@ -282,4 +282,13 @@ export const APP: Record<string, string> = {
   'Built-in': '内置',
   Search: '搜索',
   Text: '文字',
+  'Ask about this dashboard': '询问这张 Dashboard',
+  'Ask about this dashboard…': '询问这张 Dashboard…',
+  'New conversation': '新对话',
+  'Close chat': '关闭对话',
+  Send: '发送',
+  Stop: '停止',
+  'Summarize this dashboard': '总结这张 Dashboard',
+  'What changed the most?': '哪个数字变化最大？',
+  'Anything unusual?': '有什么异常吗？',
 }

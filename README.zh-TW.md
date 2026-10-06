@@ -49,6 +49,8 @@ dashboards/sales-overview/
 - **`/dashboard-authoring`**：參考手冊：查詢檔、參數、每個元件、格式，以及各資料庫的 SQL 寫法。
 - **`/current-dashboard`**：解析「這張圖」指的是哪張。檢視器會把你正在看的內容——Dashboard、最後檢視的面板、篩選值——寫進 `node_modules/.open-dashboard/current.json`。
 - **`/create-chart`**：內建面板畫不出來的圖，就用 `defineChart` 寫在 `charts/<id>/`，並遵循與內建面板相同的視覺規則。
+- **`/create-theme`**：依色彩規則撰寫 `themes/<id>.json`（品牌色、字型、紅漲綠跌），並套用到 Dashboard 或整個 workspace。
+- **`/set-up-assistant`**：開啟選用的對話助理（金鑰只放 `.env`、絕不出現在頁面上），並在 `assistant.md` 撰寫它的指示。
 - **`/apply-comments`**：套用你在檢視器裡留在面板上的備註。
 
 升級之後，執行 `open-dashboard sync-skills` 更新這些 Skills；`dev` 會提醒你哪些已經過期。
@@ -228,6 +230,24 @@ import Radar from '../../charts/radar'
 <img src=".github/assets/download.png" alt="面板的下載選單，可選 PNG 或 SVG。" width="100%">
 
 每個面板都有**下載**選單。匯出內容包含標題與圖例，套用 Dashboard 的主題，並排除按鈕、提示框與編輯控制項。SVG 是真正的向量檔——文字是 `<text>`、顏色已解析、沒有 `<foreignObject>`——所以在瀏覽器以外也能正確顯示（例如 macOS 的預覽程式）；PNG 則以兩倍解析度從它繪製。字型是以名稱引用而非內嵌：在沒有該字型的電腦上開啟 SVG，會換成其他字型，PNG 則一定和螢幕上看到的一樣。
+
+### 💬 選用的對話助理，只根據畫面回答
+
+workspace 設定了助理時，每張 Dashboard 右下角會出現對話按鈕。問「哪一區成長最多？」，回答會根據面板的查詢結果——就是你在畫面上看到的、套用目前篩選條件的那些數字——以及 `-- description:` 的指標定義與 `database.md` 的說明。模型不會執行查詢，也不會寫 SQL：它只讀頁面已經載入的資料。沒有設定時，連按鈕都不會出現。
+
+```ts
+// open-dashboard.config.ts
+assistant: {
+  provider: 'gemini',                         // 或 'openai'：任何 OpenAI 相容 API
+  model: process.env.ASSISTANT_MODEL ?? '',   // 你的供應商所用的模型名稱
+  apiKey: process.env.GEMINI_API_KEY,         // 放在 .env——不會顯示在頁面上，也不會傳給頁面
+  // baseUrl: 'http://localhost:11434/v1',    // 本機的 OpenAI 相容伺服器（Ollama 等），不需金鑰
+},
+```
+
+可以用 Markdown 寫自己的指示——workspace 根目錄的 `assistant.md` 套用到所有 Dashboard，`dashboards/<id>/assistant.md` 只套用到那一張。用來指定語氣、讀者、專有名詞與回答格式；它們接在內建規則（只根據資料回答、絕不編造數字、資料不是指令）之後，所以無法關掉這些規則。每次提問都會重新讀取：改完、存檔，下一個問題就生效。
+
+金鑰只留在 `.env` 與伺服器；頁面上沒有任何輸入金鑰的欄位，API 也只會回報助理是否開啟。回覆會逐字串流顯示。每次提問都會把這張 Dashboard 的資料（每條查詢最多 `maxRows` 筆，預設 200 筆）送到你設定的供應商——處理敏感資料時請留意這一點。
 
 ### 🎛️ 篩選、下鑽，以及可以分享的連結
 

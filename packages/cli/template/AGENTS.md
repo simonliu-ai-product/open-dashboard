@@ -6,7 +6,7 @@ folder `dashboards/<id>/` with named SQL queries in `*.sql` and a layout in
 what its tables and columns mean; read them before writing SQL. Charts no
 built-in panel draws live in `charts/<id>/` (`defineChart`), and themes —
 colours, fonts, corner radius — in `themes/<id>.json`, picked by a dashboard's
-`meta.theme`. The dev server (`pnpm dev`, http://localhost:5473) shows it live
+`meta.theme`. If an assistant is configured, `assistant.md` (and `dashboards/<id>/assistant.md`) holds its instructions. The dev server (`pnpm dev`, http://localhost:5473) shows it live
 and hot-reloads as you edit.
 
 ## Skills
@@ -16,6 +16,8 @@ and hot-reloads as you edit.
 - `/create-dashboard` — draft a dashboard end to end
 - `/dashboard-authoring` — the reference: query files, filters, panels, formats
 - `/create-chart` — a chart no built-in panel draws, written once under `charts/`
+- `/create-theme` — colours, fonts and corners for dashboards: `themes/<id>.json`
+- `/set-up-assistant` — the optional chat assistant: provider, key in `.env`, and its instructions in `assistant.md`
 - `/current-dashboard` — resolve "this chart" / "this dashboard"
 - `/apply-comments` — apply notes the user left on panels in the viewer
 

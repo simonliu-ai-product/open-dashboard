@@ -13,6 +13,7 @@
     "@open-dashboard/core": "workspace:*"
   },
   "devDependencies": {
+    "@types/node": "^26.6.3",
     "typescript": "^5.7.0"
   }
 }

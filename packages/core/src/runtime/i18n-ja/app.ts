@@ -282,4 +282,13 @@ export const APP: Record<string, string> = {
   'Built-in': '組み込み',
   Search: '検索',
   Text: 'テキスト',
+  'Ask about this dashboard': 'このダッシュボードについて質問',
+  'Ask about this dashboard…': 'このダッシュボードについて質問…',
+  'New conversation': '新しい会話',
+  'Close chat': '会話を閉じる',
+  Send: '送信',
+  Stop: '停止',
+  'Summarize this dashboard': 'このダッシュボードを要約',
+  'What changed the most?': '最も大きく変わったのは？',
+  'Anything unusual?': '何か異常はある？',
 }

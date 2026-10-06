@@ -29,7 +29,46 @@ export interface ResolvedConfig {
   cacheMs: number
   /** `themes/<id>.json` used by a dashboard whose `meta.theme` names none. */
   theme: string | undefined
+  /** Resolved and usable, or undefined when off or incomplete. */
+  assistant: ResolvedAssistant | undefined
   configFile: string | undefined
+}
+
+export interface ResolvedAssistant {
+  provider: 'gemini' | 'openai'
+  model: string
+  apiKey: string | undefined
+  baseUrl: string
+  maxRows: number
+}
+
+const PROVIDER_URLS = {
+  gemini: 'https://generativelanguage.googleapis.com/v1beta/openai',
+  openai: 'https://api.openai.com/v1',
+} as const
+
+/** A config that names no model, an unknown provider, or a hosted API with no key turns the assistant off rather than failing. */
+export function resolveAssistant(
+  input: OpenDashboardConfig['assistant'],
+): ResolvedAssistant | undefined {
+  if (!input || typeof input !== 'object') return undefined
+  const provider = input.provider
+  if (provider !== 'gemini' && provider !== 'openai') return undefined
+  const model = typeof input.model === 'string' ? input.model.trim() : ''
+  if (!model) return undefined
+  const apiKey =
+    typeof input.apiKey === 'string' && input.apiKey.trim() ? input.apiKey.trim() : undefined
+  const custom =
+    typeof input.baseUrl === 'string' && input.baseUrl.trim() ? input.baseUrl.trim() : undefined
+  if (!apiKey && !(provider === 'openai' && custom)) return undefined
+  return {
+    provider,
+    model,
+    apiKey,
+    baseUrl: (custom ?? PROVIDER_URLS[provider]).replace(/\/+$/, ''),
+    maxRows:
+      typeof input.maxRows === 'number' && input.maxRows > 0 ? Math.min(input.maxRows, 2000) : 200,
+  }
 }
 
 /**
@@ -108,7 +147,12 @@ export async function loadConfig(
   const names = Object.keys(datasources)
   // Before anything can fail and print: every secret this config or the
   // environment holds is masked in messages from here on.
-  registerSecrets([...secretsOf(datasources), ...secretsInEnv(process.env)])
+  const assistant = resolveAssistant(user.assistant)
+  registerSecrets([
+    ...secretsOf(datasources),
+    ...secretsInEnv(process.env),
+    ...(assistant?.apiKey ? [assistant.apiKey] : []),
+  ])
   return {
     root,
     dashboardsDir: user.dashboardsDir ?? 'dashboards',
@@ -120,6 +164,7 @@ export async function loadConfig(
     timeoutMs: user.timeoutMs ?? 15_000,
     cacheMs: resolveCache(user.cache),
     theme: user.theme,
+    assistant,
     configFile: file,
   }
 }

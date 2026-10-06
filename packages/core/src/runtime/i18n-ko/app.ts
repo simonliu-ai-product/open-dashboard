@@ -282,4 +282,13 @@ export const APP: Record<string, string> = {
   'Built-in': '기본 제공',
   Search: '검색',
   Text: '텍스트',
+  'Ask about this dashboard': '이 대시보드에 대해 질문',
+  'Ask about this dashboard…': '이 대시보드에 대해 질문…',
+  'New conversation': '새 대화',
+  'Close chat': '대화 닫기',
+  Send: '보내기',
+  Stop: '중지',
+  'Summarize this dashboard': '이 대시보드 요약',
+  'What changed the most?': '가장 크게 변한 것은?',
+  'Anything unusual?': '특이한 점이 있나요?',
 }

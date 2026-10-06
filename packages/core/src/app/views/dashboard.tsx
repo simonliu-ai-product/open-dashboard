@@ -18,6 +18,7 @@ import { EditContext } from '../../runtime/edit.js'
 import { useT } from '../../runtime/i18n.js'
 import type { DashboardTheme } from '../../runtime/theme.js'
 import type { DashboardMeta, PanelInfo, QueryRun } from '../../runtime/types.js'
+import { Assistant, useAssistantEnabled } from '../components/assistant.js'
 import { DashboardHeader } from '../components/dashboard-header.js'
 import { SaveBar } from '../components/save-bar.js'
 import { api } from '../lib/api.js'
@@ -209,6 +210,7 @@ export function DashboardView({ id, preview }: { id: string; preview?: ThemePrev
   const inflight = useRef(new Map<string, Promise<QueryRun>>())
   const meta = loaded?.meta
   const themes = useThemeList()
+  const assistant = useAssistantEnabled()
   const staged = editor.edits.findLast((edit) => edit.kind === 'meta' && edit.key === 'theme')
   const saved = useSavedTheme(id, editor.status.kind === 'saved' ? editor.layout?.hash : undefined)
   const chosen = staged?.kind === 'meta' ? staged.value : saved ? saved.theme : meta?.theme
@@ -373,6 +375,9 @@ export function DashboardView({ id, preview }: { id: string; preview?: ThemePrev
             onSave={save}
             onReload={editor.reload}
           />
+        ) : null}
+        {assistant && !preview && meta ? (
+          <Assistant dashboard={id} title={meta.title} params={() => params.current} />
         ) : null}
         {inspecting && !preview ? (
           <Inspector

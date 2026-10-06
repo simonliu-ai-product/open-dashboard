@@ -1,4 +1,5 @@
 export * from './analyze.js'
+export * from './assistant.js'
 export * from './charts.js'
 export * from './check.js'
 export * from './combine.js'

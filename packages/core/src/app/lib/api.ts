@@ -53,6 +53,36 @@ export const api = {
     request<QueryRun>(
       `chart-query?id=${encodeURIComponent(id)}&name=${encodeURIComponent(name)}&params=${encodeURIComponent(JSON.stringify(params))}${fresh ? '&fresh=1' : ''}`,
     ),
+  assistant: () => request<{ enabled: boolean }>('assistant'),
+  /** The reply as it streams in; `onText` gets the whole reply so far. */
+  ask: async (
+    id: string,
+    params: Record<string, ParamValue>,
+    messages: { role: 'user' | 'assistant'; content: string }[],
+    onText: (text: string) => void,
+    signal: AbortSignal,
+  ): Promise<string> => {
+    const response = await fetch(`${BASE}assistant`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ id, params, messages }),
+      signal,
+    })
+    if (!response.ok || !response.body) {
+      const body = (await response.json().catch(() => ({}))) as { error?: string }
+      throw new Error(body.error ?? `${response.status} ${response.statusText}`)
+    }
+    const reader = response.body.getReader()
+    const decoder = new TextDecoder()
+    let text = ''
+    for (;;) {
+      const { done, value } = await reader.read()
+      if (done) break
+      text += decoder.decode(value, { stream: true })
+      onText(text)
+    }
+    return text
+  },
   themes: () => request<ThemeList>('themes'),
   theme: (id: string) => request<ThemeFile>(`theme?id=${encodeURIComponent(id)}`),
   saveTheme: (id: string, hash: string, theme: DashboardTheme) =>

@@ -157,6 +157,23 @@ export type DatasourceConfig =
   | McpSource
 export type DatasourceType = DatasourceConfig['type']
 
+/**
+ * An optional chat assistant on dashboard pages, answering from what the page
+ * shows. Off unless configured; the key stays on the server.
+ */
+export interface AssistantConfig {
+  /** 'gemini': Google's OpenAI-compatible endpoint. 'openai': any OpenAI-compatible API (OpenAI, Ollama, vLLM, LM Studio…). */
+  provider: 'gemini' | 'openai'
+  /** The model name your provider uses. */
+  model: string
+  /** From `.env`. Optional only for a local `openai` server with `baseUrl`. */
+  apiKey?: string
+  /** Override the provider's endpoint, e.g. `http://localhost:11434/v1` for Ollama. */
+  baseUrl?: string
+  /** Rows per query sent with a question. Default 200. */
+  maxRows?: number
+}
+
 export interface OpenDashboardConfig {
   /** Where dashboards live. Default `dashboards`. */
   dashboardsDir?: string
@@ -177,6 +194,7 @@ export interface OpenDashboardConfig {
   cache?: string | false
   /** The theme in `themes/<id>.json` for dashboards that do not pick one with `meta.theme`. */
   theme?: string
+  assistant?: AssistantConfig
 }
 
 export type ColumnType = 'number' | 'string' | 'date' | 'boolean' | 'unknown'

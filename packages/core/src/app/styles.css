@@ -4066,3 +4066,237 @@ body.odd-dragging * {
     overflow: visible;
   }
 }
+
+/* Assistant: only rendered when the server has one configured */
+
+.odd-chat-fab {
+  position: fixed;
+  right: 24px;
+  bottom: 24px;
+  z-index: 40;
+  display: grid;
+  place-items: center;
+  width: 48px;
+  height: 48px;
+  border: 0;
+  border-radius: 50%;
+  background: var(--odd-ink);
+  color: var(--odd-surface);
+  box-shadow: var(--odd-lift);
+  cursor: pointer;
+  transition: transform 140ms ease;
+}
+
+.odd-chat-fab:hover {
+  transform: translateY(-1px) scale(1.04);
+}
+
+.odd-chat-fab:focus-visible {
+  outline: 2px solid var(--odd-accent);
+  outline-offset: 3px;
+}
+
+.odd-chat {
+  position: fixed;
+  right: 24px;
+  bottom: 84px;
+  z-index: 40;
+  display: flex;
+  flex-direction: column;
+  width: min(400px, calc(100vw - 32px));
+  height: min(560px, calc(100vh - 120px));
+  border-radius: 14px;
+  background: var(--odd-surface);
+  box-shadow:
+    0 0 0 1px var(--odd-border-strong),
+    var(--odd-lift);
+  overflow: hidden;
+  transform-origin: bottom right;
+  animation: odd-pop 160ms ease-out;
+}
+
+.odd-chat-head {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 10px 10px 10px 16px;
+  border-bottom: 1px solid var(--odd-border);
+}
+
+.odd-chat-title {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  font-size: 13px;
+  font-weight: 600;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.odd-chat-messages {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 14px;
+  overflow: auto;
+  overscroll-behavior: contain;
+}
+
+.odd-chat-message {
+  max-width: 88%;
+  padding: 8px 12px;
+  border-radius: 12px;
+  font-size: 13.5px;
+  line-height: 1.55;
+  overflow-wrap: anywhere;
+}
+
+.odd-chat-message[data-role="user"] {
+  align-self: flex-end;
+  border-bottom-right-radius: 4px;
+  background: var(--odd-ink);
+  color: var(--odd-surface);
+  white-space: pre-wrap;
+}
+
+.odd-chat-message[data-role="assistant"] {
+  align-self: flex-start;
+  border-bottom-left-radius: 4px;
+  background: var(--odd-surface-2);
+  color: var(--odd-ink);
+}
+
+.odd-chat-message[data-error] {
+  background: color-mix(in srgb, var(--odd-bad) 12%, var(--odd-surface));
+  color: var(--odd-ink);
+}
+
+.odd-chat-message p,
+.odd-chat-message ul,
+.odd-chat-message ol {
+  margin: 0 0 6px;
+}
+
+.odd-chat-message > :last-child {
+  margin-bottom: 0;
+}
+
+.odd-chat-message ul,
+.odd-chat-message ol {
+  padding-left: 18px;
+}
+
+.odd-chat-typing {
+  display: inline-flex;
+  gap: 4px;
+  padding: 4px 0;
+}
+
+.odd-chat-typing i {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--odd-muted);
+  animation: odd-typing 1s ease-in-out infinite;
+}
+
+.odd-chat-typing i:nth-child(2) {
+  animation-delay: 150ms;
+}
+
+.odd-chat-typing i:nth-child(3) {
+  animation-delay: 300ms;
+}
+
+@keyframes odd-typing {
+  0%,
+  100% {
+    opacity: 0.3;
+    transform: translateY(0);
+  }
+  50% {
+    opacity: 1;
+    transform: translateY(-2px);
+  }
+}
+
+.odd-chat-suggestions {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 8px;
+  margin-top: auto;
+}
+
+.odd-chat-suggestions button {
+  padding: 7px 12px;
+  border: 0;
+  border-radius: 999px;
+  background: var(--odd-surface);
+  box-shadow: 0 0 0 1px var(--odd-border-strong);
+  color: var(--odd-ink-2);
+  font: inherit;
+  font-size: 13px;
+  cursor: pointer;
+}
+
+.odd-chat-suggestions button:hover {
+  background: var(--odd-hover);
+  color: var(--odd-ink);
+}
+
+.odd-chat-input {
+  display: flex;
+  align-items: flex-end;
+  gap: 8px;
+  padding: 10px;
+  border-top: 1px solid var(--odd-border);
+}
+
+.odd-chat-input textarea {
+  flex: 1;
+  max-height: 120px;
+  padding: 8px 10px;
+  border: 0;
+  border-radius: 10px;
+  background: var(--odd-page);
+  box-shadow: 0 0 0 1px var(--odd-border-strong);
+  color: var(--odd-ink);
+  font: inherit;
+  font-size: 13.5px;
+  line-height: 1.45;
+  resize: none;
+  field-sizing: content;
+}
+
+.odd-chat-input textarea:focus-visible {
+  outline: 2px solid var(--odd-accent);
+  outline-offset: 1px;
+}
+
+.odd-chat-send {
+  display: grid;
+  flex: none;
+  place-items: center;
+  width: 34px;
+  height: 34px;
+  border: 0;
+  border-radius: 10px;
+  background: var(--odd-ink);
+  color: var(--odd-surface);
+  cursor: pointer;
+}
+
+.odd-chat-send:disabled {
+  opacity: 0.35;
+  cursor: default;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .odd-chat,
+  .odd-chat-typing i {
+    animation: none;
+  }
+}
