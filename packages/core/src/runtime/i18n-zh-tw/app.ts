@@ -305,4 +305,8 @@ export const APP: Record<string, string> = {
   'Updating…': '更新中…',
   'Update failed': '更新失敗',
   'Not run yet': '尚未執行',
+  'Read {names}': '讀取了 {names}',
+  History: '變更紀錄',
+  'Not committed to git yet': '尚未 commit 到 git',
+  'Changed since the last commit': '上次 commit 之後有修改',
 }

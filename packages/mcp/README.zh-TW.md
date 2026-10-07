@@ -42,6 +42,8 @@ pnpm exec open-dashboard dev --mcp
 | `write_dashboard_file` | 寫入 `index.tsx` 或 `<name>.sql`；新的 id 會建立新的 Dashboard。修改既有檔案要帶 `expected`。 |
 | `check_dashboard` | 以篩選器的預設值執行所有查詢，並檢查每個面板。 |
 | `run_query` | 像面板一樣，執行 Dashboard 裡某個已命名的查詢。 |
+| `render_panel` | 把面板或整張 Dashboard 畫成讀者看到的樣子，回傳 PNG 圖片——檢查 `check_dashboard` 看不到的問題。需要 Playwright。 |
+| `query_history` | 這條查詢的 SQL 是誰、何時、怎麼改的，資料來自 git。 |
 | `list_sources` | 所有資料來源、類型，以及是否連得上。 |
 | `read_schema` | 資料來源的資料表、欄位、鍵與筆數。 |
 | `read_database_doc` / `write_database_doc` | `databases/<source>/database.md`：資料的意義。 |
@@ -57,7 +59,7 @@ pnpm exec open-dashboard dev --mcp
 1. `list_sources`，再對該資料來源 `read_schema` 與 `read_database_doc`。
 2. `list_charts`——先用內建面板，沒有才自己寫。
 3. 用 `write_dashboard_file` 寫入 `queries.sql`（已命名的查詢：`-- name: …`），再寫 `index.tsx`。
-4. `check_dashboard`，修正它回報的問題。這時瀏覽器已經更新好了。
+4. `check_dashboard`，修正它回報的問題；再用 `render_panel` 看看畫出來的樣子。這時瀏覽器已經更新好了。
 
 ## 同時編輯
 

@@ -11,10 +11,12 @@ import {
   listSources,
   listThemes,
   OpsError,
+  queryHistory,
   readDashboardFiles,
   readDatabaseDoc,
   readSchema,
   readTheme,
+  renderDashboard,
   runCollector,
   runDashboardQuery,
   runSql,
@@ -165,6 +167,65 @@ export function registerTools(server: McpServer, workspace: Workspace, options: 
           ...rows(result.result, limit),
         }
       }),
+  )
+
+  server.registerTool(
+    'render_panel',
+    {
+      title: 'Look at a panel',
+      description:
+        'A panel (by its title) or the whole dashboard, drawn as the reader sees it, as a PNG. Use it after writing or changing a panel to check what check_dashboard cannot: labels that collide or are cut off, a chart type that hides the point, an empty or flat chart, colours too close to tell apart. Needs Playwright in the workspace.',
+      inputSchema: z.object({
+        dashboard: z.string(),
+        panel: z.string().optional().describe('the panel title; omit for the whole dashboard'),
+        filters: z
+          .record(z.string(), z.union([z.string(), z.null()]))
+          .optional()
+          .describe(
+            'filter values by key as in the URL (time: "90d", region: "North"); null for All',
+          ),
+        theme: z.enum(['light', 'dark']).optional(),
+      }),
+      annotations: { readOnlyHint: true },
+    },
+    async ({ dashboard, panel, filters, theme }) => {
+      try {
+        const rendered = await renderDashboard(workspace, dashboard, {
+          ...(panel ? { panel } : {}),
+          ...(filters ? { values: filters } : {}),
+          ...(theme ? { theme } : {}),
+        })
+        return {
+          content: [
+            {
+              type: 'image' as const,
+              data: rendered.png.toString('base64'),
+              mimeType: 'image/png',
+            },
+            {
+              type: 'text' as const,
+              text: `${panel ?? dashboard}: ${rendered.width}×${rendered.height}. Panels on the page: ${rendered.panels.join('; ')}`,
+            },
+          ],
+        }
+      } catch (error) {
+        return run(() => {
+          throw error
+        })
+      }
+    },
+  )
+
+  server.registerTool(
+    'query_history',
+    {
+      title: 'History of a query',
+      description:
+        "Who changed a named query's SQL, when and how, from git — newest first, with each commit's diff of just that query, and whether it changed since the last commit. Use it when a number moved: was it the data, or the definition?",
+      inputSchema: z.object({ dashboard: z.string(), query: z.string() }),
+      annotations: { readOnlyHint: true },
+    },
+    ({ dashboard, query }) => run(() => queryHistory(config(), dashboard, query)),
   )
 
   server.registerTool(

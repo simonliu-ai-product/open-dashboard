@@ -42,6 +42,8 @@ Add `--allow-sql` for `run_sql`. The workspace is read once at start: restart th
 | `write_dashboard_file` | Write `index.tsx` or a `<name>.sql`; a new id creates the dashboard. Pass `expected` to change a file. |
 | `check_dashboard` | Run every query with the filters' defaults and verify every panel. |
 | `run_query` | Run one of a dashboard's named queries, as a panel would. |
+| `render_panel` | A panel or the whole dashboard as the reader sees it, as a PNG image — to check what `check_dashboard` cannot. Needs Playwright. |
+| `query_history` | Who changed a query's SQL, when and how, from git. |
 | `list_sources` | Every datasource, its type, whether it connects. |
 | `read_schema` | Tables, columns, keys and row counts of a datasource. |
 | `read_database_doc` / `write_database_doc` | `databases/<source>/database.md`: what the data means. |
@@ -57,7 +59,7 @@ Add `--allow-sql` for `run_sql`. The workspace is read once at start: restart th
 1. `list_sources`, then `read_schema` and `read_database_doc` for the source.
 2. `list_charts` — use a built-in panel before writing a new one.
 3. `write_dashboard_file` with `queries.sql` (named queries: `-- name: …`), then `index.tsx`.
-4. `check_dashboard`, and fix what it reports. The browser has already reloaded.
+4. `check_dashboard`, and fix what it reports; then `render_panel` to look at what you drew. The browser has already reloaded.
 
 ## Concurrent edits
 

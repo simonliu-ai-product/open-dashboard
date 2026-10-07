@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import type { ParamValue } from '../../config.js'
-import { useT } from '../../runtime/i18n.js'
+import { useLocale, useT } from '../../runtime/i18n.js'
 import { Blocks, parseBlocks } from '../../runtime/markdown.js'
 import { api } from '../lib/api.js'
 
@@ -12,6 +12,8 @@ interface Message {
   thought?: string
   /** Seconds from the question to the first word of the answer. */
   seconds?: number
+  /** The panels the answer was written from, when the page was too large to send whole. */
+  read?: string[]
 }
 
 const SUGGESTIONS = ['Summarize this dashboard', 'What changed the most?', 'Anything unusual?']
@@ -66,8 +68,17 @@ function latestStep(thought: string): string {
   return last.length > 80 ? `${last.slice(0, 80)}…` : last
 }
 
-function Thinking({ thought, seconds }: { thought: string; seconds: number | undefined }) {
+function Thinking({
+  thought,
+  seconds,
+  read,
+}: {
+  thought: string
+  seconds: number | undefined
+  read: string[] | undefined
+}) {
   const t = useT()
+  const { locale } = useLocale()
   const [open, setOpen] = useState(false)
   const active = seconds === undefined
   const step = active ? latestStep(thought) : ''
@@ -90,6 +101,15 @@ function Thinking({ thought, seconds }: { thought: string; seconds: number | und
         ) : null}
         {thought ? <Icon d={open ? 'M4 10l4-4 4 4' : 'M4 6l4 4 4-4'} /> : null}
       </button>
+      {read?.length ? (
+        <p className="odd-chat-read">
+          {t('Read {names}', {
+            names: new Intl.ListFormat(locale, { style: 'short', type: 'conjunction' }).format(
+              read,
+            ),
+          })}
+        </p>
+      ) : null}
       {open && thought ? (
         <div className="odd-chat-thought">
           <Blocks blocks={parseBlocks(thought)} />
@@ -176,7 +196,13 @@ export function Assistant({
         history.map(({ role, content }) => ({ role, content })),
         (reply) => {
           if (reply.text && seconds === undefined) seconds = elapsed()
-          replace({ role: 'assistant', content: reply.text, thought: reply.thought, seconds })
+          replace({
+            role: 'assistant',
+            content: reply.text,
+            thought: reply.thought,
+            seconds,
+            ...(reply.read ? { read: reply.read } : {}),
+          })
         },
         controller.signal,
       )
@@ -245,8 +271,12 @@ export function Assistant({
                 >
                   {message.role === 'assistant' &&
                   !message.error &&
-                  (message.thought || message.seconds === undefined) ? (
-                    <Thinking thought={message.thought ?? ''} seconds={message.seconds} />
+                  (message.thought || message.read || message.seconds === undefined) ? (
+                    <Thinking
+                      thought={message.thought ?? ''}
+                      seconds={message.seconds}
+                      read={message.read}
+                    />
                   ) : null}
                   {message.role === 'assistant' && !message.error ? (
                     message.content ? (

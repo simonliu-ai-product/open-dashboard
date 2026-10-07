@@ -135,7 +135,19 @@ every query a panel names exists and every column a panel names is in that
 query's result. **It must pass with no errors.** Treat "returns no rows" and
 "defined but no panel uses it" warnings as things to fix or explain.
 
-Then, if the dev server is running, look at it: `http://localhost:5473/d/<id>`.
+Then look at what you drew — `check` cannot see a cut-off label or a chart
+that hides the point:
+
+```bash
+pnpm exec open-dashboard render <id>                      # the whole page → a PNG path
+pnpm exec open-dashboard render <id> --panel "<title>"    # one panel, larger
+```
+
+Read the PNG it prints. Fix what a reader would trip on — overlapping or
+truncated labels, a flat or empty chart, a pie with too many slices, colours
+too close to tell apart — and render again. Without Playwright it says how to
+install it; if the user does not want it, open `http://localhost:5473/d/<id>`
+and ask them to look.
 
 ## Step 8 — Report
 

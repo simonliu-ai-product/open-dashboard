@@ -94,6 +94,8 @@ $ open-dashboard check sales-overview
 
 SQL 錯誤、不存在的查詢、沒有綁定的參數、找不到的欄位都會被判定為錯誤，只要有任何一項，`check` 就會以非零狀態結束——所以 Agent 會在回報「完成」之前先跑它，CI 也能跑。它只讀取字面值的屬性：寧可少報，也不亂猜。
 
+`check` 證明資料是對的，但看不到標籤被切掉、或圖表類型選錯這種問題。這時就讓 Agent 自己看：`open-dashboard render <id> --panel "Revenue by region" [--filter region=North] [--theme dark]` 會用和頁面完全相同的方式畫出面板，存成 Agent 讀得到的 PNG（MCP 則是 `render_panel`，直接回傳圖片）。需要在 workspace 裝 Playwright——`pnpm add -D playwright && pnpm exec playwright install chromium`——不需要 dev server。
+
 ### 🔌 11 種資料來源
 
 | `type` | 資料庫 | 安裝 | 也適用於 |
@@ -286,6 +288,8 @@ pnpm exec open-dashboard build sales --out public
 
 workspace 設定了助理時，每張 Dashboard 右下角會出現對話按鈕。問「哪一區成長最多？」，回答會根據面板的查詢結果——就是你在畫面上看到的、套用目前篩選條件的那些數字——以及 `-- description:` 的指標定義與 `database.md` 的說明。模型不會執行查詢，也不會寫 SQL：它只讀頁面已經載入的資料。沒有設定時，連按鈕都不會出現。
 
+資料量大的頁面會分兩步回答，把 Token 花在真正需要的資料上：模型先拿到面板清單——每張圖在呈現什麼、有哪些欄位、幾筆資料——挑出問題需要的面板，接著只送那些面板的資料，回覆裡也會標出讀了哪些面板。在 demo 有 29 張圖的圖表展示上，送出的資料少了 86%。資料量小的頁面（大約 8,000 字元以下）仍然一次全部送出。
+
 ```ts
 // open-dashboard.config.ts
 assistant: {
@@ -319,6 +323,8 @@ assistant: {
 <sub>檢視器：面板的查詢、資料來源、筆數、耗時、定義所在的檔案與行號，以及給 Agent 的備註。</sub>
 
 滑過面板、打開檢視器，就能看到它的 SQL、參數、資料列與耗時。輸入一則備註——「改成依通路拆開」——它會以 `@dashboard-comment` 標記寫進 `index.tsx`，就放在那個面板旁邊。請 Agent 執行 `/apply-comments`，它會逐一完成修改並清掉標記。備註錨定在原始碼上，而不是一張截圖。
+
+檢視器裡還有**變更紀錄**分頁：這條查詢的定義是誰、在什麼時候、怎麼改的，資料來自 git（只追蹤這條查詢的那幾行；只顯示作者名稱，不含 email）。數字突然變了的時候，可以分辨是資料變了，還是指標的算法被改了。
 
 ### ✏️ 編輯模式改的是原始碼，不是狀態
 
@@ -368,6 +374,7 @@ pnpm dev                     # http://localhost:5473
 | `open-dashboard check [id] [--json]` | 執行每條查詢、驗證每個面板；有錯誤時以非零狀態結束 |
 | `open-dashboard charts [--json]` | 這個 workspace 能用的所有圖表——41 種內建與 `charts/`——以及使用它們的 Dashboard |
 | `open-dashboard build [id...] [--out site] [--max-runs 100]` | 把 Dashboard 連同此刻的結果輸出成靜態網站 |
+| `open-dashboard render <id> [--panel title] [--filter k=v] [--theme dark]` | 把 Dashboard 或單一面板畫成 PNG，給 Agent 看（需要 Playwright） |
 | `open-dashboard collect [name...]` | 立刻執行設定檔裡的收集器；有失敗時以非零狀態結束 |
 | `open-dashboard mcp [--allow-sql]` | 透過 stdio 提供 MCP 工具，給會自己啟動 server 的用戶端（需要 `@open-dashboard/mcp`） |
 | `open-dashboard sync-skills` | 升級後更新這個 workspace 的 Agent Skills |

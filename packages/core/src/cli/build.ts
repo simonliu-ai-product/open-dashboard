@@ -52,7 +52,12 @@ function escapeHtml(text: string): string {
 export async function snapshotFiles(
   workspace: Workspace,
   ids: string[],
-  options: { now: Date; maxRuns?: number; log?: (line: string) => void },
+  options: {
+    now: Date
+    maxRuns?: number
+    values?: Record<string, string | null>
+    log?: (line: string) => void
+  },
 ): Promise<{ files: Map<string, unknown>; snapshots: DashboardSnapshot[] }> {
   const config = workspace.config
   const files = new Map<string, unknown>()
@@ -61,6 +66,7 @@ export async function snapshotFiles(
     const snap = await snapshotDashboard(workspace, id, {
       now: options.now,
       ...(options.maxRuns ? { maxRuns: options.maxRuns } : {}),
+      ...(options.values ? { values: options.values } : {}),
     })
     snapshots.push(snap)
     for (const [name, stored] of Object.entries(snap.queries))
@@ -130,7 +136,7 @@ async function bundleViewer(
       chunkSizeWarningLimit: 4000,
       rollupOptions: {
         input: sourceEntry('app', 'main.tsx'),
-        ...(single ? { output: { inlineDynamicImports: true } } : {}),
+        ...(single ? { output: { codeSplitting: false } } : {}),
       },
     },
   })
@@ -228,7 +234,7 @@ export async function exportHtml(
   workspace: Workspace,
   id: string,
   search = '',
-  options: { maxRuns?: number } = {},
+  options: { maxRuns?: number; values?: Record<string, string | null> } = {},
 ): Promise<string> {
   const config = workspace.config
   const summary = listDashboards(config).find((d) => d.id === id)

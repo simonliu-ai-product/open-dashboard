@@ -3,6 +3,7 @@ import type { CatalogEntry } from '../../ops/charts.js'
 import type { CollectorRun, CollectorStatus } from '../../ops/collectors.js'
 import type { DashboardSummary } from '../../ops/dashboards.js'
 import type { DatabaseDoc } from '../../ops/database-doc.js'
+import type { QueryHistory } from '../../ops/history.js'
 import type { DashboardLayout, LayoutEdit } from '../../ops/layout.js'
 import type { SourceDetail, SourceStatus } from '../../ops/sources.js'
 import type { ThemeFile, ThemeList } from '../../ops/themes.js'
@@ -41,6 +42,10 @@ export const liveApi = {
     request<QueryRun>(
       `query?id=${encodeURIComponent(id)}&name=${encodeURIComponent(name)}&params=${encodeURIComponent(JSON.stringify(params))}${fresh ? '&fresh=1' : ''}`,
     ),
+  queryHistory: (id: string, name: string) =>
+    request<QueryHistory>(
+      `query-history?id=${encodeURIComponent(id)}&name=${encodeURIComponent(name)}`,
+    ),
   comments: (id: string) =>
     request<{ comments: { line: number; text: string }[] }>(
       `comments?id=${encodeURIComponent(id)}`,
@@ -62,9 +67,9 @@ export const liveApi = {
     id: string,
     params: Record<string, ParamValue>,
     messages: { role: 'user' | 'assistant'; content: string }[],
-    onUpdate: (reply: { thought: string; text: string }) => void,
+    onUpdate: (reply: { thought: string; text: string; read?: string[] }) => void,
     signal: AbortSignal,
-  ): Promise<{ thought: string; text: string }> => {
+  ): Promise<{ thought: string; text: string; read?: string[] }> => {
     const response = await fetch(`${BASE}assistant`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -77,7 +82,7 @@ export const liveApi = {
     }
     const reader = response.body.getReader()
     const decoder = new TextDecoder()
-    const reply = { thought: '', text: '' }
+    const reply: { thought: string; text: string; read?: string[] } = { thought: '', text: '' }
     let buffer = ''
     for (;;) {
       const { done, value } = await reader.read()
@@ -87,8 +92,14 @@ export const liveApi = {
       buffer = lines.pop() ?? ''
       for (const line of lines) {
         if (!line) continue
-        const piece = JSON.parse(line) as { thought?: string; text?: string; error?: string }
+        const piece = JSON.parse(line) as {
+          thought?: string
+          text?: string
+          read?: string[]
+          error?: string
+        }
         if (piece.error) throw new Error(piece.error)
+        if (piece.read) reply.read = piece.read
         reply.thought += piece.thought ?? ''
         reply.text += piece.text ?? ''
       }

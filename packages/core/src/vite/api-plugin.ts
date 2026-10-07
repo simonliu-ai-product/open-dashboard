@@ -9,13 +9,14 @@ import {
   runCollector,
   scheduleCollectors,
 } from '../ops/collectors.js'
+import { queryHistory } from '../ops/history.js'
 import {
   type AnswerPiece,
   addComment,
+  answerContext,
   assistantInstructions,
   assistantStatus,
   chartCatalog,
-  dashboardContext,
   dashboardQueries,
   describeSource,
   docSourceOf,
@@ -284,11 +285,18 @@ export function apiPlugin(workspace: Workspace, overrides: ConfigOverrides): Plu
             if (typeof body.id !== 'string') return json(res, 400, { error: 'id is required' })
             const params = parseParams(body.params ? JSON.stringify(body.params) : null)
             const messages = validateMessages(body.messages)
-            const context = await dashboardContext(workspace, body.id, params, assistant.maxRows)
             const controller = new AbortController()
             res.on('close', () => {
               if (!res.writableEnded) controller.abort()
             })
+            const { context, read } = await answerContext(
+              workspace,
+              assistant,
+              body.id,
+              params,
+              messages,
+              controller.signal,
+            )
             const system = systemPrompt(assistantInstructions(config, body.id), context)
             const stream = streamAnswer(assistant, system, messages, controller.signal)
             // The first piece is awaited before any header goes out, so a refused
@@ -298,8 +306,10 @@ export function apiPlugin(workspace: Workspace, overrides: ConfigOverrides): Plu
             res.setHeader('Content-Type', 'application/x-ndjson; charset=utf-8')
             res.setHeader('Cache-Control', 'no-store')
             res.setHeader('X-Content-Type-Options', 'nosniff')
-            // One JSON object per line: { thought } while the model thinks, { text } for the answer.
-            const send = (line: Record<string, string>) => res.write(`${JSON.stringify(line)}\n`)
+            // One JSON object per line: { read } — the panels it looked at — then
+            // { thought } while the model thinks and { text } for the answer.
+            const send = (line: Record<string, unknown>) => res.write(`${JSON.stringify(line)}\n`)
+            if (read) send({ read })
             const write = (piece: AnswerPiece) =>
               send(piece.kind === 'thought' ? { thought: piece.text } : { text: piece.text })
             if (!first.done) write(first.value)
@@ -326,6 +336,12 @@ export function apiPlugin(workspace: Workspace, overrides: ConfigOverrides): Plu
             const run = await pending
             collected(body.id, run)
             return json(res, 200, run)
+          }
+          if (route === 'query-history' && req.method === 'GET') {
+            const id = q('id')
+            const name = q('name')
+            if (!id || !name) return json(res, 400, { error: 'id and name are required' })
+            return json(res, 200, await queryHistory(config, id, name))
           }
           if (route === 'export-html' && req.method === 'GET') {
             const id = q('id')

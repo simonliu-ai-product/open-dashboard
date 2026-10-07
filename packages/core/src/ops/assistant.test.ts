@@ -4,9 +4,15 @@ import { join } from 'node:path'
 import { afterEach, describe, expect, it } from 'vitest'
 import { loadConfig, type ResolvedAssistant, resolveAssistant } from '../workspace.js'
 import {
+  answerContext,
   assistantInstructions,
   assistantStatus,
   dashboardContext,
+  PICK_PROMPT,
+  panelCatalog,
+  panelContext,
+  parseChoice,
+  readDashboardData,
   SYSTEM_PROMPT,
   streamAnswer,
   systemPrompt,
@@ -289,5 +295,127 @@ describe('assistant messages', () => {
     expect(() => validateMessages([{ role: 'user', content: 'x'.repeat(9000) }])).toThrow(
       /over 8000/,
     )
+  })
+})
+
+const BIG_DASHBOARD = `import { Dashboard, Row, Stat, BarChart, Table } from '@open-dashboard/core'
+export const meta = { title: 'Sales' }
+export default function Sales() {
+  return (
+    <Dashboard>
+      <Row>
+        <Stat title="Total" query="total" column="amount" />
+        <BarChart title="By region" query="by_region" x="region" y="amount" />
+        <Table title="Log" query="log" />
+      </Row>
+    </Dashboard>
+  )
+}
+`
+
+const BIG_QUERIES = `${QUERIES}
+-- name: log
+WITH RECURSIVE n(i) AS (SELECT 1 UNION ALL SELECT i + 1 FROM n WHERE i < 600)
+SELECT i, 'log line number ' || i AS line FROM n;
+`
+
+/** An OpenAI-compatible endpoint answering one non-streamed completion with `content`. */
+async function fakeChooser(
+  content: string,
+): Promise<{ url: string; requests: Record<string, unknown>[] }> {
+  const requests: Record<string, unknown>[] = []
+  const instance = createServer((req, res) => {
+    let raw = ''
+    req.on('data', (chunk) => {
+      raw += chunk
+    })
+    req.on('end', () => {
+      requests.push(JSON.parse(raw))
+      res.writeHead(200, { 'Content-Type': 'application/json' })
+      res.end(JSON.stringify({ choices: [{ message: { content } }] }))
+    })
+  })
+  server = instance
+  await new Promise<void>((resolve) => instance.listen(0, '127.0.0.1', resolve))
+  return { url: `http://127.0.0.1:${(instance.address() as AddressInfo).port}`, requests }
+}
+
+describe('two-step answers', () => {
+  it('reads the panel numbers out of a reply, and only valid ones', () => {
+    expect(parseChoice('{"panels": [2, 3]}', 3)).toEqual([2, 3])
+    expect(parseChoice('Sure:\n```json\n{"panels":[3,3,9,0,1.5]}\n```', 3)).toEqual([3])
+    expect(parseChoice('{"panels": []}', 3)).toEqual([])
+    expect(parseChoice('I need the region panel', 3)).toBeUndefined()
+    expect(parseChoice('{"panels": "all"}', 3)).toBeUndefined()
+  })
+
+  it('lists panels by shape, without their rows', async () => {
+    fixture = await makeFixture({
+      'dashboards/sales/index.tsx': BIG_DASHBOARD,
+      'dashboards/sales/queries.sql': BIG_QUERIES,
+    })
+    const data = await readDashboardData(fixture.workspace, 'sales', {})
+    const catalog = panelCatalog(data)
+    expect(catalog).toContain('[2] By region (BarChart) — columns: region, amount; 2 rows')
+    expect(catalog).toContain('[3] Log (Table) — columns: i, line; 600 rows')
+    expect(catalog).toContain('Definition: Every sale, no refunds')
+    expect(catalog).not.toContain('log line number')
+    const whole = panelContext(fixture.workspace, data, 1000)
+    const one = panelContext(fixture.workspace, data, 1000, [2])
+    expect(one).toContain('North\t40')
+    expect(one).not.toContain('log line number')
+    expect(one).toContain('Other panels on the page, data not included: Total; Log')
+    expect(catalog.length).toBeLessThan(whole.length / 10)
+  })
+
+  it('sends a small page whole, without a second request', async () => {
+    fixture = await makeFixture({
+      'dashboards/sales/index.tsx': DASHBOARD,
+      'dashboards/sales/queries.sql': QUERIES,
+    })
+    const chooser = await fakeChooser('{"panels":[1]}')
+    const answer = await answerContext(fixture.workspace, assistantAt(chooser.url), 'sales', {}, [
+      { role: 'user', content: 'Who leads?' },
+    ])
+    expect(chooser.requests).toHaveLength(0)
+    expect(answer.read).toBeUndefined()
+    expect(answer.context).toContain('North\t40')
+  })
+
+  it('asks which panels first on a large page, then sends only those', async () => {
+    fixture = await makeFixture({
+      'dashboards/sales/index.tsx': BIG_DASHBOARD,
+      'dashboards/sales/queries.sql': BIG_QUERIES,
+    })
+    const chooser = await fakeChooser('{"panels":[2]}')
+    const answer = await answerContext(
+      fixture.workspace,
+      assistantAt(chooser.url, { provider: 'gemini', maxRows: 1000 }),
+      'sales',
+      {},
+      [{ role: 'user', content: 'Which region sells most?' }],
+    )
+    const sent = chooser.requests[0] as { stream: boolean; messages: { content: string }[] }
+    expect(sent.stream).toBe(false)
+    expect(sent.messages[0]?.content).toContain(PICK_PROMPT)
+    expect(sent.messages[0]?.content).not.toContain('log line number')
+    expect(sent.messages.at(-1)?.content).toBe('Which region sells most?')
+    expect(answer.read).toEqual(['By region'])
+    expect(answer.context).toContain('North\t40')
+    expect(answer.context).not.toContain('log line number')
+  })
+
+  it('falls back to every panel when the choice cannot be read', async () => {
+    fixture = await makeFixture({
+      'dashboards/sales/index.tsx': BIG_DASHBOARD,
+      'dashboards/sales/queries.sql': BIG_QUERIES,
+    })
+    const chooser = await fakeChooser('the region one, probably')
+    const assistant = assistantAt(chooser.url, { maxRows: 1000 })
+    const answer = await answerContext(fixture.workspace, assistant, 'sales', {}, [
+      { role: 'user', content: 'Which region?' },
+    ])
+    expect(answer.read).toBeUndefined()
+    expect(answer.context).toContain('log line number 600')
   })
 })

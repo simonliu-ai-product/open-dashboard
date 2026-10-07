@@ -94,6 +94,8 @@ $ open-dashboard check sales-overview
 
 SQL errors, unknown queries, unbound parameters and missing columns are errors, and `check` exits non-zero on any of them — so the agent runs it before saying "done", and CI can run it too. It reads only literal props: it would rather report less than guess.
 
+`check` proves the data is right; it cannot see a label cut off or a chart that hides the point. For that the agent looks: `open-dashboard render <id> --panel "Revenue by region" [--filter region=North] [--theme dark]` draws the panel exactly as the page does and writes a PNG it can read (MCP: `render_panel`, returned as an image). It needs Playwright in the workspace — `pnpm add -D playwright && pnpm exec playwright install chromium` — and no dev server.
+
 ### 🔌 Eleven kinds of datasource
 
 | `type` | Database | Install | Also covers |
@@ -286,6 +288,8 @@ The site holds query results, so `site/` is git-ignored in a new workspace: publ
 
 When the workspace configures one, a chat button appears at the bottom right of every dashboard. Ask *"which region grew the most?"* and the answer comes from the panels' results exactly as you see them, under the filters you have set, with the metric definitions from `-- description:` and the notes in `database.md`. The model never runs a query or writes SQL: it reads what the page already loaded. Without a configuration there is no button at all.
 
+A large page is answered in two steps, to spend tokens on the data that matters: the model first gets the list of panels — what each shows, its columns and row count — and picks the ones the question needs; only their rows go with the question, and the reply says which panels it read. On the demo's 29-panel gallery that sends 86% less. A small page (under about 8,000 characters of data) still goes whole, in one request.
+
 ```ts
 // open-dashboard.config.ts
 assistant: {
@@ -318,7 +322,7 @@ The key stays in `.env` and on the server; the page has no field for it and the 
 
 <sub>The inspector: the panel's query, source, row count, timing, the file and line it is defined at, and a note for your agent.</sub>
 
-Hover a panel and open the inspector to see its SQL, parameters, rows and timing. Type a note — *"split this by channel"* — and it is written into `index.tsx` beside that panel as a `@dashboard-comment` marker. Ask your agent to `/apply-comments` and it makes each change and clears the markers. The note is anchored to the source, not to a screenshot.
+Hover a panel and open the inspector to see its SQL, parameters, rows and timing — and its **History**: who changed the query's definition, when and how, from git (`git log -L` over just that query's lines; author names, no e-mail). When a number moves, it tells you whether the data changed or the metric did. Type a note — *"split this by channel"* — and it is written into `index.tsx` beside that panel as a `@dashboard-comment` marker. Ask your agent to `/apply-comments` and it makes each change and clears the markers. The note is anchored to the source, not to a screenshot.
 
 ### ✏️ Edit mode writes source, not state
 
@@ -368,6 +372,7 @@ No database to hand? `init my-dashboards --sample` adds a small generated SQLite
 | `open-dashboard check [id] [--json]` | Run every query, verify every panel; non-zero exit on errors |
 | `open-dashboard charts [--json]` | Every chart this workspace can use — the 41 built-ins and `charts/` — and the dashboards using each |
 | `open-dashboard build [id...] [--out site] [--max-runs 100]` | Static site of the dashboards with their results taken now |
+| `open-dashboard render <id> [--panel title] [--filter k=v] [--theme dark]` | A dashboard or one panel as a PNG, for an agent to look at (needs Playwright) |
 | `open-dashboard collect [name...]` | Run the config's collectors now; non-zero exit if one fails |
 | `open-dashboard mcp [--allow-sql]` | The MCP tools over stdio, for a client that starts the server (needs `@open-dashboard/mcp`) |
 | `open-dashboard sync-skills` | Update this workspace's agent skills after an upgrade |

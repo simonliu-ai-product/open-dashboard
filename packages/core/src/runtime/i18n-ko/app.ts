@@ -305,4 +305,8 @@ export const APP: Record<string, string> = {
   'Updating…': '업데이트 중…',
   'Update failed': '업데이트 실패',
   'Not run yet': '아직 실행 안 됨',
+  'Read {names}': '{names} 참조',
+  History: '변경 기록',
+  'Not committed to git yet': '아직 git에 커밋되지 않음',
+  'Changed since the last commit': '마지막 커밋 이후 변경됨',
 }

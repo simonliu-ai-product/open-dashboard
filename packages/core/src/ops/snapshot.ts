@@ -29,6 +29,8 @@ export interface SnapshotOptions {
   /** Values taken from a Select's options query. */
   maxOptions?: number
   now?: Date
+  /** Filter values to open at, by filter key as the URL has them, in place of the defaults. */
+  values?: Record<string, string | null>
 }
 
 /** A filter as the browser applies it: string values (null for "all"), each turned into params. */
@@ -74,7 +76,8 @@ export async function snapshotDashboard(
   const choices: { decl: FilterDecl; choice: Choice }[] = []
   for (const decl of filters) {
     if (decl.kind === 'TimeRange') {
-      const fallback = decl.default ?? '30d'
+      const set = options.values?.[decl.name ?? 'time']
+      const fallback = isTimePreset(set) ? set : (decl.default ?? '30d')
       if (!isTimePreset(fallback)) continue
       const presets = (decl.options ?? Object.keys(TIME_PRESETS)).filter(isTimePreset)
       choices.push({
@@ -89,7 +92,10 @@ export async function snapshotDashboard(
       })
     } else if (decl.name) {
       const name = decl.name
-      const fallback = decl.default ?? null
+      const fallback =
+        options.values && name in options.values
+          ? (options.values[name] ?? null)
+          : (decl.default ?? null)
       choices.push({
         decl,
         choice: {

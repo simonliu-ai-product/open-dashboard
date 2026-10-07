@@ -1,3 +1,5 @@
+import { mkdirSync, writeFileSync } from 'node:fs'
+import { dirname, join, resolve } from 'node:path'
 import type { ParamValue } from '../config.js'
 import { DRIVERS } from '../datasource/registry.js'
 import { errorMessage } from '../datasource/types.js'
@@ -16,10 +18,12 @@ import {
   schemaToText,
   syncSkills,
 } from '../ops/index.js'
+import { exportName } from '../runtime/export-panel.js'
 import { coreVersion, importMcp, MCP_INSTALL } from '../vite/mcp-plugin.js'
 import { loadConfig, Workspace } from '../workspace.js'
 import { buildSite } from './build.js'
 import { dev } from './dev.js'
+import { renderDashboard } from './render.js'
 import { formatResult } from './table.js'
 
 const USAGE = `open-dashboard — describe a dashboard to your agent, get a live one over your database
@@ -39,6 +43,7 @@ Commands:
   check [id]                Run every query of every dashboard, verify panels
   charts                    Every chart you can use — built-in and charts/ — and where each is used
   collect [id...]           Run the collectors in the config (all, or those named) and report each
+  render <id>               A dashboard, or one panel (--panel), as a PNG — for an agent to look at (needs Playwright)
   mcp                       Serve the MCP tools over stdio, for a client that starts it (needs @open-dashboard/mcp)
   sync-skills               Update the agent skills in this workspace to the installed version
 
@@ -48,7 +53,10 @@ Options:
   --port <n>             Port for dev
   --host <host>          Bind address for dev
   --open                 Open a browser (dev)
-  --out <dir>            Output folder for build (default: site)
+  --out <path>           Output folder for build (default: site), or PNG file for render
+  --panel <title>        Render one panel, by its title
+  --filter <key=value>   A filter value for render, as the URL has it; repeatable
+  --theme <light|dark>   Colour scheme for render (default light)
   --max-runs <n>         Runs per query for build: filter combinations beyond it keep defaults (default 100)
   --mcp                  Serve an MCP endpoint at /mcp for agents (dev; needs @open-dashboard/mcp)
   --allow-sql            With --mcp or mcp, also offer run_sql: read-only SQL of the agent's own
@@ -83,6 +91,10 @@ const VALUE_FLAGS = new Set([
   '--name',
   '--out',
   '--max-runs',
+  '--panel',
+  '--filter',
+  '--theme',
+  '--width',
 ])
 
 function positional(argv: string[]): string[] {
@@ -206,7 +218,7 @@ export async function run(argv: string[]): Promise<number> {
     return 0
   }
 
-  const known = ['sources', 'schema', 'query', 'check', 'charts', 'collect']
+  const known = ['sources', 'schema', 'query', 'check', 'charts', 'collect', 'render']
   if (!known.includes(command)) {
     process.stderr.write(`unknown command: ${command}\n\n${USAGE}`)
     return 1
@@ -214,6 +226,43 @@ export async function run(argv: string[]): Promise<number> {
 
   const workspace = new Workspace(await loadConfig(root))
   try {
+    if (command === 'render') {
+      const id = positional(argv)[0]
+      if (!id)
+        throw new Error('render needs a dashboard id: open-dashboard render <id> [--panel "Title"]')
+      const panel = flag(argv, 'panel')
+      const theme = flag(argv, 'theme')
+      const width = flag(argv, 'width')
+      const values = Object.fromEntries(
+        flags(argv, 'filter').map((raw) => {
+          const eq = raw.indexOf('=')
+          if (eq <= 0) throw new Error(`--filter expects key=value, got "${raw}"`)
+          const value = raw.slice(eq + 1)
+          return [raw.slice(0, eq), value === '' || value === 'null' ? null : value]
+        }),
+      )
+      const rendered = await renderDashboard(workspace, id, {
+        values,
+        ...(panel ? { panel } : {}),
+        ...(theme === 'dark' || theme === 'light' ? { theme } : {}),
+        ...(width ? { width: Number(width) } : {}),
+      })
+      // Kept out of the workspace's own files unless asked: a render is for looking at, not committing.
+      const slug = exportName(id, panel ?? '')
+      const file = resolve(
+        root,
+        flag(argv, 'out') ?? join('node_modules', '.open-dashboard', 'renders', `${slug}.png`),
+      )
+      mkdirSync(dirname(file), { recursive: true })
+      writeFileSync(file, rendered.png)
+      out(
+        json
+          ? `${JSON.stringify({ file, width: rendered.width, height: rendered.height, panels: rendered.panels })}\n`
+          : `${file}  (${rendered.width}×${rendered.height})\n`,
+      )
+      return 0
+    }
+
     if (command === 'collect') {
       const named = positional(argv)
       const ids = named.length ? named : Object.keys(workspace.config.collectors)

@@ -66,6 +66,7 @@ export function staticApi(): Api {
     databaseDoc: unavailable,
     schema: unavailable,
     query: (id, name, params) => query('d', id, name, params),
+    queryHistory: unavailable,
     comments: async () => [],
     comment: unavailable,
     current: async () => {},

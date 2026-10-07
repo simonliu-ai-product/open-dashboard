@@ -4374,6 +4374,68 @@ body.odd-dragging * {
   animation: odd-step-in 240ms ease-out;
 }
 
+.odd-history-pending {
+  margin: 0 0 8px;
+  color: var(--odd-ink-2);
+  font-size: 12.5px;
+}
+
+.odd-history-list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.odd-history-list li + li {
+  border-top: 1px solid var(--odd-border);
+}
+
+.odd-history-list summary {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 8px 2px;
+  cursor: pointer;
+  list-style: none;
+}
+
+.odd-history-list summary::-webkit-details-marker {
+  display: none;
+}
+
+.odd-history-subject {
+  color: var(--odd-ink);
+  font-size: 13px;
+}
+
+.odd-history-meta {
+  color: var(--odd-muted);
+  font-size: 12px;
+}
+
+.odd-history-meta code {
+  font-family: var(--odd-mono);
+}
+
+.odd-diff [data-kind="add"] {
+  color: var(--odd-good);
+}
+
+.odd-diff [data-kind="del"] {
+  color: var(--odd-bad);
+}
+
+.odd-diff [data-kind="hunk"] {
+  color: var(--odd-muted);
+}
+
+.odd-chat-read {
+  margin: 2px 0 0;
+  color: var(--odd-muted);
+  font-size: 12px;
+  line-height: 1.45;
+}
+
 .odd-chat-thought {
   max-height: 220px;
   margin-top: 4px;

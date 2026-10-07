@@ -1,20 +1,88 @@
 import { useEffect, useState } from 'react'
 import type { ParamValue } from '../../config.js'
+import type { QueryHistory } from '../../ops/history.js'
 import { useEdit } from '../../runtime/edit.js'
-import { useT } from '../../runtime/i18n.js'
+import { useLocale, useT } from '../../runtime/i18n.js'
 import type { PanelInfo, QueryRun } from '../../runtime/types.js'
 import { ChartSettings } from '../components/chart-settings.js'
 import { CheckIcon } from '../components/icons.js'
 import { api } from '../lib/api.js'
 
-export type InspectorTab = 'chart' | 'data' | 'sql' | 'params'
+export type InspectorTab = 'chart' | 'data' | 'sql' | 'history' | 'params'
 type Tab = InspectorTab
 
 const TAB_LABELS: Record<Tab, string> = {
   chart: 'Chart',
   data: 'Data',
   sql: 'SQL',
+  history: 'History',
   params: 'Params',
+}
+
+/** Who changed this query's definition, when and how — from git, newest first. */
+function QueryHistoryView({ id, query }: { id: string; query: string }) {
+  const t = useT()
+  const { locale } = useLocale()
+  const [history, setHistory] = useState<QueryHistory>()
+  const [error, setError] = useState<string>()
+  useEffect(() => {
+    let live = true
+    setHistory(undefined)
+    setError(undefined)
+    api.queryHistory(id, query).then(
+      (found) => live && setHistory(found),
+      (e: Error) => live && setError(e.message),
+    )
+    return () => {
+      live = false
+    }
+  }, [id, query])
+  if (error) return <p className="odd-callout odd-callout-error">{error}</p>
+  if (!history) return <p className="odd-muted">{t('Loading…')}</p>
+  const when = (date: string) => new Date(date).toLocaleDateString(locale, { dateStyle: 'medium' })
+  return (
+    <div className="odd-history">
+      {!history.tracked ? (
+        <p className="odd-muted">{t('Not committed to git yet')}</p>
+      ) : history.uncommitted ? (
+        <p className="odd-history-pending">{t('Changed since the last commit')}</p>
+      ) : null}
+      <ol className="odd-history-list">
+        {history.changes.map((change) => (
+          <li key={change.commit}>
+            <details>
+              <summary>
+                <span className="odd-history-subject">{change.subject}</span>
+                <span className="odd-history-meta">
+                  {change.author} · {when(change.date)} · <code>{change.commit}</code>
+                </span>
+              </summary>
+              <pre className="odd-code odd-diff">
+                {change.diff.split('\n').map((line, i) => (
+                  <span
+                    // biome-ignore lint/suspicious/noArrayIndexKey: a diff's lines have no identity but their place
+                    key={i}
+                    data-kind={
+                      line.startsWith('+')
+                        ? 'add'
+                        : line.startsWith('-')
+                          ? 'del'
+                          : line.startsWith('@@')
+                            ? 'hunk'
+                            : undefined
+                    }
+                  >
+                    {line}
+                    {'\n'}
+                  </span>
+                ))}
+              </pre>
+            </details>
+          </li>
+        ))}
+      </ol>
+    </div>
+  )
 }
 
 export function Inspector(props: {
@@ -139,7 +207,7 @@ export function Inspector(props: {
       {run ? (
         <>
           <div className="odd-tabs odd-tabs-small" role="tablist">
-            {(['chart', 'data', 'sql', 'params'] as Tab[]).map((name) => (
+            {(['chart', 'data', 'sql', 'history', 'params'] as Tab[]).map((name) => (
               <button
                 key={name}
                 type="button"
@@ -187,6 +255,8 @@ export function Inspector(props: {
               </div>
             ) : tab === 'sql' ? (
               <pre className="odd-code">{run.query.sql}</pre>
+            ) : tab === 'history' ? (
+              <QueryHistoryView id={id} query={run.query.name} />
             ) : (
               <pre className="odd-code">{JSON.stringify(run.params, null, 2)}</pre>
             )}
