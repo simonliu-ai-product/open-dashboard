@@ -17,6 +17,9 @@ export interface FilterDecl {
   query?: string
   /** The choices written as a literal `options` array: presets, or a Select's values. */
   options?: string[]
+  /** A Select's literal `{ value, label }` options, by value. */
+  optionLabels?: Record<string, string>
+  label?: string
   allowAll: boolean
   line: number
 }
@@ -208,7 +211,14 @@ export function analyzeDashboard(
               : undefined,
         )
         if (values.every((value) => value !== undefined)) decl.options = values as string[]
+        const labels: Record<string, string> = {}
+        for (const option of options as { value?: unknown; label?: unknown }[])
+          if (typeof option?.value === 'string' && typeof option.label === 'string')
+            labels[option.value] = option.label
+        if (Object.keys(labels).length) decl.optionLabels = labels
       }
+      const label = read('label')
+      if (typeof label === 'string') decl.label = label
       if (typeof query === 'string') {
         decl.query = query
         result.queryRefs.push({ name: query, line: line(node), columns: [] })

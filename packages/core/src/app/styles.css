@@ -4429,6 +4429,31 @@ body.odd-dragging * {
   color: var(--odd-muted);
 }
 
+.odd-chat-switched {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px 8px;
+  margin: 0 0 6px;
+  color: var(--odd-ink-2);
+  font-size: 12.5px;
+}
+
+.odd-chat-switched button {
+  padding: 1px 8px;
+  border: 0;
+  border-radius: 6px;
+  background: var(--odd-surface);
+  box-shadow: 0 0 0 1px var(--odd-border-strong);
+  color: var(--odd-ink);
+  font: inherit;
+  cursor: pointer;
+}
+
+.odd-chat-switched button:hover {
+  background: var(--odd-hover);
+}
+
 .odd-chat-read {
   margin: 2px 0 0;
   color: var(--odd-muted);

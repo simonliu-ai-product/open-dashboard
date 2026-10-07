@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import type { ParamValue } from '../../config.js'
+import type { SwitchedFilter } from '../../ops/assistant.js'
 import { useLocale, useT } from '../../runtime/i18n.js'
 import { Blocks, parseBlocks } from '../../runtime/markdown.js'
 import { api } from '../lib/api.js'
@@ -14,6 +15,29 @@ interface Message {
   seconds?: number
   /** The panels the answer was written from, when the page was too large to send whole. */
   read?: string[]
+  /** Filters the assistant switched before answering. */
+  switched?: SwitchedFilter[]
+  /** The reader put those filters back. */
+  undone?: boolean
+}
+
+/** What the assistant switched, in the page's words, with a way back. */
+function Switched({ switched, onUndo }: { switched: SwitchedFilter[]; onUndo?: () => void }) {
+  const t = useT()
+  const { locale } = useLocale()
+  const names = new Intl.ListFormat(locale, { style: 'short', type: 'conjunction' }).format(
+    switched.map((filter) => `${t(filter.label)} ${t(filter.valueLabel)}`),
+  )
+  return (
+    <p className="odd-chat-switched">
+      <span>{t('Switched to {names}', { names })}</span>
+      {onUndo ? (
+        <button type="button" onClick={onUndo}>
+          {t('Undo')}
+        </button>
+      ) : null}
+    </p>
+  )
 }
 
 const SUGGESTIONS = ['Summarize this dashboard', 'What changed the most?', 'Anything unusual?']
@@ -138,10 +162,13 @@ export function Assistant({
   dashboard,
   title,
   params,
+  onFilters,
 }: {
   dashboard: string
   title: string
   params: () => Record<string, ParamValue>
+  /** Applies filter values on the page: the assistant's switch, or the reader undoing it. */
+  onFilters: (values: Record<string, string | null>) => void
 }) {
   const t = useT()
   const [open, setOpen] = useState(false)
@@ -189,6 +216,7 @@ export function Assistant({
     const started = performance.now()
     let seconds: number | undefined
     const elapsed = () => Math.max(1, Math.round((performance.now() - started) / 1000))
+    let applied = ''
     try {
       await api.ask(
         dashboard,
@@ -196,12 +224,19 @@ export function Assistant({
         history.map(({ role, content }) => ({ role, content })),
         (reply) => {
           if (reply.text && seconds === undefined) seconds = elapsed()
+          // The answer is written for the switched view: show it as the answer arrives.
+          const switched = reply.switched ? JSON.stringify(reply.switched) : ''
+          if (reply.switched && switched !== applied) {
+            applied = switched
+            onFilters(Object.fromEntries(reply.switched.map((f) => [f.key, f.value])))
+          }
           replace({
             role: 'assistant',
             content: reply.text,
             thought: reply.thought,
             seconds,
             ...(reply.read ? { read: reply.read } : {}),
+            ...(reply.switched ? { switched: reply.switched } : {}),
           })
         },
         controller.signal,
@@ -214,7 +249,7 @@ export function Assistant({
       setMessages((current) => {
         const end = current.at(-1)
         if (end?.role !== 'assistant' || end.error || end.seconds !== undefined) return current
-        if (!end.content && !end.thought) return current.slice(0, -1)
+        if (!end.content && !end.thought && !end.switched) return current.slice(0, -1)
         return [...current.slice(0, -1), { ...end, seconds: elapsed() }]
       })
       setBusy(false)
@@ -269,6 +304,25 @@ export function Assistant({
                   data-role={message.role}
                   data-error={message.error || undefined}
                 >
+                  {message.switched ? (
+                    <Switched
+                      switched={message.switched}
+                      {...(message.undone
+                        ? {}
+                        : {
+                            onUndo: () => {
+                              onFilters(
+                                Object.fromEntries(
+                                  message.switched?.map((f) => [f.key, f.was]) ?? [],
+                                ),
+                              )
+                              setMessages((current) =>
+                                current.map((m) => (m === message ? { ...m, undone: true } : m)),
+                              )
+                            },
+                          })}
+                    />
+                  ) : null}
                   {message.role === 'assistant' &&
                   !message.error &&
                   (message.thought || message.read || message.seconds === undefined) ? (

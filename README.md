@@ -288,7 +288,7 @@ The site holds query results, so `site/` is git-ignored in a new workspace: publ
 
 When the workspace configures one, a chat button appears at the bottom right of every dashboard. Ask *"which region grew the most?"* and the answer comes from the panels' results exactly as you see them, under the filters you have set, with the metric definitions from `-- description:` and the notes in `database.md`. The model never runs a query or writes SQL: it reads what the page already loaded. Without a configuration there is no button at all.
 
-A large page is answered in two steps, to spend tokens on the data that matters: the model first gets the list of panels — what each shows, its columns and row count — and picks the ones the question needs; only their rows go with the question, and the reply says which panels it read. On the demo's 29-panel gallery that sends 86% less. A small page (under about 8,000 characters of data) still goes whole, in one request.
+It works by native tool calling, with exactly two tools. It starts from the list of panels — what each shows, its columns and row count — and reads the rows of only the panels the question needs, so a question about one chart does not pay for every table on the page (on the demo's 29-panel gallery, 86% less is sent); the reply says which panels it read. And it can change what you are looking at: ask *"switch to the North, last 90 days"* and it sets the filters — only to values the filters offer, never a date range or a region they do not — reads the new view, and answers from it, while the page follows; the reply says what it switched, with an **Undo**. A small page goes with the question whole; a model without tool support gets the whole page in one request.
 
 ```ts
 // open-dashboard.config.ts

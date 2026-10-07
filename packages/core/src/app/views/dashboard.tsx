@@ -283,6 +283,13 @@ export function DashboardView({ id, preview }: { id: string; preview?: ThemePrev
     if (meta && !preview) document.title = `${meta.title} · open-dashboard`
   }, [meta, preview])
 
+  const [filterOverride, setFilterOverride] = useState<HostContextValue['filterOverride']>()
+  const applyFilters = useCallback(
+    (values: Record<string, string | null>) =>
+      setFilterOverride((previous) => ({ values, seq: (previous?.seq ?? 0) + 1 })),
+    [],
+  )
+
   const host: HostContextValue | undefined = useMemo(() => {
     if (!meta) return undefined
     return {
@@ -312,6 +319,7 @@ export function DashboardView({ id, preview }: { id: string; preview?: ThemePrev
           url: window.location.href,
         })
       },
+      ...(filterOverride ? { filterOverride } : {}),
       fetchQuery: (name, values) => {
         const key = `${tick}|${name}|${JSON.stringify(values)}`
         let pending = inflight.current.get(key)
@@ -325,7 +333,7 @@ export function DashboardView({ id, preview }: { id: string; preview?: ThemePrev
         return pending
       },
     }
-  }, [id, meta, tick, refresh, preview, taken])
+  }, [id, meta, tick, refresh, preview, taken, filterOverride])
 
   if (error) {
     return (
@@ -404,7 +412,12 @@ export function DashboardView({ id, preview }: { id: string; preview?: ThemePrev
           />
         ) : null}
         {assistant && !preview && meta ? (
-          <Assistant dashboard={id} title={meta.title} params={() => params.current} />
+          <Assistant
+            dashboard={id}
+            title={meta.title}
+            params={() => params.current}
+            onFilters={applyFilters}
+          />
         ) : null}
         {inspecting && !preview ? (
           <Inspector

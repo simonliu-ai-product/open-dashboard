@@ -1,4 +1,5 @@
 import type { ParamValue, SchemaInfo } from '../../config.js'
+import type { SwitchedFilter } from '../../ops/assistant.js'
 import type { CatalogEntry } from '../../ops/charts.js'
 import type { CollectorRun, CollectorStatus } from '../../ops/collectors.js'
 import type { DashboardSummary } from '../../ops/dashboards.js'
@@ -13,6 +14,15 @@ import type { QueryRun } from '../../runtime/types.js'
 import { staticApi } from './static-api.js'
 
 const BASE = '/__odd/api/'
+
+export interface AssistantReply {
+  thought: string
+  text: string
+  /** The panels the answer was written from. */
+  read?: string[]
+  /** Filters the assistant switched, for the page to apply. */
+  switched?: SwitchedFilter[]
+}
 
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
   const response = await fetch(BASE + path, init)
@@ -67,13 +77,13 @@ export const liveApi = {
     id: string,
     params: Record<string, ParamValue>,
     messages: { role: 'user' | 'assistant'; content: string }[],
-    onUpdate: (reply: { thought: string; text: string; read?: string[] }) => void,
+    onUpdate: (reply: AssistantReply) => void,
     signal: AbortSignal,
-  ): Promise<{ thought: string; text: string; read?: string[] }> => {
+  ): Promise<AssistantReply> => {
     const response = await fetch(`${BASE}assistant`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ id, params, messages }),
+      body: JSON.stringify({ id, params, messages, search: window.location.search }),
       signal,
     })
     if (!response.ok || !response.body) {
@@ -82,7 +92,7 @@ export const liveApi = {
     }
     const reader = response.body.getReader()
     const decoder = new TextDecoder()
-    const reply: { thought: string; text: string; read?: string[] } = { thought: '', text: '' }
+    const reply: AssistantReply = { thought: '', text: '' }
     let buffer = ''
     for (;;) {
       const { done, value } = await reader.read()
@@ -96,10 +106,13 @@ export const liveApi = {
           thought?: string
           text?: string
           read?: string[]
+          switched?: SwitchedFilter[]
           error?: string
         }
         if (piece.error) throw new Error(piece.error)
-        if (piece.read) reply.read = piece.read
+        // A model may read in more than one round: the list grows.
+        if (piece.read) reply.read = [...new Set([...(reply.read ?? []), ...piece.read])]
+        if (piece.switched) reply.switched = piece.switched
         reply.thought += piece.thought ?? ''
         reply.text += piece.text ?? ''
       }

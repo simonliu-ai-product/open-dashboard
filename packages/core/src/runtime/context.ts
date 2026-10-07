@@ -13,6 +13,8 @@ export interface HostContextValue {
   inspectable?: boolean
   onParams(params: Record<string, ParamValue>): void
   fetchQuery(name: string, params: Record<string, ParamValue>): Promise<QueryRun>
+  /** Filter values set from outside the filters — the assistant's switch; `seq` makes each one new. */
+  filterOverride?: { values: Record<string, string | null>; seq: number }
 }
 
 export interface FilterState {

@@ -309,4 +309,5 @@ export const APP: Record<string, string> = {
   History: '変更履歴',
   'Not committed to git yet': 'まだ git にコミットされていません',
   'Changed since the last commit': '前回のコミット以降に変更あり',
+  'Switched to {names}': '{names} に切り替えました',
 }

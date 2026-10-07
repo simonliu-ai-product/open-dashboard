@@ -11,9 +11,9 @@ import {
 } from '../ops/collectors.js'
 import { queryHistory } from '../ops/history.js'
 import {
-  type AnswerPiece,
+  type AnswerEvent,
   addComment,
-  answerContext,
+  answer,
   assistantInstructions,
   assistantStatus,
   chartCatalog,
@@ -289,16 +289,21 @@ export function apiPlugin(workspace: Workspace, overrides: ConfigOverrides): Plu
             res.on('close', () => {
               if (!res.writableEnded) controller.abort()
             })
-            const { context, read } = await answerContext(
-              workspace,
-              assistant,
-              body.id,
-              params,
-              messages,
-              controller.signal,
-            )
-            const system = systemPrompt(assistantInstructions(config, body.id), context)
-            const stream = streamAnswer(assistant, system, messages, controller.signal)
+            // The reader's filter values, as their address has them: what a switch starts from.
+            const values =
+              typeof body.search === 'string'
+                ? Object.fromEntries(
+                    [...new URLSearchParams(body.search)].map(([key, value]) => [
+                      key,
+                      value === '' ? null : value,
+                    ]),
+                  )
+                : undefined
+            const stream = answer(workspace, assistant, body.id, params, messages, {
+              ...(values ? { values } : {}),
+              instructions: assistantInstructions(config, body.id),
+              signal: controller.signal,
+            })
             // The first piece is awaited before any header goes out, so a refused
             // key or an unknown model comes back as an ordinary JSON error.
             const first = await stream.next()
@@ -306,15 +311,17 @@ export function apiPlugin(workspace: Workspace, overrides: ConfigOverrides): Plu
             res.setHeader('Content-Type', 'application/x-ndjson; charset=utf-8')
             res.setHeader('Cache-Control', 'no-store')
             res.setHeader('X-Content-Type-Options', 'nosniff')
-            // One JSON object per line: { read } — the panels it looked at — then
-            // { thought } while the model thinks and { text } for the answer.
+            // One JSON object per line: { thought } while the model thinks, { read } and
+            // { switched } as it uses its tools, { text } for the answer.
             const send = (line: Record<string, unknown>) => res.write(`${JSON.stringify(line)}\n`)
-            if (read) send({ read })
-            const write = (piece: AnswerPiece) =>
-              send(piece.kind === 'thought' ? { thought: piece.text } : { text: piece.text })
+            const write = (event: AnswerEvent) => {
+              if (event.kind === 'read') send({ read: event.panels })
+              else if (event.kind === 'switched') send({ switched: event.switched })
+              else send(event.kind === 'thought' ? { thought: event.text } : { text: event.text })
+            }
             if (!first.done) write(first.value)
             try {
-              for await (const piece of stream) write(piece)
+              for await (const event of stream) write(event)
             } catch (error) {
               if (!controller.signal.aborted) send({ error: redact(errorMessage(error)) })
             }

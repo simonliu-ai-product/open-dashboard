@@ -309,4 +309,5 @@ export const APP: Record<string, string> = {
   History: '변경 기록',
   'Not committed to git yet': '아직 git에 커밋되지 않음',
   'Changed since the last commit': '마지막 커밋 이후 변경됨',
+  'Switched to {names}': '{names}(으)로 전환함',
 }

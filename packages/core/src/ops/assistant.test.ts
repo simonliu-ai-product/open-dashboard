@@ -4,14 +4,14 @@ import { join } from 'node:path'
 import { afterEach, describe, expect, it } from 'vitest'
 import { loadConfig, type ResolvedAssistant, resolveAssistant } from '../workspace.js'
 import {
-  answerContext,
+  type AnswerEvent,
+  answer,
   assistantInstructions,
   assistantStatus,
   dashboardContext,
-  PICK_PROMPT,
   panelCatalog,
   panelContext,
-  parseChoice,
+  pickFilters,
   readDashboardData,
   SYSTEM_PROMPT,
   streamAnswer,
@@ -19,6 +19,7 @@ import {
   thoughtSplitter,
   validateMessages,
 } from './assistant.js'
+import { dashboardFilters } from './filters.js'
 import { type Fixture, makeFixture } from './fixture.test-helper.js'
 
 const DASHBOARD = `import { Dashboard, Row, Stat, BarChart, type DashboardMeta } from '@open-dashboard/core'
@@ -319,9 +320,41 @@ WITH RECURSIVE n(i) AS (SELECT 1 UNION ALL SELECT i + 1 FROM n WHERE i < 600)
 SELECT i, 'log line number ' || i AS line FROM n;
 `
 
-/** An OpenAI-compatible endpoint answering one non-streamed completion with `content`. */
-async function fakeChooser(
-  content: string,
+const FILTERED = `import { Dashboard, Filters, Select, TimeRange, Row, Stat, BarChart } from '@open-dashboard/core'
+export const meta = { title: 'Sales' }
+export default function Sales() {
+  return (
+    <Dashboard>
+      <Filters>
+        <TimeRange default="all" options={['all', '30d']} />
+        <Select name="region" label="Region" query="regions" />
+      </Filters>
+      <Row>
+        <Stat title="Total" query="total" column="amount" />
+        <BarChart title="By region" query="by_region" x="region" y="amount" />
+      </Row>
+    </Dashboard>
+  )
+}
+`
+
+const FILTERED_QUERIES = `-- name: regions
+SELECT DISTINCT region FROM sales ORDER BY region;
+
+-- name: total
+SELECT SUM(amount) AS amount FROM sales
+WHERE day >= :from AND day < :to AND (:region IS NULL OR region = :region);
+
+-- name: by_region
+SELECT region, SUM(amount) AS amount FROM sales
+WHERE day >= :from AND day < :to GROUP BY region ORDER BY region;
+`
+
+type Reply = { status?: number; deltas: Record<string, unknown>[] }
+
+/** An OpenAI-compatible endpoint that plays `script` in order, one streamed reply per request. */
+async function scripted(
+  script: Reply[],
 ): Promise<{ url: string; requests: Record<string, unknown>[] }> {
   const requests: Record<string, unknown>[] = []
   const instance = createServer((req, res) => {
@@ -331,8 +364,18 @@ async function fakeChooser(
     })
     req.on('end', () => {
       requests.push(JSON.parse(raw))
-      res.writeHead(200, { 'Content-Type': 'application/json' })
-      res.end(JSON.stringify({ choices: [{ message: { content } }] }))
+      const reply = script[Math.min(requests.length - 1, script.length - 1)] as Reply
+      if (reply.status && reply.status !== 200) {
+        res.writeHead(reply.status, { 'Content-Type': 'application/json' })
+        res.end(
+          JSON.stringify({ error: { message: 'Function calling is not enabled for this model' } }),
+        )
+        return
+      }
+      res.writeHead(200, { 'Content-Type': 'text/event-stream' })
+      for (const delta of reply.deltas)
+        res.write(`data: ${JSON.stringify({ choices: [{ delta }] })}\n\n`)
+      res.end('data: [DONE]\n\n')
     })
   })
   server = instance
@@ -340,82 +383,213 @@ async function fakeChooser(
   return { url: `http://127.0.0.1:${(instance.address() as AddressInfo).port}`, requests }
 }
 
-describe('two-step answers', () => {
-  it('reads the panel numbers out of a reply, and only valid ones', () => {
-    expect(parseChoice('{"panels": [2, 3]}', 3)).toEqual([2, 3])
-    expect(parseChoice('Sure:\n```json\n{"panels":[3,3,9,0,1.5]}\n```', 3)).toEqual([3])
-    expect(parseChoice('{"panels": []}', 3)).toEqual([])
-    expect(parseChoice('I need the region panel', 3)).toBeUndefined()
-    expect(parseChoice('{"panels": "all"}', 3)).toBeUndefined()
-  })
+const call = (id: string, name: string, args: unknown, extra: Record<string, unknown> = {}) => ({
+  tool_calls: [
+    {
+      index: 0,
+      id,
+      type: 'function',
+      function: { name, arguments: JSON.stringify(args) },
+      ...extra,
+    },
+  ],
+})
+const calls = (...list: [string, string, unknown][]) => ({
+  tool_calls: list.map(([id, name, args], index) => ({
+    index,
+    id,
+    type: 'function',
+    function: { name, arguments: JSON.stringify(args) },
+  })),
+})
 
-  it('lists panels by shape, without their rows', async () => {
+async function events(stream: AsyncGenerator<AnswerEvent>) {
+  const out: AnswerEvent[] = []
+  for await (const event of stream) out.push(event)
+  return out
+}
+
+type Sent = { tools?: { function: { name: string } }[]; messages: Record<string, unknown>[] }
+
+describe('answers by tool calling', () => {
+  it('lists panels by shape, and sends rows only through read_panels', async () => {
     fixture = await makeFixture({
       'dashboards/sales/index.tsx': BIG_DASHBOARD,
       'dashboards/sales/queries.sql': BIG_QUERIES,
     })
-    const data = await readDashboardData(fixture.workspace, 'sales', {})
-    const catalog = panelCatalog(data)
-    expect(catalog).toContain('[2] By region (BarChart) — columns: region, amount; 2 rows')
-    expect(catalog).toContain('[3] Log (Table) — columns: i, line; 600 rows')
-    expect(catalog).toContain('Definition: Every sale, no refunds')
-    expect(catalog).not.toContain('log line number')
-    const whole = panelContext(fixture.workspace, data, 1000)
-    const one = panelContext(fixture.workspace, data, 1000, [2])
-    expect(one).toContain('North\t40')
-    expect(one).not.toContain('log line number')
-    expect(one).toContain('Other panels on the page, data not included: Total; Log')
-    expect(catalog.length).toBeLessThan(whole.length / 10)
+    const provider = await scripted([
+      // Gemini sends a thought signature with its call; it must come back as it was.
+      {
+        deltas: [
+          call(
+            'c1',
+            'read_panels',
+            { panels: [2] },
+            { extra_content: { google: { thought_signature: 'sig-1' } } },
+          ),
+        ],
+      },
+      { deltas: [{ content: 'North leads with 40.' }] },
+    ])
+    const out = await events(
+      answer(fixture.workspace, assistantAt(provider.url, { maxRows: 1000 }), 'sales', {}, [
+        { role: 'user', content: 'Which region sells most?' },
+      ]),
+    )
+    expect(out).toEqual([
+      { kind: 'read', panels: ['By region'] },
+      { kind: 'text', text: 'North leads with 40.' },
+    ])
+    const [first, second] = provider.requests as Sent[]
+    expect(first?.tools?.map((t) => t.function.name)).toEqual(['read_panels'])
+    const system = String(first?.messages[0]?.content)
+    expect(system).toContain('[3] Log (Table) — columns: i, line; 600 rows')
+    expect(system).not.toContain('log line number')
+    const tool = second?.messages.at(-1) as { role: string; tool_call_id: string; content: string }
+    expect(tool).toMatchObject({ role: 'tool', tool_call_id: 'c1' })
+    expect(tool.content).toContain('North\t40')
+    expect(tool.content).not.toContain('log line number')
+    expect(second?.messages.at(-2)).toMatchObject({
+      role: 'assistant',
+      tool_calls: [{ id: 'c1', extra_content: { google: { thought_signature: 'sig-1' } } }],
+    })
   })
 
-  it('sends a small page whole, without a second request', async () => {
+  it('offers no tools on a small page without filters', async () => {
     fixture = await makeFixture({
       'dashboards/sales/index.tsx': DASHBOARD,
       'dashboards/sales/queries.sql': QUERIES,
     })
-    const chooser = await fakeChooser('{"panels":[1]}')
-    const answer = await answerContext(fixture.workspace, assistantAt(chooser.url), 'sales', {}, [
-      { role: 'user', content: 'Who leads?' },
-    ])
-    expect(chooser.requests).toHaveLength(0)
-    expect(answer.read).toBeUndefined()
-    expect(answer.context).toContain('North\t40')
-  })
-
-  it('asks which panels first on a large page, then sends only those', async () => {
-    fixture = await makeFixture({
-      'dashboards/sales/index.tsx': BIG_DASHBOARD,
-      'dashboards/sales/queries.sql': BIG_QUERIES,
-    })
-    const chooser = await fakeChooser('{"panels":[2]}')
-    const answer = await answerContext(
-      fixture.workspace,
-      assistantAt(chooser.url, { provider: 'gemini', maxRows: 1000 }),
-      'sales',
-      {},
-      [{ role: 'user', content: 'Which region sells most?' }],
+    const provider = await scripted([{ deltas: [{ content: 'North.' }] }])
+    await events(
+      answer(fixture.workspace, assistantAt(provider.url), 'sales', {}, [
+        { role: 'user', content: 'Who leads?' },
+      ]),
     )
-    const sent = chooser.requests[0] as { stream: boolean; messages: { content: string }[] }
-    expect(sent.stream).toBe(false)
-    expect(sent.messages[0]?.content).toContain(PICK_PROMPT)
-    expect(sent.messages[0]?.content).not.toContain('log line number')
-    expect(sent.messages.at(-1)?.content).toBe('Which region sells most?')
-    expect(answer.read).toEqual(['By region'])
-    expect(answer.context).toContain('North\t40')
-    expect(answer.context).not.toContain('log line number')
+    const [first] = provider.requests as Sent[]
+    expect(first?.tools).toBeUndefined()
+    expect(String(first?.messages[0]?.content)).toContain('North\t40')
   })
 
-  it('falls back to every panel when the choice cannot be read', async () => {
+  it('switches filters before reading, whatever order the calls came in', async () => {
+    fixture = await makeFixture({
+      'dashboards/sales/index.tsx': FILTERED,
+      'dashboards/sales/queries.sql': FILTERED_QUERIES,
+    })
+    const provider = await scripted([
+      {
+        deltas: [
+          calls(
+            ['r', 'read_panels', { panels: [1] }],
+            ['f', 'set_filters', { filters: [{ key: 'region', value: 'South' }] }],
+          ),
+        ],
+      },
+      { deltas: [{ content: 'The page now shows the South: 20.' }] },
+    ])
+    const out = await events(
+      answer(
+        fixture.workspace,
+        assistantAt(provider.url),
+        'sales',
+        { from: '0001-01-01', to: '9999-12-31', region: null },
+        [{ role: 'user', content: 'Show me the South' }],
+        { values: {} },
+      ),
+    )
+    expect(out.slice(0, 2)).toEqual([
+      {
+        kind: 'switched',
+        switched: [
+          { key: 'region', label: 'Region', value: 'South', valueLabel: 'South', was: null },
+        ],
+      },
+      { kind: 'read', panels: ['Total'] },
+    ])
+    const [first, second] = provider.requests as Sent[]
+    expect(first?.tools?.map((t) => t.function.name)).toEqual(['read_panels', 'set_filters'])
+    expect(String(first?.messages[0]?.content)).toContain(
+      '- region "Region": now null (All); options: null (All), North, South',
+    )
+    const read = second?.messages.find((m) => m.tool_call_id === 'r') as { content: string }
+    expect(read.content).toMatch(/amount\n20\b/)
+  })
+
+  it('refuses a value the filter does not offer', async () => {
+    fixture = await makeFixture({
+      'dashboards/sales/index.tsx': FILTERED,
+      'dashboards/sales/queries.sql': FILTERED_QUERIES,
+    })
+    const provider = await scripted([
+      { deltas: [call('f', 'set_filters', { filters: [{ key: 'region', value: 'Mars' }] })] },
+      { deltas: [{ content: 'There is no Mars.' }] },
+    ])
+    const out = await events(
+      answer(
+        fixture.workspace,
+        assistantAt(provider.url),
+        'sales',
+        {},
+        [{ role: 'user', content: 'Mars?' }],
+        {
+          values: {},
+        },
+      ),
+    )
+    expect(out.some((e) => e.kind === 'switched')).toBe(false)
+    const reply = (provider.requests[1] as Sent).messages.at(-1) as { content: string }
+    expect(reply.content).toContain('Nothing switched')
+  })
+
+  it('keeps only values on offer, matched by value or by label', async () => {
+    fixture = await makeFixture({
+      'dashboards/sales/index.tsx': FILTERED,
+      'dashboards/sales/queries.sql': FILTERED_QUERIES,
+    })
+    const filters = await dashboardFilters(fixture.workspace, 'sales', { values: {} })
+    expect(filters.map((f) => [f.key, f.current, f.options])).toEqual([
+      ['time', 'all', ['all', '30d']],
+      ['region', null, [null, 'North', 'South']],
+    ])
+    expect(pickFilters(filters, [{ key: 'region', value: 'South' }])).toEqual({ region: 'South' })
+    expect(pickFilters(filters, { time: 'last 30 days', region: 'Mars' })).toEqual({ time: '30d' })
+    expect(pickFilters(filters, [{ key: 'time', value: 'all' }])).toEqual({})
+    expect(pickFilters(filters, [{ key: 'nope', value: 'x' }])).toEqual({})
+  })
+
+  it('answers in one request when the model has no tools', async () => {
     fixture = await makeFixture({
       'dashboards/sales/index.tsx': BIG_DASHBOARD,
       'dashboards/sales/queries.sql': BIG_QUERIES,
     })
-    const chooser = await fakeChooser('the region one, probably')
-    const assistant = assistantAt(chooser.url, { maxRows: 1000 })
-    const answer = await answerContext(fixture.workspace, assistant, 'sales', {}, [
-      { role: 'user', content: 'Which region?' },
+    const provider = await scripted([
+      { status: 400, deltas: [] },
+      { deltas: [{ content: 'Done.' }] },
     ])
-    expect(answer.read).toBeUndefined()
-    expect(answer.context).toContain('log line number 600')
+    const out = await events(
+      answer(fixture.workspace, assistantAt(provider.url, { maxRows: 1000 }), 'sales', {}, [
+        { role: 'user', content: 'Anything?' },
+      ]),
+    )
+    expect(out).toEqual([{ kind: 'text', text: 'Done.' }])
+    const second = provider.requests[1] as Sent
+    expect(second.tools).toBeUndefined()
+    expect(String(second.messages[0]?.content)).toContain('log line number 600')
+  })
+
+  it('stops offering tools after a few rounds', async () => {
+    fixture = await makeFixture({
+      'dashboards/sales/index.tsx': BIG_DASHBOARD,
+      'dashboards/sales/queries.sql': BIG_QUERIES,
+    })
+    const provider = await scripted([{ deltas: [call('c', 'read_panels', { panels: [1] })] }])
+    await events(
+      answer(fixture.workspace, assistantAt(provider.url, { maxRows: 1000 }), 'sales', {}, [
+        { role: 'user', content: 'Loop?' },
+      ]),
+    )
+    const sent = provider.requests as Sent[]
+    expect(sent).toHaveLength(5)
+    expect(sent.at(-1)?.tools).toBeUndefined()
   })
 })

@@ -212,6 +212,18 @@ export function Dashboard({ children }: DashboardProps) {
     })
   }, [specKey])
 
+  // biome-ignore lint/correctness/useExhaustiveDependencies: seq marks each override as new
+  useEffect(() => {
+    const override = host.filterOverride
+    if (!override) return
+    setValues((previous) => {
+      const next = { ...previous }
+      for (const spec of specs)
+        if (spec.key in override.values) next[spec.key] = override.values[spec.key] ?? null
+      return next
+    })
+  }, [host.filterOverride?.seq])
+
   // biome-ignore lint/correctness/useExhaustiveDependencies: specKey stands for specs
   const params = useMemo(() => {
     const out: Record<string, ParamValue> = {}

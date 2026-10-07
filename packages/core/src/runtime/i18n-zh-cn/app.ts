@@ -309,4 +309,5 @@ export const APP: Record<string, string> = {
   History: '变更记录',
   'Not committed to git yet': '尚未提交到 git',
   'Changed since the last commit': '上次提交之后有修改',
+  'Switched to {names}': '已切换：{names}',
 }
