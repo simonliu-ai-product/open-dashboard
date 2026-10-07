@@ -1,6 +1,6 @@
 {
   "name": "@open-dashboard/mcp",
-  "version": "0.6.0",
+  "version": "0.7.0",
   "description": "MCP server for open-dashboard \u2014 lets any agent read, query, check and write dashboards over Streamable HTTP.",
   "type": "module",
   "exports": {
@@ -48,7 +48,7 @@
     "zod": "^4.4.3"
   },
   "peerDependencies": {
-    "@open-dashboard/core": "^0.6.0"
+    "@open-dashboard/core": "^0.7.0"
   },
   "devDependencies": {
     "@open-dashboard/core": "workspace:*",
