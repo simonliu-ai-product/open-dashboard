@@ -466,7 +466,13 @@ function Chart({
                   y2={height}
                   className="odd-grid-line"
                 />
-                <text x={sx(tick)} y={AXIS - 10} textAnchor="middle" className="odd-tick">
+                <text
+                  x={sx(tick)}
+                  y={AXIS - 10}
+                  // A tick at the right edge would run out of the panel.
+                  textAnchor={sx(tick) > left + w - 24 ? 'end' : 'middle'}
+                  className="odd-tick"
+                >
                   {tickFormat.format(new Date(tick))}
                 </text>
               </g>
