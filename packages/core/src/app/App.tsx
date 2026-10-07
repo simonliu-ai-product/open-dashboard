@@ -220,9 +220,17 @@ function Shell() {
 }
 
 export function App() {
+  // A one-file export is that dashboard alone: no other page to go to.
+  const single = snapshot()?.single ? snapshot()?.route?.replace(/^\/d\//, '') : undefined
   return (
     <LocaleProvider>
-      <Shell />
+      {single ? (
+        <main className="odd-main odd-standalone">
+          <DashboardView id={single} />
+        </main>
+      ) : (
+        <Shell />
+      )}
     </LocaleProvider>
   )
 }

@@ -14,6 +14,7 @@ import {
 import type { ParamValue } from '../config.js'
 import { FilterContext, type FilterState, useHost } from '../runtime/context.js'
 import { type EditState, useEdit } from '../runtime/edit.js'
+import { snapshot } from '../runtime/snapshot.js'
 import type { RowShape } from '../runtime/structure.js'
 import { useRowDrag } from './edit-chrome.js'
 
@@ -79,7 +80,7 @@ function readUrl(specs: FilterSpec[]): Record<string, string | null> {
   const search =
     typeof window === 'undefined'
       ? new URLSearchParams()
-      : new URLSearchParams(window.location.search)
+      : new URLSearchParams(window.location.search || snapshot()?.search || '')
   const values: Record<string, string | null> = {}
   for (const spec of specs) {
     const raw = search.get(spec.key)
@@ -95,7 +96,12 @@ function writeUrl(specs: FilterSpec[], values: Record<string, string | null>): v
     if (value === spec.default) url.searchParams.delete(spec.key)
     else url.searchParams.set(spec.key, value ?? '')
   }
-  if (url.href !== window.location.href) window.history.replaceState(window.history.state, '', url)
+  if (url.href === window.location.href) return
+  try {
+    window.history.replaceState(window.history.state, '', url)
+  } catch {
+    // a file opened from disk may refuse; the filters still apply
+  }
 }
 
 function titleOf(node: ReactNode): string | undefined {

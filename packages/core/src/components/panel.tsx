@@ -142,8 +142,13 @@ export function PanelFrame(props: FrameProps) {
           ) : null}
           <DownloadMenu
             save={async (format) => {
-              if (ref.current)
-                await downloadPanel(ref.current, format, exportName(host.id, props.title))
+              if (ref.current && format !== 'html')
+                await downloadPanel(
+                  ref.current,
+                  format,
+                  exportName(host.id, props.title),
+                  props.title,
+                )
             }}
             label={t('Download {title}', { title: props.title })}
             disabled={
@@ -185,9 +190,13 @@ export function PanelFrame(props: FrameProps) {
   )
 }
 
-/** A download button with a PNG / SVG menu: a panel's, or the whole dashboard's in its header. */
+const IMAGE_FORMATS: ImageFormat[] = ['png', 'svg', 'pdf']
+
+/** A download button with a PNG / SVG / PDF menu: a panel's, or the whole dashboard's in its header. */
 export function DownloadMenu(props: {
   save: (format: ImageFormat) => Promise<void>
+  /** Default PNG, SVG and PDF; the dashboard's adds HTML. */
+  formats?: ImageFormat[]
   /** The button's accessible name. */
   label: string
   disabled?: boolean
@@ -196,6 +205,7 @@ export function DownloadMenu(props: {
   const t = useT()
   const [open, setOpen] = useState(false)
   const [busy, setBusy] = useState(false)
+  const [error, setError] = useState<string>()
   const root = useRef<HTMLDivElement>(null)
   const trigger = useRef<HTMLButtonElement>(null)
   const id = useId()
@@ -218,13 +228,21 @@ export function DownloadMenu(props: {
     }
   }, [open])
 
+  useEffect(() => {
+    if (!error) return
+    const timer = window.setTimeout(() => setError(undefined), 6000)
+    return () => window.clearTimeout(timer)
+  }, [error])
+
   const save = async (format: ImageFormat) => {
     setOpen(false)
+    setError(undefined)
     setBusy(true)
     try {
       await props.save(format)
-    } catch (error) {
-      console.error(error)
+    } catch (failure) {
+      // Said where it was asked for: a download that silently never comes looks like a dead button.
+      setError(failure instanceof Error ? failure.message : String(failure))
     } finally {
       setBusy(false)
     }
@@ -242,7 +260,11 @@ export function DownloadMenu(props: {
         aria-expanded={open}
         aria-controls={open ? id : undefined}
         disabled={props.disabled || busy}
-        onClick={() => setOpen((value) => !value)}
+        data-busy={busy || undefined}
+        onClick={() => {
+          setError(undefined)
+          setOpen((value) => !value)
+        }}
       >
         <svg viewBox="0 0 16 16" width="14" height="14" aria-hidden="true">
           <path
@@ -257,13 +279,17 @@ export function DownloadMenu(props: {
       </button>
       {open ? (
         <div className="odd-download-menu" id={id} role="menu">
-          <button type="button" role="menuitem" onClick={() => save('png')}>
-            PNG
-          </button>
-          <button type="button" role="menuitem" onClick={() => save('svg')}>
-            SVG
-          </button>
+          {(props.formats ?? IMAGE_FORMATS).map((format) => (
+            <button key={format} type="button" role="menuitem" onClick={() => save(format)}>
+              {format.toUpperCase()}
+            </button>
+          ))}
         </div>
+      ) : null}
+      {error && !open ? (
+        <p className="odd-download-error" role="alert">
+          {error}
+        </p>
       ) : null}
     </div>
   )

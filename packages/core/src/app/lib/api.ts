@@ -99,6 +99,17 @@ export const liveApi = {
   collectors: () =>
     request<{ collectors: CollectorStatus[] }>('collectors').then((r) => r.collectors),
   collect: (id: string) => post<CollectorRun>('collect', { id }),
+  /** The dashboard as one HTML file, opening at the filters in `search`. */
+  exportHtml: async (id: string, search: string): Promise<Blob> => {
+    const response = await fetch(
+      `${BASE}export-html?id=${encodeURIComponent(id)}&search=${encodeURIComponent(search)}`,
+    )
+    if (!response.ok) {
+      const body = (await response.json().catch(() => ({}))) as { error?: string }
+      throw new Error(body.error ?? `${response.status} ${response.statusText}`)
+    }
+    return response.blob()
+  },
   themes: () => request<ThemeList>('themes'),
   theme: (id: string) => request<ThemeFile>(`theme?id=${encodeURIComponent(id)}`),
   saveTheme: (id: string, hash: string, theme: DashboardTheme) =>

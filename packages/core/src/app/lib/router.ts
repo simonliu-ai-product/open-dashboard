@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { stripBase, withBase } from '../../runtime/snapshot.js'
+import { snapshot, stripBase, withBase } from '../../runtime/snapshot.js'
 
 export type Route =
   | { name: 'home' }
@@ -51,7 +51,9 @@ export function navigate(path: string, options: { replace?: boolean } = {}): voi
 }
 
 export function useRoute(): Route {
-  const [route, setRoute] = useState(() => parseRoute(stripBase(window.location.pathname)))
+  const [route, setRoute] = useState(() =>
+    parseRoute(snapshot()?.route ?? stripBase(window.location.pathname)),
+  )
   useEffect(() => {
     const update = () => {
       const now = current()
@@ -61,7 +63,7 @@ export function useRoute(): Route {
         return
       }
       shown = now
-      setRoute(parseRoute(stripBase(window.location.pathname)))
+      setRoute(parseRoute(snapshot()?.route ?? stripBase(window.location.pathname)))
     }
     window.addEventListener('popstate', update)
     return () => window.removeEventListener('popstate', update)

@@ -15,7 +15,7 @@ import type { ParamValue } from '../../config.js'
 import { HostContext, type HostContextValue } from '../../runtime/context.js'
 import { applyProps } from '../../runtime/convert.js'
 import { EditContext } from '../../runtime/edit.js'
-import { downloadDashboard, exportName } from '../../runtime/export-panel.js'
+import { downloadBlob, downloadDashboard, exportName } from '../../runtime/export-panel.js'
 import { useT } from '../../runtime/i18n.js'
 import { snapshot } from '../../runtime/snapshot.js'
 import type { DashboardTheme } from '../../runtime/theme.js'
@@ -369,8 +369,16 @@ export function DashboardView({ id, preview }: { id: string; preview?: ThemePrev
               onTheme={(value) =>
                 editor.editState.stage({ kind: 'meta', key: 'theme', value: value || null })
               }
+              standalone={snapshot()?.single === true}
+              // HTML is built by the server; a snapshot has none.
+              formats={taken ? ['png', 'svg', 'pdf'] : ['png', 'svg', 'pdf', 'html']}
               onDownload={async (format) => {
-                if (page.current) await downloadDashboard(page.current, format, exportName(id, ''))
+                if (format === 'html') {
+                  const blob = await api.exportHtml(id, window.location.search)
+                  downloadBlob(blob, `${exportName(id, '')}.html`)
+                } else if (page.current) {
+                  await downloadDashboard(page.current, format, exportName(id, ''), meta?.title)
+                }
               }}
             />
           )}

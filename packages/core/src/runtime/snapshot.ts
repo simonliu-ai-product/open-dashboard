@@ -7,6 +7,10 @@ import type { ParamValue } from '../config.js'
 export interface Snapshot {
   base: string
   builtAt: string
+  /** A one-file export: always this page, opening at these filters, with nothing else to link to. */
+  route?: string
+  search?: string
+  single?: boolean
 }
 
 const store = globalThis as typeof globalThis & { __ODD_SNAPSHOT__?: Snapshot }

@@ -1,3 +1,5 @@
+import { jpegToPdf } from './pdf.js'
+
 /**
  * A panel as a picture — vector SVG, and PNG drawn from it.
  *
@@ -47,32 +49,48 @@ const SVG_PROPS = [
 
 const COLOR_PROPS = new Set(['fill', 'stroke'])
 
-export type ImageFormat = 'png' | 'svg'
+/** 'html' is the whole dashboard as one interactive file, built by the server. */
+export type ImageFormat = 'png' | 'svg' | 'pdf' | 'html'
+
+async function encode(
+  drawn: { svg: string; width: number; height: number },
+  format: Exclude<ImageFormat, 'html'>,
+  background: string | undefined,
+  title: string,
+): Promise<Blob> {
+  const { svg, width, height } = drawn
+  if (format === 'svg') return new Blob([svg], { type: 'image/svg+xml' })
+  if (format === 'png') return rasterise(svg, width, height, 'image/png')
+  // JPEG has no transparency: what would be clear is painted with the page behind it.
+  const jpeg = await rasterise(svg, width, height, 'image/jpeg', background ?? '#ffffff')
+  const pdf = jpegToPdf(
+    new Uint8Array(await jpeg.arrayBuffer()),
+    { width: Math.round(width * PNG_SCALE), height: Math.round(height * PNG_SCALE) },
+    { width, height },
+    title,
+  )
+  return new Blob([pdf as BlobPart], { type: 'application/pdf' })
+}
 
 export async function downloadPanel(
   panel: HTMLElement,
-  format: ImageFormat,
+  format: Exclude<ImageFormat, 'html'>,
   name: string,
+  title = name,
 ): Promise<void> {
-  const { svg, width, height } = panelToSvg(panel)
-  const blob =
-    format === 'svg'
-      ? new Blob([svg], { type: 'image/svg+xml' })
-      : await rasterise(svg, width, height)
+  const blob = await encode(panelToSvg(panel), format, backgroundOf(panel), title)
   downloadBlob(blob, `${name}.${format}`)
 }
 
 /** The whole dashboard — title, filters and every panel — as one image, on the page's background. */
 export async function downloadDashboard(
   page: HTMLElement,
-  format: ImageFormat,
+  format: Exclude<ImageFormat, 'html'>,
   name: string,
+  title = name,
 ): Promise<void> {
-  const { svg, width, height } = elementToSvg(page, backgroundOf(page))
-  const blob =
-    format === 'svg'
-      ? new Blob([svg], { type: 'image/svg+xml' })
-      : await rasterise(svg, width, height)
+  const background = backgroundOf(page)
+  const blob = await encode(elementToSvg(page, background), format, background, title)
   downloadBlob(blob, `${name}.${format}`)
 }
 
@@ -425,7 +443,13 @@ function attr(value: string): string {
   return escapeXml(value).replace(/"/g, "'")
 }
 
-async function rasterise(svg: string, width: number, height: number): Promise<Blob> {
+async function rasterise(
+  svg: string,
+  width: number,
+  height: number,
+  type: 'image/png' | 'image/jpeg',
+  background?: string,
+): Promise<Blob> {
   const url = URL.createObjectURL(new Blob([svg], { type: 'image/svg+xml' }))
   try {
     const image = new Image()
@@ -439,12 +463,17 @@ async function rasterise(svg: string, width: number, height: number): Promise<Bl
     canvas.height = Math.round(height * PNG_SCALE)
     const ctx = canvas.getContext('2d')
     if (!ctx) throw new Error('This browser would not give a 2D canvas.')
+    if (background) {
+      ctx.fillStyle = background
+      ctx.fillRect(0, 0, canvas.width, canvas.height)
+    }
     ctx.setTransform(PNG_SCALE, 0, 0, PNG_SCALE, 0, 0)
     ctx.drawImage(image, 0, 0, width, height)
     return await new Promise<Blob>((resolve, reject) => {
       canvas.toBlob(
         (blob) => (blob ? resolve(blob) : reject(new Error('The canvas produced no image.'))),
-        'image/png',
+        type,
+        0.92,
       )
     })
   } finally {
@@ -452,7 +481,7 @@ async function rasterise(svg: string, width: number, height: number): Promise<Bl
   }
 }
 
-function downloadBlob(blob: Blob, filename: string): void {
+export function downloadBlob(blob: Blob, filename: string): void {
   const url = URL.createObjectURL(blob)
   const a = document.createElement('a')
   a.href = url

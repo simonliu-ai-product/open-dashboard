@@ -1,6 +1,6 @@
 import { useFilters } from '../runtime/context.js'
 import { useEdit } from '../runtime/edit.js'
-import { withBase } from '../runtime/snapshot.js'
+import { snapshot, withBase } from '../runtime/snapshot.js'
 
 /**
  * Click a bar, slice, point or row to filter by it.
@@ -32,6 +32,8 @@ export function useDrill(drill: Drill | undefined): DrillState | undefined {
   const { editing } = useEdit()
   if (!drill || editing) return undefined
   const spec = typeof drill === 'string' ? { filter: drill } : drill
+  // A one-file export holds this dashboard only: there is no other to open.
+  if (spec.dashboard && snapshot()?.single) return undefined
   const current = spec.dashboard ? null : (values[spec.filter] ?? null)
   return {
     filter: spec.filter,

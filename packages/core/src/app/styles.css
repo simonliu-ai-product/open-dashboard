@@ -2645,6 +2645,42 @@ body.odd-dragging * {
   animation: odd-pop 140ms ease-out;
 }
 
+.odd-download-error {
+  position: absolute;
+  top: calc(100% + 4px);
+  right: 0;
+  z-index: 30;
+  width: max-content;
+  max-width: 280px;
+  margin: 0;
+  padding: 8px 10px;
+  border-radius: 8px;
+  background: var(--odd-surface);
+  box-shadow:
+    0 0 0 1px var(--odd-border-strong),
+    var(--odd-shadow);
+  color: var(--odd-bad);
+  font-size: 12.5px;
+  line-height: 1.4;
+  animation: odd-pop 140ms ease-out;
+}
+
+.odd-download [data-busy] svg {
+  animation: odd-pulse 1s ease-in-out infinite;
+}
+
+@keyframes odd-pulse {
+  50% {
+    opacity: 0.35;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .odd-download [data-busy] svg {
+    animation: none;
+  }
+}
+
 .odd-download-menu button {
   padding: 6px 10px;
   border: 0;

@@ -327,6 +327,17 @@ export function apiPlugin(workspace: Workspace, overrides: ConfigOverrides): Plu
             collected(body.id, run)
             return json(res, 200, run)
           }
+          if (route === 'export-html' && req.method === 'GET') {
+            const id = q('id')
+            if (!id) return json(res, 400, { error: 'id is required' })
+            // Loaded on demand: it runs a Vite build, and imports what imports this file.
+            const { exportHtml } = await import('../cli/build.js')
+            const html = await exportHtml(workspace, id, q('search') ?? '')
+            res.statusCode = 200
+            res.setHeader('Content-Type', 'text/html; charset=utf-8')
+            res.setHeader('Cache-Control', 'no-store')
+            return res.end(html)
+          }
           if (route === 'charts' && req.method === 'GET') {
             return json(res, 200, { charts: await chartCatalog(workspace) })
           }

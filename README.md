@@ -263,11 +263,13 @@ The **Charts** page lists the 41 built-in panels and your custom charts side by 
 
 A theme is `themes/<id>.json` — chart palette, accent, up / down colours (red-up, green-down if that is your market's convention), page and panel backgrounds, grid, fonts and corner radius, each for light and dark. Anything left out keeps the built-in value, and the text drawn on a coloured mark picks black or white by contrast on its own. A dashboard picks one with `meta.theme` (or from the theme menu in Edit mode, which writes it into `index.tsx`); `theme` in the config sets the workspace default. Every chart draws through the `--odd-*` variables, so a theme restyles all 41 panels and every custom chart without touching them.
 
-### 🖼️ Download a panel — or the whole dashboard — as PNG or SVG
+### 🖼️ Download a panel — or the whole dashboard — as PNG, SVG, PDF or HTML
 
 <img src=".github/assets/download.png" alt="A panel's download menu with PNG and SVG." width="100%">
 
 Every panel has a **Download** menu. The export includes the title and legend, uses the dashboard's theme, and leaves out the buttons, tooltips and edit handles. SVG is real vectors — text as `<text>`, colours resolved, no `<foreignObject>` — so it renders outside a browser too (macOS Preview, for one); PNG is drawn from it at twice the size. The **download button in the header**, beside Preview / Edit, does the same for the whole dashboard — title, the filters as they are set, and every panel — as one image. Fonts are referenced by name, not embedded: an SVG opened on a machine without the dashboard's font falls back to another one, while the PNG always looks exactly as it did on screen.
+
+**PDF** is the same picture on one page sized to it, ready to attach to an email; its text is part of the image, so it cannot be selected. **HTML** (the whole dashboard) is one file holding the viewer and the dashboard's results, opening at the filters you had set: send it, open it from disk with no server, and its filters, tooltips and downloads still work — the same contents rule as `open-dashboard build`, results only.
 
 ### 📦 Share a snapshot: `open-dashboard build`
 

@@ -22,7 +22,13 @@ function unavailable(): Promise<never> {
  */
 export function staticApi(): Api {
   const loaded = new Map<string, Promise<unknown>>()
+  // A one-file export carries its data inline.
+  const inline = (globalThis as { __ODD_DATA__?: Record<string, unknown> }).__ODD_DATA__
   const load = <T>(path: string): Promise<T> => {
+    if (inline)
+      return path in inline
+        ? Promise.resolve(inline[path] as T)
+        : Promise.reject(new Error(NOT_IN_SNAPSHOT))
     let pending = loaded.get(path)
     if (!pending) {
       const base = new URL(snapshot()?.base ?? '/', window.location.origin)
@@ -71,6 +77,7 @@ export function staticApi(): Api {
     ask: unavailable,
     collectors: async () => [],
     collect: unavailable,
+    exportHtml: unavailable,
     themes: () => load('themes.json'),
     theme: (id) => load(`themes/${encodeURIComponent(id)}.json`),
     saveTheme: unavailable,

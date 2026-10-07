@@ -25,6 +25,9 @@ export interface DashboardHeaderProps {
   onDownload?: (format: ImageFormat) => Promise<void>
   /** A built snapshot: results are fixed, nothing can be edited or refreshed. */
   frozen?: boolean
+  /** A one-file export: no list to go back to, no address worth copying. */
+  standalone?: boolean
+  formats?: ImageFormat[]
 }
 
 /**
@@ -48,8 +51,12 @@ export function DashboardHeader(props: DashboardHeaderProps) {
   return (
     <header className="odd-header" data-mode={props.mode}>
       <nav className="odd-crumbs" aria-label={t('Breadcrumb')}>
-        <a {...linkProps('/')}>{t('Dashboards')}</a>
-        <span aria-hidden="true">/</span>
+        {props.standalone ? null : (
+          <>
+            <a {...linkProps('/')}>{t('Dashboards')}</a>
+            <span aria-hidden="true">/</span>
+          </>
+        )}
         <span aria-current="page">{props.title}</span>
       </nav>
 
@@ -101,20 +108,22 @@ export function DashboardHeader(props: DashboardHeaderProps) {
             </button>
           </>
         )}
-        <button
-          type="button"
-          className="odd-icon-button odd-header-icon"
-          title={copied ? t('Link copied') : t('Copy link')}
-          aria-label={copied ? t('Link copied') : t('Copy link')}
-          onClick={() =>
-            navigator.clipboard?.writeText(window.location.href).then(
-              () => setCopied(true),
-              () => {},
-            )
-          }
-        >
-          {copied ? <CheckIcon /> : <LinkIcon />}
-        </button>
+        {props.standalone ? null : (
+          <button
+            type="button"
+            className="odd-icon-button odd-header-icon"
+            title={copied ? t('Link copied') : t('Copy link')}
+            aria-label={copied ? t('Link copied') : t('Copy link')}
+            onClick={() =>
+              navigator.clipboard?.writeText(window.location.href).then(
+                () => setCopied(true),
+                () => {},
+              )
+            }
+          >
+            {copied ? <CheckIcon /> : <LinkIcon />}
+          </button>
+        )}
         {props.mode === 'edit' && props.themes && props.onTheme ? (
           <label className="odd-refresh">
             <span className="odd-sr-only">{t('Themes')}</span>
@@ -158,6 +167,7 @@ export function DashboardHeader(props: DashboardHeaderProps) {
         {props.onDownload ? (
           <DownloadMenu
             save={props.onDownload}
+            {...(props.formats ? { formats: props.formats } : {})}
             label={t('Download dashboard')}
             className="odd-icon-button odd-header-icon"
           />
