@@ -301,4 +301,8 @@ export const APP: Record<string, string> = {
   'Phase (group)': '단계 (그룹)',
   'Depends on (after)': '선행 작업 (after)',
   'Done (progress)': '진행률 (progress)',
+  'Update now': '지금 업데이트',
+  'Updating…': '업데이트 중…',
+  'Update failed': '업데이트 실패',
+  'Not run yet': '아직 실행 안 됨',
 }

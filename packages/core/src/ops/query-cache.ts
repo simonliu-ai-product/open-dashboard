@@ -1,13 +1,15 @@
 import type { ParamValue } from '../config.js'
 
-/** '30s', '5m', '1h', '250ms'; 'off' or '0' for no caching. */
+/** '30s', '5m', '1h', '1d', '250ms'; 'off' or '0' for no caching. */
 export function parseDuration(text: string): number | undefined {
   const value = text.trim().toLowerCase()
   if (value === 'off' || value === 'false' || value === '0') return 0
-  const match = /^(\d+(?:\.\d+)?)\s*(ms|s|m|h)$/.exec(value)
+  const match = /^(\d+(?:\.\d+)?)\s*(ms|s|m|h|d)$/.exec(value)
   if (!match) return undefined
   const n = Number(match[1])
-  const unit = { ms: 1, s: 1000, m: 60_000, h: 3_600_000 }[match[2] as 'ms' | 's' | 'm' | 'h']
+  const unit = { ms: 1, s: 1000, m: 60_000, h: 3_600_000, d: 86_400_000 }[
+    match[2] as 'ms' | 's' | 'm' | 'h' | 'd'
+  ]
   return Math.round(n * unit)
 }
 

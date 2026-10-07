@@ -12,7 +12,7 @@ const RESOLVED_ID = `\0${MANIFEST_ID}`
  * whenever a dashboard folder appears or disappears, so the browser only ever
  * sees lazy imports.
  */
-export function manifestPlugin(workspace: Workspace): Plugin {
+export function manifestPlugin(workspace: Workspace, only?: string[]): Plugin {
   let server: ViteDevServer | undefined
 
   const generate = (): string => {
@@ -25,7 +25,7 @@ export function manifestPlugin(workspace: Workspace): Plugin {
         )
         .join(',\n')
     return (
-      `export const dashboards = [\n${list(discoverDashboards(root, dashboardsDir))}\n]\n` +
+      `export const dashboards = [\n${list(discoverDashboards(root, dashboardsDir).filter((d) => !only || only.includes(d.id)))}\n]\n` +
       `export const charts = [\n${list(discoverCharts(root, chartsDir))}\n]\n`
     )
   }

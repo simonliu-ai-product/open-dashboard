@@ -7,6 +7,7 @@ import {
   McpServer,
   originValidationResponse,
 } from '@modelcontextprotocol/server'
+import { type ServeStdioOptions, serveStdio } from '@modelcontextprotocol/server/stdio'
 import type { Workspace } from '@open-dashboard/core/node'
 import { registerTools } from './tools.js'
 
@@ -59,4 +60,17 @@ export function createOpenDashboardMcpHandler(options: OpenDashboardMcpOptions) 
 /** Connect-style middleware, for mounting on the dev server. */
 export function createOpenDashboardMcpMiddleware(options: OpenDashboardMcpOptions) {
   return toNodeHandler(createOpenDashboardMcpHandler(options))
+}
+
+/**
+ * The same tools over this process's stdin and stdout, for clients that start
+ * a server themselves (Claude Desktop, most agent frameworks). The client that
+ * spawned the process is the only caller, so there is no Host or Origin to
+ * check. Nothing else may write to stdout: it is the protocol.
+ */
+export function serveOpenDashboardStdio(
+  options: OpenDashboardMcpOptions & Pick<ServeStdioOptions, 'transport' | 'onerror'>,
+) {
+  const { transport, onerror, ...rest } = options
+  return serveStdio(() => createOpenDashboardMcpServer(rest), { transport, onerror })
 }

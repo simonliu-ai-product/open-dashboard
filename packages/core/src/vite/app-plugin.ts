@@ -1,7 +1,8 @@
 import type { Plugin } from 'vite'
 import { sourceEntry } from './package-root.js'
 
-function shell(entry: string): string {
+/** The page around the viewer: the dev server's, and every page `open-dashboard build` writes. */
+export function shell(script: string, head = '', afterScript = ''): string {
   return `<!doctype html>
 <html lang="en">
 <head>
@@ -10,10 +11,11 @@ function shell(entry: string): string {
 <title>open-dashboard</title>
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 20 20'%3E%3Crect x='2' y='10' width='4' height='8' rx='1' fill='%232a78d6'/%3E%3Crect x='8' y='5' width='4' height='13' rx='1' fill='%231baf7a'/%3E%3Crect x='14' y='2' width='4' height='16' rx='1' fill='%23eb6834'/%3E%3C/svg%3E">
 <script>try{var t=localStorage.getItem('odd:theme');if(t)document.documentElement.dataset.theme=t}catch(e){}</script>
-</head>
+${head}</head>
 <body>
 <div id="root"></div>
-<script type="module" src="/@fs${entry}"></script>
+<script type="module" src="${script}"></script>
+${afterScript}
 </body>
 </html>
 `
@@ -36,7 +38,7 @@ export function appPlugin(): Plugin {
           const [path] = req.url.split('?')
           if (path?.includes('.') || path?.startsWith('/@') || path?.startsWith('/__odd'))
             return next()
-          const html = await server.transformIndexHtml(req.url, shell(entry))
+          const html = await server.transformIndexHtml(req.url, shell(`/@fs${entry}`))
           res.statusCode = 200
           res.setHeader('Content-Type', 'text/html')
           res.end(html)

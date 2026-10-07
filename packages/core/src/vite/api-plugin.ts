@@ -4,6 +4,12 @@ import type { ParamValue } from '../config.js'
 import { redact, redactValue } from '../datasource/redact.js'
 import { errorMessage } from '../datasource/types.js'
 import {
+  type CollectorRun,
+  listCollectors,
+  runCollector,
+  scheduleCollectors,
+} from '../ops/collectors.js'
+import {
   type AnswerPiece,
   addComment,
   assistantInstructions,
@@ -161,6 +167,17 @@ export function apiPlugin(workspace: Workspace, overrides: ConfigOverrides): Plu
           }
         }
       }
+      // The data under every panel may have changed: refetch them all.
+      const collected = (id: string, run: CollectorRun) => {
+        server.ws.send({ type: 'custom', event: 'odd:collectors-changed', data: { id } })
+        server.ws.send({ type: 'custom', event: 'odd:queries-changed', data: {} })
+        server.config.logger.info(
+          `  open-dashboard: collector ${id} ${run.ok ? 'done' : 'failed'} in ${Math.round(run.durationMs / 1000)} s`,
+        )
+      }
+      const stopSchedule = scheduleCollectors(workspace, collected)
+      server.httpServer?.once('close', stopSchedule)
+
       server.watcher.add([join(root, '.env'), join(root, '.env.local')])
       server.watcher.on('change', onChange)
       server.watcher.on('add', onChange)
@@ -292,6 +309,23 @@ export function apiPlugin(workspace: Workspace, overrides: ConfigOverrides): Plu
               if (!controller.signal.aborted) send({ error: redact(errorMessage(error)) })
             }
             return res.end()
+          }
+          if (route === 'collectors' && req.method === 'GET') {
+            return json(res, 200, { collectors: listCollectors(workspace) })
+          }
+          if (route === 'collect' && req.method === 'POST') {
+            // The page names a collector from the config; it never sends a command.
+            const body = await readBody(req)
+            if (typeof body.id !== 'string') return json(res, 400, { error: 'id is required' })
+            const pending = runCollector(workspace, body.id)
+            server.ws.send({
+              type: 'custom',
+              event: 'odd:collectors-changed',
+              data: { id: body.id },
+            })
+            const run = await pending
+            collected(body.id, run)
+            return json(res, 200, run)
           }
           if (route === 'charts' && req.method === 'GET') {
             return json(res, 200, { charts: await chartCatalog(workspace) })

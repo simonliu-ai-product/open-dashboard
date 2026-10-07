@@ -301,4 +301,8 @@ export const APP: Record<string, string> = {
   'Phase (group)': '阶段（分组）',
   'Depends on (after)': '前置任务（after）',
   'Done (progress)': '完成度（progress）',
+  'Update now': '立即更新',
+  'Updating…': '更新中…',
+  'Update failed': '更新失败',
+  'Not run yet': '尚未运行',
 }

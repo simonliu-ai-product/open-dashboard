@@ -135,7 +135,7 @@ export function queryParams(config: ResolvedConfig, query: NamedQuery): string[]
 }
 
 /** Every parameter a query reads, its inputs' included. */
-function readsOf(
+export function readsOf(
   config: ResolvedConfig,
   queries: Map<string, NamedQuery>,
   name: string,

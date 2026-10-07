@@ -1,3 +1,5 @@
+import { referenceNow } from './snapshot.js'
+
 export const TIME_PRESETS = {
   today: 'Today',
   '7d': 'Last 7 days',
@@ -30,7 +32,7 @@ function day(date: Date): string {
  */
 export function resolveTimeRange(
   preset: TimePreset,
-  now = new Date(),
+  now = referenceNow(),
 ): { from: string; to: string } {
   const start = new Date(now.getFullYear(), now.getMonth(), now.getDate())
   const tomorrow = new Date(start)

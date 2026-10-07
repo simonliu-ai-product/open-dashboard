@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import { stripBase, withBase } from '../../runtime/snapshot.js'
 
 export type Route =
   | { name: 'home' }
@@ -23,6 +24,10 @@ export function parseRoute(pathname: string): Route {
 let guard: (() => boolean) | undefined
 let shown = typeof window === 'undefined' ? '' : window.location.pathname + window.location.search
 
+function current(): string {
+  return window.location.pathname + window.location.search
+}
+
 /**
  * While unsaved changes are open, leaving the page is refused rather than
  * losing them: the guard returns true to block, and shows why on its own.
@@ -36,26 +41,27 @@ export function setNavigationGuard(next: (() => boolean) | undefined): () => voi
 
 /** `replace` for a redirect: the address it leaves is not one the back button should return to. */
 export function navigate(path: string, options: { replace?: boolean } = {}): void {
-  if (path === window.location.pathname + window.location.search) return
+  const address = withBase(path)
+  if (address === current()) return
   if (guard?.()) return
-  if (options.replace) window.history.replaceState(null, '', path)
-  else window.history.pushState(null, '', path)
-  shown = path
+  if (options.replace) window.history.replaceState(null, '', address)
+  else window.history.pushState(null, '', address)
+  shown = address
   window.dispatchEvent(new PopStateEvent('popstate'))
 }
 
 export function useRoute(): Route {
-  const [route, setRoute] = useState(() => parseRoute(window.location.pathname))
+  const [route, setRoute] = useState(() => parseRoute(stripBase(window.location.pathname)))
   useEffect(() => {
     const update = () => {
-      const now = window.location.pathname + window.location.search
+      const now = current()
       // The back button already moved the address; put it back.
       if (now !== shown && guard?.()) {
         window.history.pushState(null, '', shown)
         return
       }
       shown = now
-      setRoute(parseRoute(window.location.pathname))
+      setRoute(parseRoute(stripBase(window.location.pathname)))
     }
     window.addEventListener('popstate', update)
     return () => window.removeEventListener('popstate', update)
@@ -66,7 +72,7 @@ export function useRoute(): Route {
 /** An in-app link: a real <a> for middle-click and copy, routed without a reload. */
 export function linkProps(path: string) {
   return {
-    href: path,
+    href: withBase(path),
     onClick: (event: React.MouseEvent) => {
       if (event.metaKey || event.ctrlKey || event.shiftKey || event.button !== 0) return
       event.preventDefault()

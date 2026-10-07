@@ -1,6 +1,6 @@
 import { existsSync, readFileSync } from 'node:fs'
 import { createRequire } from 'node:module'
-import { join } from 'node:path'
+import { join, resolve } from 'node:path'
 import { pathToFileURL } from 'node:url'
 import type { Plugin } from 'vite'
 import type { Workspace } from '../workspace.js'
@@ -11,17 +11,30 @@ const PACKAGE = '@open-dashboard/mcp'
 
 type Middleware = (req: unknown, res: unknown, next: (error?: unknown) => void) => void
 
+interface McpOptions {
+  workspace: Workspace
+  allowSql: boolean
+  version: string
+}
+
 interface McpModule {
-  createOpenDashboardMcpMiddleware(options: {
-    workspace: Workspace
-    allowSql: boolean
-    version: string
-  }): Middleware
+  createOpenDashboardMcpMiddleware(options: McpOptions): Middleware
+  serveOpenDashboardStdio(options: McpOptions & { onerror?: (error: Error) => void }): {
+    close(): Promise<void>
+  }
+}
+
+export const MCP_INSTALL = 'pnpm add -D @open-dashboard/mcp'
+
+export function coreVersion(): string {
+  return (
+    JSON.parse(readFileSync(join(packageRoot(), 'package.json'), 'utf8')) as { version: string }
+  ).version
 }
 
 /** The workspace installs the package, so resolve it from there first, then from core. */
-async function importMcp(root: string): Promise<McpModule | undefined> {
-  for (const anchor of [join(root, 'package.json'), import.meta.url]) {
+export async function importMcp(root: string): Promise<McpModule | undefined> {
+  for (const anchor of [join(resolve(root), 'package.json'), import.meta.url]) {
     if (!anchor.startsWith('file:') && !existsSync(anchor)) continue
     try {
       const resolved = createRequire(anchor).resolve(PACKAGE)
@@ -54,13 +67,10 @@ export function mcpPlugin(
         options.onMissing()
         return
       }
-      const version = (
-        JSON.parse(readFileSync(join(packageRoot(), 'package.json'), 'utf8')) as { version: string }
-      ).version
       const middleware = mod.createOpenDashboardMcpMiddleware({
         workspace,
         allowSql: options.allowSql,
-        version,
+        version: coreVersion(),
       })
       server.middlewares.use(MCP_ENDPOINT, middleware)
     },

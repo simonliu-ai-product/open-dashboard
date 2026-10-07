@@ -57,7 +57,7 @@ dashboards/sales-overview/
 
 ### 🔧 給任何 Agent 用的 MCP server
 
-Skills 教的是會改檔案的 Coding Agent。支援 MCP 的 Agent 框架，則能把同一個 workspace 當成工具來用：`pnpm add -D @open-dashboard/mcp`，再執行 `open-dashboard dev --mcp`，端點就在 `http://localhost:5473/mcp`。列出與讀取 Dashboard、讀 schema 與 `database.md`、寫入 `index.tsx` 與 `.sql`、執行具名查詢、`check`——Agent 一寫，瀏覽器裡的頁面就跟著更新。每個工具走的都是檢視器與 CLI 用的同一套程式：同樣的唯讀驅動程式、同樣的遮蔽、同樣的 hash 檢查，不會覆蓋掉期間內別人做的修改。`--allow-sql` 會加上用來探索資料的 `run_sql`——唯讀，而且預設不開啟。來自其他網站或其他主機名稱的請求一律拒絕。詳見 [packages/mcp](packages/mcp/README.zh-TW.md)。
+Skills 教的是會改檔案的 Coding Agent。支援 MCP 的 Agent 框架，則能把同一個 workspace 當成工具來用：`pnpm add -D @open-dashboard/mcp`，再執行 `open-dashboard dev --mcp`，端點就在 `http://localhost:5473/mcp`。列出與讀取 Dashboard、讀 schema 與 `database.md`、寫入 `index.tsx` 與 `.sql`、執行具名查詢、`check`——Agent 一寫，瀏覽器裡的頁面就跟著更新。每個工具走的都是檢視器與 CLI 用的同一套程式：同樣的唯讀驅動程式、同樣的遮蔽、同樣的 hash 檢查，不會覆蓋掉期間內別人做的修改。`--allow-sql` 會加上用來探索資料的 `run_sql`——唯讀，而且預設不開啟。來自其他網站或其他主機名稱的請求一律拒絕。用戶端會自己啟動 server 的情況（Claude Desktop、多數 Agent 框架），則用 `open-dashboard mcp` 透過 stdio 提供同一組工具，不需要開 dev server。詳見 [packages/mcp](packages/mcp/README.zh-TW.md)。
 
 ### 🔒 瀏覽器只能點名查詢，永遠不送 SQL
 
@@ -172,6 +172,18 @@ sheets: { type: 'csv', tables: { budget: { file: 'data/budget.csv' } } },
 - CSV 的欄位只有在每個值都是純數字時才轉成數字，所以 `0050` 這種代號會保留為文字。`.tsv` 以 Tab 分隔，也可以用 `delimiter` 指定。
 - 只讀取 workspace 裡的檔案，絕不寫入，也不會讓網頁直接下載原始檔。檔案一改，讀它的面板就會重新整理。
 
+### 🔄 用收集器讓資料保持最新
+
+資料是要抓下來的——API 存進 SQLite、匯出成 CSV——就在設定檔寫好怎麼抓，open-dashboard 會幫你跑：
+
+```ts
+collectors: {
+  stocks: { run: 'uv run collector/collect.py', every: '1h', source: 'stocks' },
+},
+```
+
+`open-dashboard dev` 會依排程執行每個收集器；`open-dashboard collect [name]` 則立刻執行。資料來源頁面會顯示上次執行的時間——失敗時附上輸出的結尾——以及「立即更新」按鈕；跑完之後，所有面板都會重新取資料。指令在 workspace 根目錄執行並載入 `.env`，金鑰留在 `.env` 裡就好。網頁只能點名設定檔裡的收集器，永遠不會送出指令；輸出和其他訊息一樣會遮蔽機密。
+
 ### 🔗 跨資料庫查詢
 
 廣告花費在一個資料庫、營收在另一個。一條查詢可以用 `-- uses:` 把其他查詢的結果當成資料表使用：
@@ -256,6 +268,17 @@ import Radar from '../../charts/radar'
 <img src=".github/assets/download.png" alt="面板的下載選單，可選 PNG 或 SVG。" width="100%">
 
 每個面板都有**下載**選單。匯出內容包含標題與圖例，套用 Dashboard 的主題，並排除按鈕、提示框與編輯控制項。SVG 是真正的向量檔——文字是 `<text>`、顏色已解析、沒有 `<foreignObject>`——所以在瀏覽器以外也能正確顯示（例如 macOS 的預覽程式）；PNG 則以兩倍解析度從它繪製。頁首「預覽／編輯」旁的**下載按鈕**則把整張 Dashboard——標題、目前的篩選條件與所有面板——輸出成一張圖。字型是以名稱引用而非內嵌：在沒有該字型的電腦上開啟 SVG，會換成其他字型，PNG 則一定和螢幕上看到的一樣。
+
+### 📦 分享快照：`open-dashboard build`
+
+`open-dashboard build` 會把 Dashboard 連同此刻的查詢結果輸出成靜態網站——放在 GitHub Pages、S3、任何網頁伺服器、任何路徑下都能開。篩選器照樣能用：每條查詢會預先跑過它讀到的篩選值的所有組合（上限 `--max-runs`，預設 100；超過時，選項最多的篩選器維持預設值）。讀者拿到的是圖表、篩選、連結與下載；網站裡沒有 SQL、沒有連線字串、沒有檔案路徑，也不會連到你的資料庫。編輯、備註、檢視器與對話助理只在 dev server 上提供。
+
+```bash
+pnpm exec open-dashboard build                   # → site/
+pnpm exec open-dashboard build sales --out public
+```
+
+網站裡有查詢結果，所以新的 workspace 會把 `site/` 列進 `.gitignore`：要公開請刻意發佈。
 
 ### 💬 選用的對話助理，只根據畫面回答
 
@@ -342,6 +365,9 @@ pnpm dev                     # http://localhost:5473
 | `open-dashboard query --dashboard <id> --name <query>` | 執行某張 Dashboard 的具名查詢 |
 | `open-dashboard check [id] [--json]` | 執行每條查詢、驗證每個面板；有錯誤時以非零狀態結束 |
 | `open-dashboard charts [--json]` | 這個 workspace 能用的所有圖表——41 種內建與 `charts/`——以及使用它們的 Dashboard |
+| `open-dashboard build [id...] [--out site] [--max-runs 100]` | 把 Dashboard 連同此刻的結果輸出成靜態網站 |
+| `open-dashboard collect [name...]` | 立刻執行設定檔裡的收集器；有失敗時以非零狀態結束 |
+| `open-dashboard mcp [--allow-sql]` | 透過 stdio 提供 MCP 工具，給會自己啟動 server 的用戶端（需要 `@open-dashboard/mcp`） |
 | `open-dashboard sync-skills` | 升級後更新這個 workspace 的 Agent Skills |
 
 ## 檔案契約

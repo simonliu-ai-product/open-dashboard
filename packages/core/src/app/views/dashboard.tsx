@@ -17,6 +17,7 @@ import { applyProps } from '../../runtime/convert.js'
 import { EditContext } from '../../runtime/edit.js'
 import { downloadDashboard, exportName } from '../../runtime/export-panel.js'
 import { useT } from '../../runtime/i18n.js'
+import { snapshot } from '../../runtime/snapshot.js'
 import type { DashboardTheme } from '../../runtime/theme.js'
 import type { DashboardMeta, PanelInfo, QueryRun } from '../../runtime/types.js'
 import { Assistant, useAssistantEnabled } from '../components/assistant.js'
@@ -268,7 +269,8 @@ export function DashboardView({ id, preview }: { id: string; preview?: ThemePrev
   if (refreshSetting && !refreshChoices.includes(refreshSetting))
     refreshChoices.push(refreshSetting)
 
-  const interval = parseInterval(refreshSetting === 'off' ? undefined : refreshSetting)
+  const taken = snapshot()?.builtAt
+  const interval = parseInterval(refreshSetting === 'off' || taken ? undefined : refreshSetting)
   useEffect(() => {
     if (!interval) return
     const timer = window.setInterval(() => {
@@ -288,7 +290,7 @@ export function DashboardView({ id, preview }: { id: string; preview?: ThemePrev
       meta,
       tick,
       refresh,
-      inspectable: !preview,
+      inspectable: !preview && !taken,
       inspect: (panel, run) => {
         setInspecting({ panel, run })
         focus.current = { panel: panel.title, ...(panel.query ? { query: panel.query } : {}) }
@@ -323,7 +325,7 @@ export function DashboardView({ id, preview }: { id: string; preview?: ThemePrev
         return pending
       },
     }
-  }, [id, meta, tick, refresh, preview])
+  }, [id, meta, tick, refresh, preview, taken])
 
   if (error) {
     return (
@@ -346,7 +348,15 @@ export function DashboardView({ id, preview }: { id: string; preview?: ThemePrev
           {preview ? null : (
             <DashboardHeader
               title={meta?.title ?? id}
-              updatedAt={timeOf(updatedAt)}
+              updatedAt={
+                taken
+                  ? new Date(taken).toLocaleString(undefined, {
+                      dateStyle: 'medium',
+                      timeStyle: 'short',
+                    })
+                  : timeOf(updatedAt)
+              }
+              frozen={taken !== undefined}
               refreshSetting={refreshSetting ?? 'off'}
               refreshChoices={refreshChoices}
               onRefreshSetting={chooseRefresh}

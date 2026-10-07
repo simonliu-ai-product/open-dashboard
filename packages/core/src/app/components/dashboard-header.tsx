@@ -23,6 +23,8 @@ export interface DashboardHeaderProps {
   onTheme?: (id: string) => void
   /** The whole dashboard as one image. */
   onDownload?: (format: ImageFormat) => Promise<void>
+  /** A built snapshot: results are fixed, nothing can be edited or refreshed. */
+  frozen?: boolean
 }
 
 /**
@@ -52,7 +54,7 @@ export function DashboardHeader(props: DashboardHeaderProps) {
       </nav>
 
       <div className="odd-header-actions">
-        {props.notes.length > 0 ? (
+        {props.notes.length > 0 && !props.frozen ? (
           <button
             type="button"
             className="odd-notes-pill"
@@ -72,29 +74,33 @@ export function DashboardHeader(props: DashboardHeaderProps) {
           </button>
         ) : null}
         <span className="odd-header-updated">{t('Updated {time}', { time: props.updatedAt })}</span>
-        <label className="odd-refresh">
-          <span className="odd-sr-only">{t('Auto-refresh')}</span>
-          <select
-            value={props.refreshSetting}
-            onChange={(event) => props.onRefreshSetting(event.target.value)}
-            title={t('Auto-refresh')}
-          >
-            {props.refreshChoices.map((value) => (
-              <option key={value} value={value}>
-                {value === 'off' ? t('Auto-refresh off') : intervalLabel(value, t)}
-              </option>
-            ))}
-          </select>
-        </label>
-        <button
-          type="button"
-          className="odd-icon-button odd-header-icon"
-          onClick={props.onRefresh}
-          title={t('Refresh')}
-          aria-label={t('Refresh')}
-        >
-          <RefreshIcon />
-        </button>
+        {props.frozen ? null : (
+          <>
+            <label className="odd-refresh">
+              <span className="odd-sr-only">{t('Auto-refresh')}</span>
+              <select
+                value={props.refreshSetting}
+                onChange={(event) => props.onRefreshSetting(event.target.value)}
+                title={t('Auto-refresh')}
+              >
+                {props.refreshChoices.map((value) => (
+                  <option key={value} value={value}>
+                    {value === 'off' ? t('Auto-refresh off') : intervalLabel(value, t)}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <button
+              type="button"
+              className="odd-icon-button odd-header-icon"
+              onClick={props.onRefresh}
+              title={t('Refresh')}
+              aria-label={t('Refresh')}
+            >
+              <RefreshIcon />
+            </button>
+          </>
+        )}
         <button
           type="button"
           className="odd-icon-button odd-header-icon"
@@ -126,27 +132,29 @@ export function DashboardHeader(props: DashboardHeaderProps) {
             </select>
           </label>
         ) : null}
-        <fieldset className="odd-mode">
-          <legend className="odd-sr-only">{t('Mode')}</legend>
-          <button
-            type="button"
-            aria-pressed={props.mode === 'view'}
-            onClick={() => props.onMode('view')}
-            title={t('Preview')}
-          >
-            <EyeIcon />
-            <span>{t('Preview')}</span>
-          </button>
-          <button
-            type="button"
-            aria-pressed={props.mode === 'edit'}
-            onClick={() => props.onMode('edit')}
-            title={t('Edit')}
-          >
-            <PencilIcon />
-            <span>{t('Edit')}</span>
-          </button>
-        </fieldset>
+        {props.frozen ? null : (
+          <fieldset className="odd-mode">
+            <legend className="odd-sr-only">{t('Mode')}</legend>
+            <button
+              type="button"
+              aria-pressed={props.mode === 'view'}
+              onClick={() => props.onMode('view')}
+              title={t('Preview')}
+            >
+              <EyeIcon />
+              <span>{t('Preview')}</span>
+            </button>
+            <button
+              type="button"
+              aria-pressed={props.mode === 'edit'}
+              onClick={() => props.onMode('edit')}
+              title={t('Edit')}
+            >
+              <PencilIcon />
+              <span>{t('Edit')}</span>
+            </button>
+          </fieldset>
+        )}
         {props.onDownload ? (
           <DownloadMenu
             save={props.onDownload}

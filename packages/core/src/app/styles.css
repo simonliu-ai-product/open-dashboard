@@ -568,6 +568,10 @@ button {
   align-items: start;
 }
 
+.odd-home-grid[data-single] {
+  grid-template-columns: minmax(0, 1fr);
+}
+
 .odd-boards {
   margin: 0;
   padding: 0;
@@ -658,6 +662,87 @@ button {
   font-size: 15px;
   font-weight: 500;
   letter-spacing: 0;
+}
+
+.odd-collectors {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-bottom: 20px;
+}
+
+.odd-collector {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 12px;
+  padding: 8px 8px 8px 12px;
+  border-radius: var(--odd-radius);
+  background: var(--odd-surface);
+  box-shadow: 0 0 0 1px var(--odd-border);
+}
+
+.odd-collector code {
+  font-family: var(--odd-mono);
+  font-size: 12.5px;
+  color: var(--odd-ink);
+}
+
+.odd-collector-status {
+  flex: 1;
+  min-width: 0;
+  font-size: 13px;
+  color: var(--odd-muted);
+}
+
+.odd-collector[data-state="failed"] .odd-collector-status {
+  color: var(--odd-bad);
+}
+
+.odd-collector .odd-button {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 13px;
+}
+
+.odd-collector .odd-button svg {
+  width: 14px;
+  height: 14px;
+}
+
+.odd-collector[data-state="running"] .odd-button svg {
+  animation: odd-spin 1s linear infinite;
+}
+
+@keyframes odd-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .odd-collector[data-state="running"] .odd-button svg {
+    animation: none;
+  }
+}
+
+.odd-collector .odd-button:disabled {
+  cursor: default;
+  opacity: 0.6;
+}
+
+.odd-collector pre {
+  flex-basis: 100%;
+  max-height: 200px;
+  margin: 0;
+  overflow: auto;
+  padding: 8px 10px;
+  border-radius: 6px;
+  background: var(--odd-surface-2);
+  font-family: var(--odd-mono);
+  font-size: 12px;
+  white-space: pre-wrap;
 }
 
 .odd-source-error {

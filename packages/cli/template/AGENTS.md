@@ -31,6 +31,8 @@ pnpm exec open-dashboard query "SELECT …"        # run read-only SQL, see rows
 pnpm exec open-dashboard query --dashboard <id> --name <query> --param from=2026-01-01
 pnpm exec open-dashboard check [id]              # run every query, verify every panel
 pnpm exec open-dashboard charts                  # every chart you can use — built-in and charts/ — before making a new one
+pnpm exec open-dashboard collect [name]          # run the config's collectors: commands that refresh a datasource
+pnpm exec open-dashboard build                   # static site of the dashboards with today's results → site/
 pnpm exec open-dashboard sync-skills             # after upgrading @open-dashboard/core: refresh these skills
 ```
 

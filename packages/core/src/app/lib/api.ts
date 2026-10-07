@@ -1,12 +1,15 @@
 import type { ParamValue, SchemaInfo } from '../../config.js'
 import type { CatalogEntry } from '../../ops/charts.js'
+import type { CollectorRun, CollectorStatus } from '../../ops/collectors.js'
 import type { DashboardSummary } from '../../ops/dashboards.js'
 import type { DatabaseDoc } from '../../ops/database-doc.js'
 import type { DashboardLayout, LayoutEdit } from '../../ops/layout.js'
 import type { SourceDetail, SourceStatus } from '../../ops/sources.js'
 import type { ThemeFile, ThemeList } from '../../ops/themes.js'
+import { snapshot } from '../../runtime/snapshot.js'
 import type { DashboardTheme } from '../../runtime/theme.js'
 import type { QueryRun } from '../../runtime/types.js'
+import { staticApi } from './static-api.js'
 
 const BASE = '/__odd/api/'
 
@@ -25,7 +28,7 @@ function post<T>(path: string, body: unknown): Promise<T> {
   })
 }
 
-export const api = {
+export const liveApi = {
   dashboards: () =>
     request<{ dashboards: DashboardSummary[] }>('dashboards').then((r) => r.dashboards),
   sources: () => request<{ sources: SourceStatus[] }>('sources').then((r) => r.sources),
@@ -93,8 +96,16 @@ export const api = {
     }
     return reply
   },
+  collectors: () =>
+    request<{ collectors: CollectorStatus[] }>('collectors').then((r) => r.collectors),
+  collect: (id: string) => post<CollectorRun>('collect', { id }),
   themes: () => request<ThemeList>('themes'),
   theme: (id: string) => request<ThemeFile>(`theme?id=${encodeURIComponent(id)}`),
   saveTheme: (id: string, hash: string, theme: DashboardTheme) =>
     post<{ hash: string }>('theme', { id, hash, theme }),
 }
+
+export type Api = typeof liveApi
+
+/** A page built by `open-dashboard build` reads stored results; the dev server is not there. */
+export const api: Api = snapshot() ? staticApi() : liveApi

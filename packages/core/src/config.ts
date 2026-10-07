@@ -209,6 +209,22 @@ export interface AssistantConfig {
   reasoningEffort?: string
 }
 
+/**
+ * A command that refreshes a datasource — fetches an API into SQLite, exports
+ * a CSV. It runs in the workspace root with `.env` loaded. The page can start
+ * one by its name; it never sends a command.
+ */
+export interface CollectorConfig {
+  /** A string runs in a shell; an array runs the program directly. */
+  run: string | string[]
+  /** Run on a schedule while `open-dashboard dev` runs: '15m', '1h', '1d'. Omit to run only when asked. */
+  every?: string
+  /** The datasource it writes: its page shows the last run, with a button to run it now. */
+  source?: string
+  /** Stopped after this long. Default '10m'. */
+  timeout?: string
+}
+
 export interface OpenDashboardConfig {
   /** Where dashboards live. Default `dashboards`. */
   dashboardsDir?: string
@@ -230,6 +246,8 @@ export interface OpenDashboardConfig {
   /** The theme in `themes/<id>.json` for dashboards that do not pick one with `meta.theme`. */
   theme?: string
   assistant?: AssistantConfig
+  /** Commands that refresh datasources, by name: `open-dashboard collect <name>`. */
+  collectors?: Record<string, CollectorConfig>
 }
 
 export type ColumnType = 'number' | 'string' | 'date' | 'boolean' | 'unknown'

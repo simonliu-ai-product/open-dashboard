@@ -57,7 +57,7 @@ After an upgrade, `open-dashboard sync-skills` refreshes them; `dev` tells you w
 
 ### 🔧 An MCP server for any agent
 
-Skills teach a coding agent that edits files. An agent framework that speaks MCP gets the same workspace as tools: `pnpm add -D @open-dashboard/mcp`, then `open-dashboard dev --mcp` serves it at `http://localhost:5473/mcp`. List and read dashboards, read schemas and `database.md`, write `index.tsx` and `.sql` files, run named queries, `check` — and the page in the browser reloads as the agent writes. Every tool goes through the same code the viewer and the CLI use: the same read-only drivers, the same masking, the same hash check that refuses to overwrite an edit made meanwhile. `--allow-sql` adds `run_sql` for exploring data — read-only, and off unless asked for. Requests from another origin or host name are refused. See [packages/mcp](packages/mcp).
+Skills teach a coding agent that edits files. An agent framework that speaks MCP gets the same workspace as tools: `pnpm add -D @open-dashboard/mcp`, then `open-dashboard dev --mcp` serves it at `http://localhost:5473/mcp`. List and read dashboards, read schemas and `database.md`, write `index.tsx` and `.sql` files, run named queries, `check` — and the page in the browser reloads as the agent writes. Every tool goes through the same code the viewer and the CLI use: the same read-only drivers, the same masking, the same hash check that refuses to overwrite an edit made meanwhile. `--allow-sql` adds `run_sql` for exploring data — read-only, and off unless asked for. Requests from another origin or host name are refused. For a client that starts its server itself — Claude Desktop, most agent frameworks — `open-dashboard mcp` serves the same tools over stdio, with no dev server. See [packages/mcp](packages/mcp).
 
 ### 🔒 The browser names a query; it never sends SQL
 
@@ -172,6 +172,18 @@ sheets: { type: 'csv', tables: { budget: { file: 'data/budget.csv' } } },
 - A CSV column becomes numbers only when every value is a plain number, so a code like `0050` stays text. `.tsv` is tab-separated; `delimiter` overrides.
 - Files are read only from inside the workspace, never written, and never served to the page as files. Edit one and the panels that read it refresh.
 
+### 🔄 Collectors keep the data fresh
+
+When the data is something you fetch — an API into SQLite, an export into CSV — say how in the config, and open-dashboard runs it:
+
+```ts
+collectors: {
+  stocks: { run: 'uv run collector/collect.py', every: '1h', source: 'stocks' },
+},
+```
+
+`open-dashboard dev` runs each collector on its schedule; `open-dashboard collect [name]` runs it now. The data source's page shows when it last ran — with the end of its output if it failed — and an **Update now** button; afterwards every panel refetches. The command runs in the workspace root with `.env` loaded, so its keys stay in `.env`. The page names a collector from the config and never sends a command, and its output is masked like every other message.
+
 ### 🔗 Cross-database queries
 
 Ad spend in one database, revenue in another. A query can `-- uses:` other queries' results as tables:
@@ -256,6 +268,17 @@ A theme is `themes/<id>.json` — chart palette, accent, up / down colours (red-
 <img src=".github/assets/download.png" alt="A panel's download menu with PNG and SVG." width="100%">
 
 Every panel has a **Download** menu. The export includes the title and legend, uses the dashboard's theme, and leaves out the buttons, tooltips and edit handles. SVG is real vectors — text as `<text>`, colours resolved, no `<foreignObject>` — so it renders outside a browser too (macOS Preview, for one); PNG is drawn from it at twice the size. The **download button in the header**, beside Preview / Edit, does the same for the whole dashboard — title, the filters as they are set, and every panel — as one image. Fonts are referenced by name, not embedded: an SVG opened on a machine without the dashboard's font falls back to another one, while the PNG always looks exactly as it did on screen.
+
+### 📦 Share a snapshot: `open-dashboard build`
+
+`open-dashboard build` writes the dashboards and their results, taken now, as a static site — open it on GitHub Pages, an S3 bucket, any web server, under any path. The filters still work: for each query, every combination of the filter values it reads is run ahead of time (up to `--max-runs`, 100 by default; past that, the widest filters keep their default). A reader gets the charts, the filters, links and downloads; there is no SQL, no connection string and no file path in the site, and nothing on it reaches your database. Editing, notes, the inspector and the assistant stay on the dev server.
+
+```bash
+pnpm exec open-dashboard build                   # → site/
+pnpm exec open-dashboard build sales --out public
+```
+
+The site holds query results, so `site/` is git-ignored in a new workspace: publish it deliberately.
 
 ### 💬 An optional assistant that answers from the page
 
@@ -342,6 +365,9 @@ No database to hand? `init my-dashboards --sample` adds a small generated SQLite
 | `open-dashboard query --dashboard <id> --name <query>` | Run one of a dashboard's named queries |
 | `open-dashboard check [id] [--json]` | Run every query, verify every panel; non-zero exit on errors |
 | `open-dashboard charts [--json]` | Every chart this workspace can use — the 41 built-ins and `charts/` — and the dashboards using each |
+| `open-dashboard build [id...] [--out site] [--max-runs 100]` | Static site of the dashboards with their results taken now |
+| `open-dashboard collect [name...]` | Run the config's collectors now; non-zero exit if one fails |
+| `open-dashboard mcp [--allow-sql]` | The MCP tools over stdio, for a client that starts the server (needs `@open-dashboard/mcp`) |
 | `open-dashboard sync-skills` | Update this workspace's agent skills after an upgrade |
 
 ## The file contract

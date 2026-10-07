@@ -4,3 +4,5 @@ dist
 .env
 .env.local
 data/sample.db
+# open-dashboard build: holds query results
+site

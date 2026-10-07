@@ -31,7 +31,53 @@ export interface ResolvedConfig {
   theme: string | undefined
   /** Resolved and usable, or undefined when off or incomplete. */
   assistant: ResolvedAssistant | undefined
+  collectors: Record<string, ResolvedCollector>
   configFile: string | undefined
+}
+
+export interface ResolvedCollector {
+  id: string
+  run: string | string[]
+  everyMs: number | undefined
+  every: string | undefined
+  source: string | undefined
+  timeoutMs: number
+}
+
+const COLLECTOR_ID = /^[A-Za-z0-9][A-Za-z0-9_-]*$/
+
+function resolveCollectors(
+  input: OpenDashboardConfig['collectors'],
+): Record<string, ResolvedCollector> {
+  const out: Record<string, ResolvedCollector> = {}
+  for (const [id, collector] of Object.entries(input ?? {})) {
+    if (!COLLECTOR_ID.test(id))
+      throw new DatasourceError(`collectors: "${id}" — use letters, digits, - and _`)
+    const run = collector.run
+    if (
+      !(typeof run === 'string' && run.trim()) &&
+      !(Array.isArray(run) && run.length > 0 && run.every((part) => typeof part === 'string'))
+    )
+      throw new DatasourceError(`collectors.${id}.run must be a command or an array of arguments`)
+    const duration = (key: 'every' | 'timeout', text: string | undefined) => {
+      if (text === undefined) return undefined
+      const ms = parseDuration(text)
+      if (!ms)
+        throw new DatasourceError(
+          `collectors.${id}.${key}: "${text}" is not a duration — use '15m', '1h' or '1d'`,
+        )
+      return ms
+    }
+    out[id] = {
+      id,
+      run,
+      everyMs: duration('every', collector.every),
+      every: collector.every,
+      source: collector.source,
+      timeoutMs: duration('timeout', collector.timeout) ?? 600_000,
+    }
+  }
+  return out
 }
 
 export interface ResolvedAssistant {
@@ -175,6 +221,7 @@ export async function loadConfig(
     cacheMs: resolveCache(user.cache),
     theme: user.theme,
     assistant,
+    collectors: resolveCollectors(user.collectors),
     configFile: file,
   }
 }
@@ -187,6 +234,8 @@ export class Workspace {
   private sources = new Map<string, Promise<Datasource>>()
   /** Dashboard query results, shared by every viewer. */
   readonly cache = new QueryCache<QueryRun>()
+  /** Collectors running now, by id: a second request joins the run instead of starting another. */
+  readonly collecting = new Map<string, Promise<unknown>>()
 
   constructor(public config: ResolvedConfig) {}
 

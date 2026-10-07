@@ -1,5 +1,6 @@
 import { useFilters } from '../runtime/context.js'
 import { useEdit } from '../runtime/edit.js'
+import { withBase } from '../runtime/snapshot.js'
 
 /**
  * Click a bar, slice, point or row to filter by it.
@@ -22,7 +23,7 @@ export interface DrillState {
 }
 
 function navigate(path: string): void {
-  window.history.pushState(null, '', path)
+  window.history.pushState(null, '', withBase(path))
   window.dispatchEvent(new PopStateEvent('popstate'))
 }
 

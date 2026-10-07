@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import type { DashboardLayout } from '../../ops/layout.js'
 import type { LayoutEdit } from '../../runtime/convert.js'
 import { type EditState, foldEdits, foldStructure, stageEdit } from '../../runtime/edit.js'
+import { snapshot } from '../../runtime/snapshot.js'
 import { api } from './api.js'
 import { setNavigationGuard } from './router.js'
 
@@ -17,6 +18,7 @@ export type SaveStatus =
 const MODE_KEY = 'odd:mode'
 
 function initialMode(): Mode {
+  if (snapshot()) return 'view'
   try {
     return sessionStorage.getItem(MODE_KEY) === 'edit' ? 'edit' : 'view'
   } catch {

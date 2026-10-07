@@ -2,7 +2,7 @@ import { createServer } from 'vite'
 import { discoverDashboards } from '../ops/dashboards.js'
 import { staleSkills } from '../ops/skills.js'
 import { viteConfigFor } from '../vite/index.js'
-import { MCP_ENDPOINT, mcpPlugin } from '../vite/mcp-plugin.js'
+import { MCP_ENDPOINT, MCP_INSTALL, mcpPlugin } from '../vite/mcp-plugin.js'
 import { type ConfigOverrides, loadConfig, Workspace } from '../workspace.js'
 
 export interface DevOptions {
@@ -48,7 +48,7 @@ export async function dev(
   if (options.mcp) {
     out.write(
       mcpMissing
-        ? '  mcp: off — run: pnpm add -D @open-dashboard/mcp\n'
+        ? `  mcp: off — run: ${MCP_INSTALL}\n`
         : `  mcp: ${new URL(MCP_ENDPOINT, url).href}${options.allowSql ? '  (run_sql on)' : ''}\n`,
     )
   }
@@ -64,6 +64,11 @@ export async function dev(
         ? '  next: ask your agent: /create-dashboard\n\n'
         : `  ${found.length} dashboard${found.length === 1 ? '' : 's'}: ${found.map((f) => f.id).join(', ')}\n`,
     )
+    const collectors = Object.values(config.collectors)
+    if (collectors.length)
+      out.write(
+        `  collectors: ${collectors.map((c) => (c.every ? `${c.id} (every ${c.every})` : c.id)).join(', ')}\n`,
+      )
     if (config.assistant)
       out.write(
         `  assistant: ${[config.assistant.provider, config.assistant.model, config.assistant.reasoningEffort].filter(Boolean).join(' · ')}\n`,

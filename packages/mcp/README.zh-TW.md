@@ -16,6 +16,23 @@ pnpm exec open-dashboard dev --mcp
 
 讓用戶端連到 `http://localhost:5473/mcp`（Streamable HTTP）。每次呼叫都是獨立的，不需要建立 session，任何用戶端都能直接連線。
 
+### 透過 stdio
+
+用戶端會自己啟動 server 的情況（Claude Desktop、多數 Agent 框架），改用 `open-dashboard mcp`。不需要 dev server，同一組工具透過 stdin 與 stdout 提供。
+
+```json
+{
+  "mcpServers": {
+    "open-dashboard": {
+      "command": "/path/to/workspace/node_modules/.bin/open-dashboard",
+      "args": ["mcp", "--root", "/path/to/workspace"]
+    }
+  }
+}
+```
+
+要 `run_sql` 就加上 `--allow-sql`。workspace 只在啟動時讀取一次：改了 `open-dashboard.config.ts` 之後請重新啟動用戶端。
+
 ## 工具
 
 | 工具 | 用途 |
@@ -32,6 +49,7 @@ pnpm exec open-dashboard dev --mcp
 | `list_themes` / `read_theme` / `write_theme` | `themes/` 下的主題，逐欄驗證。 |
 | `list_comments` / `add_comment` | 留在面板上、等待處理的備註。 |
 | `current_view` | 使用者正在檢視器裡看什麼：「這張 Dashboard」、「這張圖」指的是哪個。 |
+| `list_collectors` / `run_collector` | 設定檔裡的收集器：上次執行的結果，以及立刻執行一個。 |
 | `run_sql` | Agent 自己寫的唯讀 SQL——只有加上 `--allow-sql` 才會提供。 |
 
 ## 撰寫一張 Dashboard
@@ -51,7 +69,7 @@ pnpm exec open-dashboard dev --mcp
 
 ## 安全
 
-- **只接受本機連線。** 檢查 Host 與 Origin 標頭：其他網站的網頁無法操作這些工具（擋下 DNS rebinding），其他主機名稱的請求也會被拒絕。兩者都回 `403`，即使用 `open-dashboard dev --host` 把檢視器開放到網路上也一樣。
+- **只接受本機連線。** 透過 HTTP 時，檢查 Host 與 Origin 標頭：其他網站的網頁無法操作這些工具（擋下 DNS rebinding），其他主機名稱的請求也會被拒絕。兩者都回 `403`，即使用 `open-dashboard dev --host` 把檢視器開放到網路上也一樣。
 - **寫入範圍受限**於 `dashboards/<id>/index.tsx`、`dashboards/<id>/*.sql`、`databases/<source>/database.md` 與 `themes/<id>.json`；id 與檔名都會驗證，硬碟上的其他檔案一律寫不進去。
 - **錯誤訊息會遮蔽**，和 open-dashboard 印出的所有訊息一樣：錯誤裡的連線字串或金鑰不會傳給 Agent。
 - 這裡不驗證呼叫者的身分。要把端點開放到本機以外，需要在前面加一層會驗證身分的反向代理。

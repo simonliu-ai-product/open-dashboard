@@ -2,9 +2,11 @@ import { mkdirSync, mkdtempSync, realpathSync, rmSync, writeFileSync } from 'nod
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { DatabaseSync } from 'node:sqlite'
+import { PassThrough } from 'node:stream'
+import { StdioServerTransport } from '@modelcontextprotocol/server/stdio'
 import { loadConfig, Workspace } from '@open-dashboard/core/node'
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
-import { createOpenDashboardMcpHandler } from './index.js'
+import { createOpenDashboardMcpHandler, serveOpenDashboardStdio } from './index.js'
 
 let root: string
 let workspace: Workspace
@@ -143,5 +145,74 @@ describe('MCP server', () => {
       403,
     )
     expect((await rpc(false, 'tools/list', {}, { Host: 'evil.example' })).status).toBe(403)
+  })
+
+  it('serves the same tools over stdio', async () => {
+    const stdin = new PassThrough()
+    const stdout = new PassThrough()
+    const server = serveOpenDashboardStdio({
+      workspace,
+      transport: new StdioServerTransport(stdin, stdout),
+    })
+    const replies: Record<string, unknown>[] = []
+    let buffer = ''
+    stdout.on('data', (chunk: Buffer) => {
+      buffer += chunk.toString()
+      let newline = buffer.indexOf('\n')
+      while (newline !== -1) {
+        replies.push(JSON.parse(buffer.slice(0, newline)))
+        buffer = buffer.slice(newline + 1)
+        newline = buffer.indexOf('\n')
+      }
+    })
+    const send = (message: Record<string, unknown>) =>
+      stdin.write(`${JSON.stringify({ jsonrpc: '2.0', ...message })}\n`)
+    const reply = async (id: number) => {
+      for (let i = 0; i < 200; i += 1) {
+        const found = replies.find((r) => r.id === id)
+        if (found) return found as { result: Record<string, unknown> }
+        await new Promise((r) => setTimeout(r, 10))
+      }
+      throw new Error(`no reply to ${id}`)
+    }
+
+    send({
+      id: 1,
+      method: 'initialize',
+      params: {
+        protocolVersion: '2025-06-18',
+        capabilities: {},
+        clientInfo: { name: 'test', version: '0' },
+      },
+    })
+    await reply(1)
+    send({ method: 'notifications/initialized' })
+    send({
+      id: 2,
+      method: 'tools/call',
+      params: { name: 'run_query', arguments: { dashboard: 'sales', query: 'total' } },
+    })
+    const result = (await reply(2)).result as { content: { text: string }[] }
+    expect(JSON.parse(result.content[0]?.text ?? '').rows).toEqual([{ total: 60 }])
+    await server.close()
+  })
+
+  it('drops cached results when a query file is written', async () => {
+    expect(
+      JSON.parse((await tool('run_query', { dashboard: 'sales', query: 'total' })).text).rows,
+    ).toEqual([{ total: 60 }])
+    const { text } = await tool('read_dashboard', { id: 'sales' })
+    const sql = (JSON.parse(text).files as { name: string; hash: string }[]).find(
+      (f) => f.name === 'queries.sql',
+    )
+    await tool('write_dashboard_file', {
+      id: 'sales',
+      file: 'queries.sql',
+      content: '-- name: total\nSELECT MAX(total) AS total FROM orders;\n',
+      expected: sql?.hash,
+    })
+    expect(
+      JSON.parse((await tool('run_query', { dashboard: 'sales', query: 'total' })).text).rows,
+    ).toEqual([{ total: 40 }])
   })
 })

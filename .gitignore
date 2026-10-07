@@ -12,3 +12,4 @@ packages/cli/template/skills
 *.db-journal
 *.db-wal
 *.db-shm
+site

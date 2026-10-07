@@ -15,6 +15,8 @@ export interface FilterDecl {
   default: string | null | undefined
   /** Select only: the query that lists its options. */
   query?: string
+  /** The choices written as a literal `options` array: presets, or a Select's values. */
+  options?: string[]
   allowAll: boolean
   line: number
 }
@@ -195,6 +197,17 @@ export function analyzeDashboard(
         default: typeof raw === 'string' || raw === null ? raw : undefined,
         allowAll: read('allowAll') !== false,
         line: line(node),
+      }
+      const options = read('options')
+      if (Array.isArray(options)) {
+        const values = options.map((option) =>
+          typeof option === 'string'
+            ? option
+            : typeof (option as { value?: unknown } | undefined)?.value === 'string'
+              ? (option as { value: string }).value
+              : undefined,
+        )
+        if (values.every((value) => value !== undefined)) decl.options = values as string[]
       }
       if (typeof query === 'string') {
         decl.query = query

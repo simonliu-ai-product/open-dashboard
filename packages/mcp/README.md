@@ -16,6 +16,23 @@ pnpm exec open-dashboard dev --mcp
 
 Point a client at `http://localhost:5473/mcp` (Streamable HTTP). Every call is independent — no session handshake — so any client can connect.
 
+### Over stdio
+
+A client that starts its server itself — Claude Desktop, most agent frameworks — runs `open-dashboard mcp` instead. No dev server: the same tools over stdin and stdout.
+
+```json
+{
+  "mcpServers": {
+    "open-dashboard": {
+      "command": "/path/to/workspace/node_modules/.bin/open-dashboard",
+      "args": ["mcp", "--root", "/path/to/workspace"]
+    }
+  }
+}
+```
+
+Add `--allow-sql` for `run_sql`. The workspace is read once at start: restart the client after editing `open-dashboard.config.ts`.
+
 ## Tools
 
 | Tool | What it does |
@@ -32,6 +49,7 @@ Point a client at `http://localhost:5473/mcp` (Streamable HTTP). Every call is i
 | `list_themes` / `read_theme` / `write_theme` | Themes under `themes/`, validated field by field. |
 | `list_comments` / `add_comment` | Notes left on panels, for a later pass. |
 | `current_view` | What the person has open in the viewer: "this dashboard", "this chart". |
+| `list_collectors` / `run_collector` | The config's collectors: their last run, and running one now. |
 | `run_sql` | Read-only SQL of the agent's own — only with `--allow-sql`. |
 
 ## Writing a dashboard
@@ -51,7 +69,7 @@ The viewer never sends SQL — a page can only name a query written in a `.sql` 
 
 ## Security
 
-- **Loopback only.** Host and Origin headers are checked against loopback: a page on another origin cannot drive the tools (no DNS rebinding onto a local endpoint), and a request with another host name is refused. Both are `403`, also when `open-dashboard dev --host` exposes the viewer itself.
+- **Loopback only.** Over HTTP, Host and Origin headers are checked against loopback: a page on another origin cannot drive the tools (no DNS rebinding onto a local endpoint), and a request with another host name is refused. Both are `403`, also when `open-dashboard dev --host` exposes the viewer itself.
 - **Writes are confined** to `dashboards/<id>/index.tsx`, `dashboards/<id>/*.sql`, `databases/<source>/database.md` and `themes/<id>.json`; ids and file names are validated, and nothing else on disk can be written.
 - **Errors are masked** like every other message open-dashboard prints: a connection string or key in an error never reaches the agent.
 - Nothing here authenticates a caller. Exposing the endpoint beyond loopback needs a reverse proxy that does.

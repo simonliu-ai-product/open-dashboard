@@ -3,18 +3,22 @@ import { DRIVERS } from '../datasource/registry.js'
 import { errorMessage } from '../datasource/types.js'
 import {
   type CatalogEntry,
+  type CollectorRun,
   chartCatalog,
   checkWorkspace,
   listSources,
   readDatabaseDoc,
   readSchema,
+  runCollector,
   runDashboardQuery,
   runSql,
   SKILL_DIRS,
   schemaToText,
   syncSkills,
 } from '../ops/index.js'
+import { coreVersion, importMcp, MCP_INSTALL } from '../vite/mcp-plugin.js'
 import { loadConfig, Workspace } from '../workspace.js'
+import { buildSite } from './build.js'
 import { dev } from './dev.js'
 import { formatResult } from './table.js'
 
@@ -25,6 +29,7 @@ Usage:
 
 Commands:
   dev                       Start the viewer with hot reload (default port 5473)
+  build [id...]             Static site of the dashboards with their results taken now (default out: site/)
   drivers                   Supported databases, the package each needs, how it stays read-only
   sources                   List datasources and test each connection
   schema [source]           Print tables, columns, keys and row counts
@@ -33,6 +38,8 @@ Commands:
                             Run one of a dashboard's named queries
   check [id]                Run every query of every dashboard, verify panels
   charts                    Every chart you can use — built-in and charts/ — and where each is used
+  collect [id...]           Run the collectors in the config (all, or those named) and report each
+  mcp                       Serve the MCP tools over stdio, for a client that starts it (needs @open-dashboard/mcp)
   sync-skills               Update the agent skills in this workspace to the installed version
 
 Options:
@@ -41,8 +48,10 @@ Options:
   --port <n>             Port for dev
   --host <host>          Bind address for dev
   --open                 Open a browser (dev)
+  --out <dir>            Output folder for build (default: site)
+  --max-runs <n>         Runs per query for build: filter combinations beyond it keep defaults (default 100)
   --mcp                  Serve an MCP endpoint at /mcp for agents (dev; needs @open-dashboard/mcp)
-  --allow-sql            With --mcp, also offer run_sql: read-only SQL of the agent's own (dev)
+  --allow-sql            With --mcp or mcp, also offer run_sql: read-only SQL of the agent's own
   --source <name>        Datasource for query/schema (default: defaultSource)
   --param <key=value>    Bind :key in the SQL; repeatable. "null" binds NULL
   --limit <n>            Rows to print for query (default 50)
@@ -72,6 +81,8 @@ const VALUE_FLAGS = new Set([
   '--limit',
   '--dashboard',
   '--name',
+  '--out',
+  '--max-runs',
 ])
 
 function positional(argv: string[]): string[] {
@@ -130,6 +141,50 @@ export async function run(argv: string[]): Promise<number> {
     return new Promise<number>(() => {})
   }
 
+  if (command === 'build') {
+    const options: Parameters<typeof buildSite>[0] = {
+      root,
+      ids: positional(argv),
+      log: (line) => out(`${line}\n`),
+    }
+    const dir = flag(argv, 'out')
+    if (dir) options.out = dir
+    const maxRuns = flag(argv, 'max-runs')
+    if (maxRuns) options.maxRuns = Number(maxRuns)
+    out('open-dashboard build — taking results now\n')
+    await buildSite(options)
+    out('  serve it with any static web server; it never reaches your database\n')
+    return 0
+  }
+
+  if (command === 'mcp') {
+    // stdout is the protocol from here on: everything for a person goes to stderr.
+    const mod = await importMcp(root)
+    if (!mod) {
+      process.stderr.write(`open-dashboard mcp needs @open-dashboard/mcp — run: ${MCP_INSTALL}\n`)
+      return 1
+    }
+    const workspace = new Workspace(await loadConfig(root))
+    const allowSql = argv.includes('--allow-sql')
+    const server = mod.serveOpenDashboardStdio({
+      workspace,
+      allowSql,
+      version: coreVersion(),
+      onerror: (error) => process.stderr.write(`open-dashboard mcp: ${describeError(error)}\n`),
+    })
+    process.stderr.write(
+      `open-dashboard mcp: ${workspace.config.root} over stdio${allowSql ? ' (run_sql on)' : ''}\n`,
+    )
+    // The client closing stdin ends the session; database pools would keep the process alive.
+    return new Promise<number>((resolve) => {
+      process.stdin.once('close', async () => {
+        await server.close()
+        await workspace.close()
+        resolve(0)
+      })
+    })
+  }
+
   if (command === 'sync-skills') {
     const names = syncSkills(root)
     out(`updated ${names.length} skills in ${SKILL_DIRS.join(' and ')}: ${names.join(', ')}\n`)
@@ -151,7 +206,7 @@ export async function run(argv: string[]): Promise<number> {
     return 0
   }
 
-  const known = ['sources', 'schema', 'query', 'check', 'charts']
+  const known = ['sources', 'schema', 'query', 'check', 'charts', 'collect']
   if (!known.includes(command)) {
     process.stderr.write(`unknown command: ${command}\n\n${USAGE}`)
     return 1
@@ -159,6 +214,34 @@ export async function run(argv: string[]): Promise<number> {
 
   const workspace = new Workspace(await loadConfig(root))
   try {
+    if (command === 'collect') {
+      const named = positional(argv)
+      const ids = named.length ? named : Object.keys(workspace.config.collectors)
+      if (ids.length === 0) {
+        out('no collectors — add one under collectors in open-dashboard.config.ts\n')
+        return 1
+      }
+      const runs: Record<string, CollectorRun> = {}
+      for (const id of ids) {
+        if (!json) out(`… ${id}\n`)
+        const run = await runCollector(workspace, id)
+        runs[id] = run
+        if (json) continue
+        out(
+          `${run.ok ? '✓' : '✗'} ${id}: ${(run.durationMs / 1000).toFixed(1)} s${run.ok ? '' : `, exit ${run.exitCode ?? '—'}`}\n`,
+        )
+        if (!run.ok && run.output)
+          out(
+            `${run.output
+              .split('\n')
+              .map((line) => `    ${line}`)
+              .join('\n')}\n`,
+          )
+      }
+      if (json) out(`${JSON.stringify(runs, null, 2)}\n`)
+      return Object.values(runs).every((run) => run.ok) ? 0 : 1
+    }
+
     if (command === 'charts') {
       const catalog = await chartCatalog(workspace)
       if (json) {

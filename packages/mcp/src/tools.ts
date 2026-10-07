@@ -5,6 +5,7 @@ import {
   checkWorkspace,
   errorMessage,
   getCurrent,
+  listCollectors,
   listComments,
   listDashboards,
   listSources,
@@ -14,6 +15,7 @@ import {
   readDatabaseDoc,
   readSchema,
   readTheme,
+  runCollector,
   runDashboardQuery,
   runSql,
   schemaToText,
@@ -117,7 +119,12 @@ export function registerTools(server: McpServer, workspace: Workspace, options: 
       annotations: { readOnlyHint: false, destructiveHint: false },
     },
     ({ id, file, content, expected }) =>
-      run(() => writeDashboardFile(config(), id, file, content, expected)),
+      run(() => {
+        const written = writeDashboardFile(config(), id, file, content, expected)
+        // The dev server's watcher does this too; over stdio nothing else would.
+        if (file.endsWith('.sql')) workspace.cache.clear(id)
+        return written
+      }),
   )
 
   server.registerTool(
@@ -305,6 +312,30 @@ export function registerTools(server: McpServer, workspace: Workspace, options: 
       annotations: { readOnlyHint: true },
     },
     () => run(() => getCurrent(config()) ?? { id: null }),
+  )
+
+  server.registerTool(
+    'list_collectors',
+    {
+      title: 'List collectors',
+      description:
+        'The commands in the config that refresh datasources: the source each fills, its schedule, and how its last run went (with the end of its output if it failed).',
+      inputSchema: z.object({}),
+      annotations: { readOnlyHint: true },
+    },
+    () => run(() => listCollectors(workspace)),
+  )
+
+  server.registerTool(
+    'run_collector',
+    {
+      title: 'Run a collector',
+      description:
+        "Run one of the config's collectors now and wait for it; panels refetch afterwards. Only commands named in the config can run.",
+      inputSchema: z.object({ id: z.string().describe('the collector name from list_collectors') }),
+      annotations: { readOnlyHint: false, destructiveHint: false, openWorldHint: true },
+    },
+    ({ id }) => run(() => runCollector(workspace, id)),
   )
 
   if (options.allowSql) {

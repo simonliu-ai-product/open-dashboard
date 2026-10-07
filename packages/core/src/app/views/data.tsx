@@ -1,11 +1,13 @@
 import { useEffect, useMemo, useState } from 'react'
 import type { SchemaInfo } from '../../config.js'
 import { driverFor } from '../../datasource/registry.js'
+import type { CollectorStatus } from '../../ops/collectors.js'
 import type { DatabaseDoc } from '../../ops/database-doc.js'
 import type { SourceDetail, SourceStatus } from '../../ops/sources.js'
 import { useLocale, useT } from '../../runtime/i18n.js'
 import { Blocks, Inline, splitDatabaseDoc } from '../../runtime/markdown.js'
 import { CommandButton } from '../components/command-button.js'
+import { RefreshIcon } from '../components/icons.js'
 import { SourceOrigin } from '../components/source-origin.js'
 import { api } from '../lib/api.js'
 
@@ -44,6 +46,86 @@ function useDatabaseDoc(source: string | undefined): DatabaseDoc | undefined {
     }
   }, [source])
   return doc
+}
+
+function useCollectors(): [CollectorStatus[] | undefined, () => void] {
+  const [list, setList] = useState<CollectorStatus[]>()
+  const [version, setVersion] = useState(0)
+  // biome-ignore lint/correctness/useExhaustiveDependencies: version re-reads the list
+  useEffect(() => {
+    let live = true
+    api.collectors().then(
+      (found) => live && setList(found),
+      () => live && setList([]),
+    )
+    const reload = () => setVersion((v) => v + 1)
+    import.meta.hot?.on('odd:collectors-changed', reload)
+    import.meta.hot?.on('odd:queries-changed', reload)
+    return () => {
+      live = false
+      import.meta.hot?.off?.('odd:collectors-changed', reload)
+      import.meta.hot?.off?.('odd:queries-changed', reload)
+    }
+  }, [version])
+  return [list, () => setVersion((v) => v + 1)]
+}
+
+/** The collectors that fill this source: when they last ran, and a button to run one now. */
+function Collectors({ source }: { source: string }) {
+  const t = useT()
+  const [list, reload] = useCollectors()
+  const [busy, setBusy] = useState<string[]>([])
+  const mine = list?.filter((c) => c.source === source) ?? []
+  if (mine.length === 0) return null
+  const run = (id: string) => {
+    setBusy((ids) => [...ids, id])
+    api
+      .collect(id)
+      .catch(() => {})
+      .finally(() => {
+        setBusy((ids) => ids.filter((other) => other !== id))
+        reload()
+      })
+  }
+  return (
+    <div className="odd-collectors">
+      {mine.map((collector) => {
+        const running = collector.running || busy.includes(collector.id)
+        const last = collector.last
+        const state = running ? 'running' : !last ? 'idle' : last.ok ? 'ok' : 'failed'
+        const when = last
+          ? new Date(last.finishedAt).toLocaleString(undefined, {
+              dateStyle: 'medium',
+              timeStyle: 'short',
+            })
+          : ''
+        return (
+          <div key={collector.id} className="odd-collector" data-state={state}>
+            <code title={collector.every}>{collector.id}</code>
+            <span className="odd-collector-status">
+              {running
+                ? t('Updating…')
+                : !last
+                  ? t('Not run yet')
+                  : last.ok
+                    ? t('Updated {time}', { time: when })
+                    : `${t('Update failed')} · ${when}`}
+            </span>
+            <button
+              type="button"
+              className="odd-button"
+              disabled={running}
+              onClick={() => run(collector.id)}
+            >
+              <RefreshIcon />
+              <span>{t('Update now')}</span>
+            </button>
+            {state === 'failed' && last?.output ? <pre>{last.output}</pre> : null}
+          </div>
+        )
+      })}
+    </div>
+  )
 }
 
 function isJsonSource(type: string): boolean {
@@ -267,6 +349,7 @@ export function DataSourcesView({
           </fieldset>
         ) : null}
       </header>
+      {current ? <Collectors source={current.name} /> : null}
       {sources?.length === 0 ? (
         <ol className="odd-setup">
           <li data-state="current">

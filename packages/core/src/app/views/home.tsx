@@ -2,6 +2,7 @@ import { driverFor } from '../../datasource/registry.js'
 import type { DashboardSummary } from '../../ops/dashboards.js'
 import type { SourceStatus } from '../../ops/sources.js'
 import { useT } from '../../runtime/i18n.js'
+import { snapshot } from '../../runtime/snapshot.js'
 import { CommandButton } from '../components/command-button.js'
 import { CheckIcon } from '../components/icons.js'
 import { intervalLabel } from '../lib/refresh.js'
@@ -10,6 +11,7 @@ import { linkProps } from '../lib/router.js'
 const COMMANDS = ['/create-dashboard', '/create-chart', '/connect-database', '/apply-comments']
 
 function DashboardRow({ dashboard }: { dashboard: DashboardSummary }) {
+  const live = snapshot() === undefined
   const t = useT()
   return (
     <li>
@@ -29,10 +31,12 @@ function DashboardRow({ dashboard }: { dashboard: DashboardSummary }) {
             <dt>{t('Data')}</dt>
             <dd>{dashboard.sources.length ? dashboard.sources.join(', ') : '—'}</dd>
           </div>
-          <div>
-            <dt>{t('Auto-refresh')}</dt>
-            <dd>{dashboard.refresh ? intervalLabel(dashboard.refresh, t) : t('Off')}</dd>
-          </div>
+          {live ? (
+            <div>
+              <dt>{t('Auto-refresh')}</dt>
+              <dd>{dashboard.refresh ? intervalLabel(dashboard.refresh, t) : t('Off')}</dd>
+            </div>
+          ) : null}
         </dl>
       </a>
     </li>
@@ -83,9 +87,11 @@ export function HomeView({
   error,
 }: {
   dashboards: DashboardSummary[] | undefined
-  sources: SourceStatus[] | undefined
+  sources?: SourceStatus[] | undefined
   error: string | undefined
 }) {
+  // A built snapshot has no connections to show and nothing to set up.
+  const live = snapshot() === undefined
   const t = useT()
 
   return (
@@ -96,10 +102,10 @@ export function HomeView({
 
       {error ? <p className="odd-callout odd-callout-error">{error}</p> : null}
 
-      {dashboards?.length === 0 ? (
+      {dashboards?.length === 0 && live ? (
         <Setup sources={sources} />
       ) : (
-        <div className="odd-home-grid">
+        <div className="odd-home-grid" data-single={live ? undefined : ''}>
           <section aria-label={t('Dashboards')}>
             <ul className="odd-boards">
               {dashboards?.map((d) => (
@@ -108,52 +114,59 @@ export function HomeView({
             </ul>
           </section>
 
-          <aside className="odd-rail">
-            <section className="odd-rail-block" aria-labelledby="odd-sources-heading">
-              <header className="odd-rail-head">
-                <h2 id="odd-sources-heading">{t('Data sources')}</h2>
-                <a {...linkProps('/data')}>{t('Browse tables')}</a>
-              </header>
-              {sources === undefined ? (
-                <p className="odd-muted">{t('Checking connections…')}</p>
-              ) : null}
-              {sources?.length === 0 ? <CommandButton command="/connect-database" /> : null}
-              <ul className="odd-sources">
-                {sources?.map((s) => (
-                  <li key={s.name}>
-                    <a className="odd-source" {...linkProps(`/data/${encodeURIComponent(s.name)}`)}>
-                      <span
-                        className="odd-status"
-                        data-ok={s.ok}
-                        title={s.ok ? t('Connected') : t('Not connected')}
+          {live ? (
+            <aside className="odd-rail">
+              <section className="odd-rail-block" aria-labelledby="odd-sources-heading">
+                <header className="odd-rail-head">
+                  <h2 id="odd-sources-heading">{t('Data sources')}</h2>
+                  <a {...linkProps('/data')}>{t('Browse tables')}</a>
+                </header>
+                {sources === undefined ? (
+                  <p className="odd-muted">{t('Checking connections…')}</p>
+                ) : null}
+                {sources?.length === 0 ? <CommandButton command="/connect-database" /> : null}
+                <ul className="odd-sources">
+                  {sources?.map((s) => (
+                    <li key={s.name}>
+                      <a
+                        className="odd-source"
+                        {...linkProps(`/data/${encodeURIComponent(s.name)}`)}
                       >
-                        {s.ok ? '●' : '▲'}
-                      </span>
-                      <span className="odd-source-name">{s.name}</span>
-                      <span className="odd-source-type">{driverFor(s.type)?.label ?? s.type}</span>
-                      <span className="odd-source-detail">
-                        {s.ok ? t('{n} tables', { n: s.tables ?? 0 }) : s.error}
-                        {s.default ? <span className="odd-badge">{t('default')}</span> : null}
-                      </span>
-                    </a>
-                  </li>
-                ))}
-              </ul>
-            </section>
+                        <span
+                          className="odd-status"
+                          data-ok={s.ok}
+                          title={s.ok ? t('Connected') : t('Not connected')}
+                        >
+                          {s.ok ? '●' : '▲'}
+                        </span>
+                        <span className="odd-source-name">{s.name}</span>
+                        <span className="odd-source-type">
+                          {driverFor(s.type)?.label ?? s.type}
+                        </span>
+                        <span className="odd-source-detail">
+                          {s.ok ? t('{n} tables', { n: s.tables ?? 0 }) : s.error}
+                          {s.default ? <span className="odd-badge">{t('default')}</span> : null}
+                        </span>
+                      </a>
+                    </li>
+                  ))}
+                </ul>
+              </section>
 
-            <section className="odd-rail-block" aria-labelledby="odd-agent-heading">
-              <header className="odd-rail-head">
-                <h2 id="odd-agent-heading">{t('Ask your agent')}</h2>
-              </header>
-              <ul className="odd-commands">
-                {COMMANDS.map((command) => (
-                  <li key={command}>
-                    <CommandButton command={command} />
-                  </li>
-                ))}
-              </ul>
-            </section>
-          </aside>
+              <section className="odd-rail-block" aria-labelledby="odd-agent-heading">
+                <header className="odd-rail-head">
+                  <h2 id="odd-agent-heading">{t('Ask your agent')}</h2>
+                </header>
+                <ul className="odd-commands">
+                  {COMMANDS.map((command) => (
+                    <li key={command}>
+                      <CommandButton command={command} />
+                    </li>
+                  ))}
+                </ul>
+              </section>
+            </aside>
+          ) : null}
         </div>
       )}
     </div>
