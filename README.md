@@ -318,6 +318,8 @@ When the workspace configures one, a chat button appears at the bottom right of 
 
 It works by native tool calling, with exactly two tools. It starts from the list of panels — what each shows, its columns and row count — and reads the rows of only the panels the question needs, so a question about one chart does not pay for every table on the page (on the demo's 29-panel gallery, 86% less is sent); the reply says which panels it read. And it can change what you are looking at: ask *"switch to the North, last 90 days"* and it sets the filters — only to values the filters offer, never a date range or a region they do not — reads the new view, and answers from it, while the page follows; the reply says what it switched, with an **Undo**. A small page goes with the question whole; a model without tool support gets the whole page in one request.
 
+When this page cannot answer, it looks further: it is shown the other dashboards in the workspace — their titles, descriptions and panels — and reads the panels of the one that can, under that dashboard's default filters. The answer says which dashboard a figure comes from, the reply names the panels as *Dashboard › Panel*, and a link under it opens that dashboard. It still reads only panels, never SQL; filters it switches are this page's.
+
 ```ts
 // open-dashboard.config.ts
 assistant: {

@@ -9,6 +9,7 @@ import {
   assistantInstructions,
   assistantStatus,
   dashboardContext,
+  dashboardDirectory,
   panelCatalog,
   panelContext,
   pickFilters,
@@ -591,5 +592,177 @@ describe('answers by tool calling', () => {
     const sent = provider.requests as Sent[]
     expect(sent).toHaveLength(5)
     expect(sent.at(-1)?.tools).toBeUndefined()
+  })
+})
+
+const DAYS = `import { Dashboard, Filters, Select, Row, Table } from '@open-dashboard/core'
+export const meta = { title: 'Daily sales', description: 'Every day, by region' }
+export default function Days() {
+  return (
+    <Dashboard>
+      <Filters>
+        <Select name="region" label="Region" query="regions" default="North" />
+      </Filters>
+      <Row>
+        <Table title="Days" query="days" />
+      </Row>
+    </Dashboard>
+  )
+}
+`
+
+const DAYS_QUERIES = `-- name: regions
+SELECT DISTINCT region FROM sales ORDER BY region;
+
+-- name: days
+SELECT day, amount FROM sales WHERE region = :region ORDER BY day;
+`
+
+describe('answers from other dashboards', () => {
+  it('lists the other dashboards, and reads one under its own default filters', async () => {
+    fixture = await makeFixture({
+      'dashboards/sales/index.tsx': DASHBOARD,
+      'dashboards/sales/queries.sql': QUERIES,
+      'dashboards/days/index.tsx': DAYS,
+      'dashboards/days/queries.sql': DAYS_QUERIES,
+    })
+    const provider = await scripted([
+      { deltas: [call('c1', 'read_panels', { dashboard: 'days', panels: [1] })] },
+      { deltas: [{ content: 'North sold 30 on 2026-09-03 (Daily sales).' }] },
+    ])
+    const out = await events(
+      answer(fixture.workspace, assistantAt(provider.url), 'sales', {}, [
+        { role: 'user', content: 'What did the North sell on 3 September?' },
+      ]),
+    )
+    expect(out).toEqual([
+      {
+        kind: 'read',
+        panels: ['Daily sales › Days'],
+        dashboard: { id: 'days', title: 'Daily sales' },
+      },
+      { kind: 'text', text: 'North sold 30 on 2026-09-03 (Daily sales).' },
+    ])
+    const [first, second] = provider.requests as Sent[]
+    // A small page still offers read_panels: other dashboards are only reachable through it.
+    expect(first?.tools?.map((t) => t.function.name)).toEqual(['read_panels'])
+    const system = String(first?.messages[0]?.content)
+    expect(system).toContain('- days "Daily sales" — Every day, by region\n  [1] Days')
+    expect(system).not.toContain('2026-09-03')
+    const tool = second?.messages.at(-1) as { content: string }
+    expect(tool.content).toContain('Filters: region = North')
+    expect(tool.content).toContain('2026-09-03\t30')
+    expect(tool.content).not.toContain('2026-09-02')
+    expect(tool.content).toContain('options: null (All), North, South')
+  })
+
+  it('says which dashboards exist when asked for one that does not', async () => {
+    fixture = await makeFixture({
+      'dashboards/sales/index.tsx': DASHBOARD,
+      'dashboards/sales/queries.sql': QUERIES,
+      'dashboards/days/index.tsx': DAYS,
+      'dashboards/days/queries.sql': DAYS_QUERIES,
+    })
+    const provider = await scripted([
+      { deltas: [call('c1', 'read_panels', { dashboard: '../secrets', panels: [1] })] },
+      { deltas: [{ content: 'No such dashboard.' }] },
+    ])
+    const out = await events(
+      answer(fixture.workspace, assistantAt(provider.url), 'sales', {}, [
+        { role: 'user', content: 'Read the secrets' },
+      ]),
+    )
+    expect(out).toEqual([{ kind: 'text', text: 'No such dashboard.' }])
+    const tool = (provider.requests as Sent[])[1]?.messages.at(-1) as { content: string }
+    expect(tool.content).toContain('No dashboard "../secrets"')
+    expect(tool.content).toContain('days "Daily sales"')
+  })
+
+  it('lists only titles when the panels would not fit', () => {
+    const many = Array.from({ length: 200 }, (_, i) => ({
+      id: `d${i}`,
+      title: `Dashboard ${i}`,
+      panels: Array.from({ length: 20 }, (_, j) => `A rather long panel title number ${j}`),
+    }))
+    const text = dashboardDirectory(many)
+    expect(text).toContain('- d7 "Dashboard 7" (20 panels)')
+    expect(text).not.toContain('[1] A rather long panel title')
+    expect(dashboardDirectory([])).toBe('')
+  })
+
+  it('compares filter values by reading under each, without switching the page', async () => {
+    fixture = await makeFixture({
+      'dashboards/sales/index.tsx': FILTERED,
+      'dashboards/sales/queries.sql': FILTERED_QUERIES,
+    })
+    const provider = await scripted([
+      {
+        deltas: [
+          calls(
+            ['n', 'read_panels', { panels: [1], filters: [{ key: 'region', value: 'North' }] }],
+            ['s', 'read_panels', { panels: [1], filters: [{ key: 'region', value: 'South' }] }],
+          ),
+        ],
+      },
+      { deltas: [{ content: 'North 40, South 20.' }] },
+    ])
+    const out = await events(
+      answer(
+        fixture.workspace,
+        assistantAt(provider.url),
+        'sales',
+        { from: '0001-01-01', to: '9999-12-31', region: null },
+        [{ role: 'user', content: 'North or South?' }],
+        { values: {} },
+      ),
+    )
+    expect(out).toEqual([
+      { kind: 'read', panels: ['Total (North)'] },
+      { kind: 'read', panels: ['Total (South)'] },
+      { kind: 'text', text: 'North 40, South 20.' },
+    ])
+    const replies = (provider.requests as Sent[])[1]?.messages.slice(-2) as { content: string }[]
+    expect(replies[0]?.content).toContain('region = North')
+    expect(replies[0]?.content).toContain('\n40')
+    expect(replies[1]?.content).toContain('\n20')
+  })
+
+  it('keeps parallel calls apart when they share an index, as Gemini sends them', async () => {
+    fixture = await makeFixture({
+      'dashboards/sales/index.tsx': FILTERED,
+      'dashboards/sales/queries.sql': FILTERED_QUERIES,
+    })
+    const gemini = (id: string, region: string) => ({
+      tool_calls: [
+        {
+          index: 0,
+          id,
+          type: 'function',
+          function: {
+            name: 'read_panels',
+            arguments: JSON.stringify({ panels: [1], filters: [{ key: 'region', value: region }] }),
+          },
+        },
+      ],
+    })
+    const provider = await scripted([
+      { deltas: [gemini('g1', 'North'), gemini('g2', 'South')] },
+      { deltas: [{ content: 'North 40, South 20.' }] },
+    ])
+    await events(
+      answer(
+        fixture.workspace,
+        assistantAt(provider.url),
+        'sales',
+        { from: '0001-01-01', to: '9999-12-31', region: null },
+        [{ role: 'user', content: 'North or South?' }],
+        { values: {} },
+      ),
+    )
+    const sent = (provider.requests as Sent[])[1]?.messages ?? []
+    const asked = sent.at(-3) as { tool_calls: { id: string; function: { arguments: string } }[] }
+    expect(asked.tool_calls.map((c) => c.id)).toEqual(['g1', 'g2'])
+    expect(sent.slice(-2).map((m) => m.tool_call_id)).toEqual(['g1', 'g2'])
+    expect(String(sent.at(-1)?.content)).toContain('region = South')
   })
 })

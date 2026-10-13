@@ -4,6 +4,7 @@ import type { SwitchedFilter } from '../../ops/assistant.js'
 import { useT } from '../../runtime/i18n.js'
 import { Blocks, parseBlocks } from '../../runtime/markdown.js'
 import { api } from '../lib/api.js'
+import { linkProps } from '../lib/router.js'
 
 /**
  * Names in a line: a middle dot reads the same in every language, where a
@@ -25,6 +26,8 @@ interface Message {
   read?: string[]
   /** Filters the assistant switched before answering. */
   switched?: SwitchedFilter[]
+  /** Other dashboards the answer read from: links to open them. */
+  dashboards?: { id: string; title: string }[]
   /** The reader put those filters back. */
   undone?: boolean
 }
@@ -239,6 +242,7 @@ export function Assistant({
             seconds,
             ...(reply.read ? { read: reply.read } : {}),
             ...(reply.switched ? { switched: reply.switched } : {}),
+            ...(reply.dashboards ? { dashboards: reply.dashboards } : {}),
           })
         },
         controller.signal,
@@ -341,6 +345,19 @@ export function Assistant({
                   ) : (
                     message.content
                   )}
+                  {message.dashboards?.length && message.content ? (
+                    <p className="odd-chat-dashboards">
+                      {message.dashboards.map((other) => (
+                        <a
+                          key={other.id}
+                          className="odd-chat-dashboard-link"
+                          {...linkProps(`/d/${encodeURIComponent(other.id)}`)}
+                        >
+                          {other.title} →
+                        </a>
+                      ))}
+                    </p>
+                  ) : null}
                 </div>
               ))
             )}

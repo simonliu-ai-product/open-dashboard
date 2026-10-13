@@ -22,6 +22,8 @@ export interface AssistantReply {
   read?: string[]
   /** Filters the assistant switched, for the page to apply. */
   switched?: SwitchedFilter[]
+  /** Other dashboards it read, for the reader to open. */
+  dashboards?: { id: string; title: string }[]
 }
 
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
@@ -107,12 +109,16 @@ export const liveApi = {
           text?: string
           read?: string[]
           switched?: SwitchedFilter[]
+          dashboard?: { id: string; title: string }
           error?: string
         }
         if (piece.error) throw new Error(piece.error)
         // A model may read in more than one round: the list grows.
         if (piece.read) reply.read = [...new Set([...(reply.read ?? []), ...piece.read])]
         if (piece.switched) reply.switched = piece.switched
+        const other = piece.dashboard
+        if (other && !reply.dashboards?.some((d) => d.id === other.id))
+          reply.dashboards = [...(reply.dashboards ?? []), other]
         reply.thought += piece.thought ?? ''
         reply.text += piece.text ?? ''
       }

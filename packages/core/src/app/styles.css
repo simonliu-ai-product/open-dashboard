@@ -4461,6 +4461,27 @@ body.odd-dragging * {
   line-height: 1.45;
 }
 
+.odd-chat-dashboards {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin: 8px 0 0;
+}
+
+.odd-chat-dashboard-link {
+  padding: 2px 8px;
+  border-radius: 6px;
+  background: var(--odd-surface);
+  box-shadow: 0 0 0 1px var(--odd-border-strong);
+  color: var(--odd-ink);
+  font-size: 12.5px;
+  text-decoration: none;
+}
+
+.odd-chat-dashboard-link:hover {
+  background: var(--odd-hover);
+}
+
 .odd-chat-thought {
   max-height: 220px;
   margin-top: 4px;

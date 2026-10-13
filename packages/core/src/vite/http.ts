@@ -117,7 +117,8 @@ export async function askAssistant(
   // { switched } as it uses its tools, { text } for the answer.
   const send = (line: Record<string, unknown>) => res.write(`${JSON.stringify(line)}\n`)
   const write = (event: AnswerEvent) => {
-    if (event.kind === 'read') send({ read: event.panels })
+    if (event.kind === 'read')
+      send({ read: event.panels, ...(event.dashboard ? { dashboard: event.dashboard } : {}) })
     else if (event.kind === 'switched') send({ switched: event.switched })
     else send(event.kind === 'thought' ? { thought: event.text } : { text: event.text })
   }
