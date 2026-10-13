@@ -119,6 +119,10 @@ export function apiPlugin(workspace: Workspace, overrides: ConfigOverrides): Plu
     configureServer(server: ViteDevServer) {
       const { root } = workspace.config
 
+      // Vite's own logger runs at 'warn' to keep its chatter out; these lines
+      // are ours and must show, or a reload or a scheduled run looks like nothing happened.
+      const say = (message: string) => process.stdout.write(`${redact(message)}\n`)
+
       const onChange = async (path: string): Promise<void> => {
         const dashboards = join(root, workspace.config.dashboardsDir) + sep
         if (path.startsWith(dashboards) && path.endsWith('.sql')) {
@@ -161,7 +165,7 @@ export function apiPlugin(workspace: Workspace, overrides: ConfigOverrides): Plu
         ) {
           try {
             await workspace.reconfigure(await loadConfig(root, overrides))
-            server.config.logger.info(`  open-dashboard: reloaded ${name}`)
+            say(`  open-dashboard: reloaded ${name}`)
             server.ws.send({ type: 'custom', event: 'odd:queries-changed', data: {} })
           } catch (error) {
             server.config.logger.error(`  open-dashboard: ${name}: ${errorMessage(error)}`)
@@ -172,8 +176,9 @@ export function apiPlugin(workspace: Workspace, overrides: ConfigOverrides): Plu
       const collected = (id: string, run: CollectorRun) => {
         server.ws.send({ type: 'custom', event: 'odd:collectors-changed', data: { id } })
         server.ws.send({ type: 'custom', event: 'odd:queries-changed', data: {} })
-        server.config.logger.info(
-          `  open-dashboard: collector ${id} ${run.ok ? 'done' : 'failed'} in ${Math.round(run.durationMs / 1000)} s`,
+        const last = run.ok ? '' : run.output.split('\n').at(-1)
+        say(
+          `  open-dashboard: collector ${id} ${run.ok ? 'done' : 'failed'} in ${Math.round(run.durationMs / 1000)} s${last ? ` — ${last}` : ''}`,
         )
       }
       const stopSchedule = scheduleCollectors(workspace, collected)
