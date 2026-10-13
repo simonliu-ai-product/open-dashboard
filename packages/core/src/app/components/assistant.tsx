@@ -1,9 +1,17 @@
 import { useEffect, useRef, useState } from 'react'
 import type { ParamValue } from '../../config.js'
 import type { SwitchedFilter } from '../../ops/assistant.js'
-import { useLocale, useT } from '../../runtime/i18n.js'
+import { useT } from '../../runtime/i18n.js'
 import { Blocks, parseBlocks } from '../../runtime/markdown.js'
 import { api } from '../lib/api.js'
+
+/**
+ * Names in a line: a middle dot reads the same in every language, where a
+ * list format runs "和" straight into an English panel title.
+ */
+function joinNames(names: string[]): string {
+  return names.join(' · ')
+}
 
 interface Message {
   role: 'user' | 'assistant'
@@ -24,10 +32,7 @@ interface Message {
 /** What the assistant switched, in the page's words, with a way back. */
 function Switched({ switched, onUndo }: { switched: SwitchedFilter[]; onUndo?: () => void }) {
   const t = useT()
-  const { locale } = useLocale()
-  const names = new Intl.ListFormat(locale, { style: 'short', type: 'conjunction' }).format(
-    switched.map((filter) => `${t(filter.label)} ${t(filter.valueLabel)}`),
-  )
+  const names = joinNames(switched.map((filter) => `${t(filter.label)} ${t(filter.valueLabel)}`))
   return (
     <p className="odd-chat-switched">
       <span>{t('Switched to {names}', { names })}</span>
@@ -102,7 +107,6 @@ function Thinking({
   read: string[] | undefined
 }) {
   const t = useT()
-  const { locale } = useLocale()
   const [open, setOpen] = useState(false)
   const active = seconds === undefined
   const step = active ? latestStep(thought) : ''
@@ -128,9 +132,7 @@ function Thinking({
       {read?.length ? (
         <p className="odd-chat-read">
           {t('Read {names}', {
-            names: new Intl.ListFormat(locale, { style: 'short', type: 'conjunction' }).format(
-              read,
-            ),
+            names: joinNames(read),
           })}
         </p>
       ) : null}
