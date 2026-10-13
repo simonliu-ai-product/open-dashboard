@@ -36,6 +36,12 @@ export function pickRows(body: unknown, path: string | undefined, where: string)
 }
 
 /**
+ * Column names a source knows without any row to read them from — a CSV
+ * header with no lines under it. Set on the rows array, read by `rowsToResult`.
+ */
+export const HEADER = Symbol('header')
+
+/**
  * Rows as a result: columns in first-seen order across rows, nested values as
  * JSON text. SQLite column names ignore case, so `rtMessage` in one row and
  * `rtmessage` in the next are one column, named as first seen.
@@ -43,6 +49,11 @@ export function pickRows(body: unknown, path: string | undefined, where: string)
 export function rowsToResult(items: unknown[], elapsedMs: number): QueryResult {
   const names: string[] = []
   const seen = new Map<string, string>()
+  for (const name of (items as { [HEADER]?: string[] })[HEADER] ?? []) {
+    if (seen.has(name.toLowerCase())) continue
+    seen.set(name.toLowerCase(), name)
+    names.push(name)
+  }
   const rows: Row[] = items.map((item) => {
     const source: Record<string, unknown> =
       item && typeof item === 'object' && !Array.isArray(item)

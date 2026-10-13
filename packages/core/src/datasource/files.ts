@@ -1,7 +1,7 @@
 import { readdirSync, readFileSync, statSync } from 'node:fs'
 import { isAbsolute, join, relative, resolve, sep } from 'node:path'
 import type { CsvSource, FileTable, JsonFileSource } from '../config.js'
-import { jsonSource, pickRows } from './json-tables.js'
+import { HEADER, jsonSource, pickRows } from './json-tables.js'
 import { type Datasource, DatasourceError } from './types.js'
 
 const GLOB = /[*?[{]/
@@ -112,7 +112,10 @@ const NUMBER = /^-?(0|[1-9]\d*)(\.\d+)?([eE][-+]?\d+)?$/
  * value is a plain number — `0050`, a code with a leading zero, stays text,
  * as does `1,234`. Empty cells are null.
  */
-function csvRows(text: string, delimiter: string): Record<string, unknown>[] {
+function csvRows(
+  text: string,
+  delimiter: string,
+): Record<string, unknown>[] & { [HEADER]?: string[] } {
   const [header, ...lines] = parseCsv(text, delimiter)
   if (!header) return []
   const names = header.map((name, i) => name.trim() || `column${i + 1}`)
@@ -122,7 +125,7 @@ function csvRows(text: string, delimiter: string): Record<string, unknown>[] {
       return value === '' || NUMBER.test(value)
     }),
   )
-  return lines.map((line) =>
+  const rows = lines.map((line) =>
     Object.fromEntries(
       names.map((name, i) => {
         const value = (line[i] ?? '').trim()
@@ -131,6 +134,7 @@ function csvRows(text: string, delimiter: string): Record<string, unknown>[] {
       }),
     ),
   )
+  return Object.assign(rows, { [HEADER]: names })
 }
 
 function jsonRows(text: string, file: string, where: string): unknown {
@@ -205,6 +209,7 @@ export async function openFiles(
       const glob = GLOB.test(spec.file)
       if (files.length === 0) throw new DatasourceError(`${where}: no file matches "${spec.file}"`)
       const out: unknown[] = []
+      const header = ['_file']
       for (const file of files) {
         let text: string
         try {
@@ -215,7 +220,9 @@ export async function openFiles(
         if (config.type === 'csv') {
           const delimiter = config.delimiter ?? (/\.tsv$/i.test(file) ? '\t' : ',')
           const rows = csvRows(text, delimiter)
-          out.push(...(glob ? rows.map((row) => ({ _file: file, ...row })) : rows))
+          if (!glob) return rows
+          header.push(...(rows[HEADER] ?? []))
+          out.push(...rows.map((row) => ({ _file: file, ...row })))
           continue
         }
         const body = jsonRows(text, file, where)
@@ -229,7 +236,7 @@ export async function openFiles(
           ),
         )
       }
-      return out
+      return config.type === 'csv' ? Object.assign(out, { [HEADER]: header }) : out
     },
     // Stacked JSON was picked per file above; the stack is already the rows.
     rowsPath: (spec) => (config.type === 'json' && !GLOB.test(spec.file) ? spec.rows : undefined),

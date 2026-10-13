@@ -55,6 +55,28 @@ describe('CSV', () => {
     const source = await open({ type: 'csv', tables: { a: { file: 'a.tsv' } } })
     expect((await source.query('SELECT x + y AS s FROM a', {}, OPTIONS)).rows).toEqual([{ s: 3 }])
   })
+
+  it('keeps the header of a file with no rows yet, alone or in a glob', async () => {
+    write('data/teams.csv', 'id,team\n1,Lions\n')
+    write('data/today.csv', 'id,score\n')
+    write('logs/a.csv', 'id,ms\n')
+    const source = await open({
+      type: 'csv',
+      tables: {
+        teams: { file: 'data/teams.csv' },
+        today: { file: 'data/today.csv' },
+        logs: { file: 'logs/*.csv' },
+      },
+    })
+    const joined = await source.query(
+      'SELECT t.team, d.score FROM teams t LEFT JOIN today d USING (id)',
+      {},
+      OPTIONS,
+    )
+    expect(joined.rows).toEqual([{ team: 'Lions', score: null }])
+    const logs = await source.query('SELECT * FROM logs', {}, OPTIONS)
+    expect(logs.columns.map((c) => c.name)).toEqual(['_file', 'id', 'ms'])
+  })
 })
 
 describe('JSON', () => {
