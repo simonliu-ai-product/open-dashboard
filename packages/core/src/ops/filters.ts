@@ -63,7 +63,7 @@ export async function dashboardFilters(
   const custom = new Map(
     [...chartImports(config, file, code)].map(([name, chart]) => [name, chart.spec.columns]),
   )
-  const { filters } = analyzeDashboard(code, custom)
+  const { filters } = analyzeDashboard(code, custom, file)
 
   const choices: FilterChoice[] = []
   const queries = new Map<FilterChoice, string>()

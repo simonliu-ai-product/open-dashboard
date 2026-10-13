@@ -135,6 +135,50 @@ describe('analyze', () => {
       ['BarChart', 'By region', 'by_region', ['region', 'amount']],
     ])
   })
+
+  it('follows a prop to a constant, here or exported by a relative file', async () => {
+    fixture = await makeFixture({
+      'dashboards/shared.ts': `export const GAMES = [
+  { value: 'g1', label: 'Game 1' },
+  { value: 'g2', label: 'Game 2' },
+] as const
+const PRIVATE = ['x']
+export const COMPUTED = ['a', 'b'].map((s) => s.toUpperCase())
+`,
+    })
+    const code = `import { Dashboard, Filters, Select } from '@open-dashboard/core'
+import { GAMES as LIST, COMPUTED } from '../shared'
+const REGIONS = ['North', 'South']
+export default function D() {
+  return (
+    <Dashboard>
+      <Filters>
+        <Select name="game" options={LIST} default="g1" />
+        <Select name="region" options={REGIONS} />
+        <Select name="computed" options={COMPUTED} />
+        <Select name="private" options={PRIVATE} />
+      </Filters>
+    </Dashboard>
+  )
+}
+`
+    const file = join(fixture.root, 'dashboards', 'd', 'index.tsx')
+    const filters = analyzeDashboard(code, new Map(), file).filters
+    expect(filters.map((f) => [f.name, f.options])).toEqual([
+      ['game', ['g1', 'g2']],
+      ['region', ['North', 'South']],
+      ['computed', undefined],
+      ['private', undefined],
+    ])
+    expect(filters[0]?.optionLabels).toEqual({ g1: 'Game 1', g2: 'Game 2' })
+    // Without the file, an import cannot be followed; a constant in the file still can.
+    expect(analyzeDashboard(code).filters.map((f) => f.options)).toEqual([
+      undefined,
+      ['North', 'South'],
+      undefined,
+      undefined,
+    ])
+  })
 })
 
 const RADAR = `import { defineChart } from '@open-dashboard/core'

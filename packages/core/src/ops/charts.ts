@@ -215,6 +215,7 @@ export async function chartCatalog(
     const analysis = analyzeDashboard(
       code,
       new Map([...imported].map(([name, chart]) => [name, chart.spec.columns])),
+      file,
     )
     let layout: ReturnType<typeof describeLayout> | undefined
     try {

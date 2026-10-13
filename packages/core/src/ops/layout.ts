@@ -692,7 +692,7 @@ export function applyEdits(code: string, edits: LayoutEdit[]): string {
 export function readLayout(config: ResolvedConfig, id: string): DashboardLayout {
   const file = dashboardFile(config, id)
   const code = readFileSync(file, 'utf8')
-  const filters = analyzeDashboard(code)
+  const filters = analyzeDashboard(code, undefined, file)
     .filters.filter((f) => f.kind === 'Select' && f.name)
     .map((f) => f.name as string)
   return {

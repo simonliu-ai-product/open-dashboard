@@ -120,7 +120,7 @@ export async function checkDashboard(
       chart.spec.columns,
     ]),
   )
-  const analysis = analyzeDashboard(code, custom)
+  const analysis = analyzeDashboard(code, custom, file)
   const title = typeof analysis.meta.title === 'string' ? analysis.meta.title : id
   const report: DashboardReport = { id, title, params: {}, queries: [], findings }
 

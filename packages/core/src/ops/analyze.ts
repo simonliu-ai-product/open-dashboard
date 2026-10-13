@@ -1,3 +1,5 @@
+import { existsSync, readFileSync } from 'node:fs'
+import { dirname, resolve } from 'node:path'
 import { parse } from '@babel/parser'
 import { columnProps, PANEL_NAMES } from '../runtime/convert.js'
 
@@ -81,9 +83,85 @@ export function walk(
   for (const child of children(node)) walk(child, visit, node)
 }
 
-export function literal(node: Node | undefined | null): unknown {
+/** Top-level `const` values by name: what `literal` may look up when a prop names one. */
+export type Constants = ReadonlyMap<string, Node>
+
+function topLevelConsts(ast: Node, exportedOnly: boolean): Map<string, Node> {
+  const out = new Map<string, Node>()
+  const program = (ast.program ?? ast) as Node
+  for (const statement of (program.body as Node[] | undefined) ?? []) {
+    const exported = statement.type === 'ExportNamedDeclaration'
+    const declaration = (exported ? statement.declaration : statement) as Node | null
+    if (declaration?.type !== 'VariableDeclaration') continue
+    if (declaration.kind !== 'const' || (exportedOnly && !exported)) continue
+    for (const declarator of declaration.declarations as Node[]) {
+      const id = declarator.id as Node
+      if (id.type === 'Identifier' && declarator.init)
+        out.set(id.name as string, declarator.init as Node)
+    }
+  }
+  return out
+}
+
+const EXTENSIONS = [
+  '.tsx',
+  '.ts',
+  '.jsx',
+  '.js',
+  '/index.tsx',
+  '/index.ts',
+  '/index.jsx',
+  '/index.js',
+]
+
+/**
+ * The constants a dashboard's props may name: its own top-level `const`s, and
+ * the ones it imports by name from a relative file that exports them — one
+ * hop, read statically, never run. `options={GAMES}` with `GAMES` shared by
+ * three dashboards is still a literal list.
+ */
+export function constantsOf(ast: Node, file?: string): Map<string, Node> {
+  const out = topLevelConsts(ast, false)
+  if (!file) return out
+  const program = (ast.program ?? ast) as Node
+  for (const statement of (program.body as Node[] | undefined) ?? []) {
+    if (statement.type !== 'ImportDeclaration') continue
+    const from = (statement.source as Node).value as string
+    if (!from.startsWith('.')) continue
+    const base = resolve(dirname(file), from)
+    const target = [base, ...EXTENSIONS.map((ext) => base + ext)].find(
+      (path) => /\.[jt]sx?$/.test(path) && existsSync(path),
+    )
+    if (!target) continue
+    let exported: Map<string, Node>
+    try {
+      exported = topLevelConsts(parseSource(readFileSync(target, 'utf8')), true)
+    } catch {
+      continue
+    }
+    for (const specifier of statement.specifiers as Node[]) {
+      if (specifier.type !== 'ImportSpecifier') continue
+      const imported = specifier.imported as Node
+      const name = (imported.name ?? imported.value) as string
+      const value = exported.get(name)
+      if (value && !out.has((specifier.local as Node).name as string))
+        out.set((specifier.local as Node).name as string, value)
+    }
+  }
+  return out
+}
+
+export function literal(node: Node | undefined | null, constants?: Constants): unknown {
   if (!node) return undefined
   switch (node.type) {
+    case 'Identifier': {
+      const value = constants?.get(node.name as string)
+      if (!value) return undefined
+      // A constant naming itself, directly or not, ends here instead of looping.
+      const rest = new Map(constants)
+      rest.delete(node.name as string)
+      return literal(value, rest)
+    }
     case 'StringLiteral':
     case 'NumericLiteral':
     case 'BooleanLiteral':
@@ -96,12 +174,12 @@ export function literal(node: Node | undefined | null): unknown {
       return (quasis[0]?.value as { cooked?: string })?.cooked
     }
     case 'JSXExpressionContainer':
-      return literal(node.expression as Node)
+      return literal(node.expression as Node, constants)
     case 'TSAsExpression':
     case 'TSSatisfiesExpression':
-      return literal(node.expression as Node)
+      return literal(node.expression as Node, constants)
     case 'ArrayExpression':
-      return (node.elements as Node[]).map((element) => literal(element))
+      return (node.elements as Node[]).map((element) => literal(element, constants))
     case 'ObjectExpression': {
       const out: Record<string, unknown> = {}
       for (const property of node.properties as Node[]) {
@@ -113,7 +191,7 @@ export function literal(node: Node | undefined | null): unknown {
             : key.type === 'StringLiteral'
               ? key.value
               : undefined
-        if (typeof name === 'string') out[name] = literal(property.value as Node)
+        if (typeof name === 'string') out[name] = literal(property.value as Node, constants)
       }
       return out
     }
@@ -162,16 +240,20 @@ export function readMeta(code: string): Record<string, string | number | boolean
 }
 
 /**
- * Reads only what is written literally. A prop computed at runtime is invisible
- * here, which is fine: this feeds `check` and the dashboard list, and both say
- * less rather than guess.
+ * Reads only what is written literally — in the prop, or in a constant it
+ * names (`constantsOf`). A prop computed at runtime is invisible here, which
+ * is fine: this feeds `check` and the dashboard list, and both say less rather
+ * than guess.
  */
 export function analyzeDashboard(
   code: string,
   /** Custom charts by the name the dashboard uses, and the props of each that name columns. */
   custom: ReadonlyMap<string, readonly string[]> = new Map(),
+  /** The dashboard's file: constants imported from relative files are followed from it. */
+  file?: string,
 ): DashboardAnalysis {
   const ast = parseSource(code)
+  const constants = constantsOf(ast, file)
   const result: DashboardAnalysis = { meta: {}, filters: [], panels: [], queryRefs: [] }
 
   walk(ast, (node) => {
@@ -189,7 +271,7 @@ export function analyzeDashboard(
     const name = elementName(node)
     if (!name) return
     const attrs = attributes(node)
-    const read = (key: string) => (attrs.has(key) ? literal(attrs.get(key)) : undefined)
+    const read = (key: string) => (attrs.has(key) ? literal(attrs.get(key), constants) : undefined)
 
     if (name === 'TimeRange' || name === 'Select') {
       const raw = read('default')

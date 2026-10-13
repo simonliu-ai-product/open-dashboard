@@ -70,7 +70,7 @@ export function listDashboards(config: ResolvedConfig): DashboardSummary[] {
     const custom = new Map(
       [...chartImports(config, file, code)].map(([name, chart]) => [name, chart.spec.columns]),
     )
-    const { meta, panels } = analyzeDashboard(code, custom)
+    const { meta, panels } = analyzeDashboard(code, custom, file)
     let queries = 0
     const sources = new Set<string>()
     try {
