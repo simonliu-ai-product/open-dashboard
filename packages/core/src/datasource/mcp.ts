@@ -1,9 +1,9 @@
 import { type ChildProcessWithoutNullStreams, spawn } from 'node:child_process'
 import { readFileSync } from 'node:fs'
 import { join } from 'node:path'
-import type { McpSource } from '../config.js'
+import type { JsonTable, McpSource } from '../config.js'
 import { packageRoot } from '../vite/package-root.js'
-import { bindTableValue, jsonSource } from './json-tables.js'
+import { bindTableValue, type JsonSourceSpec, jsonSource } from './json-tables.js'
 import { type Datasource, DatasourceError } from './types.js'
 
 const PROTOCOL = '2025-06-18'
@@ -224,7 +224,11 @@ function toolOutput(name: string, tool: string, result: unknown): unknown {
  * called only when it says it is read-only (or the config explicitly allows
  * tools that say nothing), and never when it says it is destructive.
  */
-export async function openMcp(name: string, config: McpSource): Promise<Datasource> {
+export async function openMcp(
+  name: string,
+  config: McpSource,
+  reuse: Pick<JsonSourceSpec<JsonTable>, 'store' | 'reuseMs'> = {},
+): Promise<Datasource> {
   if (!config.url && !config.command) {
     throw new DatasourceError(
       `datasource "${name}": give a url (remote server) or a command (local server)`,
@@ -294,6 +298,8 @@ export async function openMcp(name: string, config: McpSource): Promise<Datasour
     name,
     type: 'mcp',
     tables: config.tables ?? {},
+    ...(config.concurrency ? { concurrency: config.concurrency } : {}),
+    ...reuse,
     key: (_table, spec, params) =>
       `${spec.tool}\u0000${JSON.stringify(bindTableValue(spec.args ?? {}, params))}`,
     async fetch(table, spec, params) {

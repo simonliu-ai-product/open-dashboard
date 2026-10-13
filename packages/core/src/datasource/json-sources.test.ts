@@ -3,10 +3,11 @@ import { createServer, type IncomingMessage, type Server, type ServerResponse } 
 import type { AddressInfo } from 'node:net'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import { openHttp } from './http.js'
-import { pickRows, tablesIn } from './json-tables.js'
+import { openHttp, retryDelay } from './http.js'
+import { limiter, pickRows, tablesIn } from './json-tables.js'
 import { openMcp } from './mcp.js'
 import { MASK, registerSecrets } from './redact.js'
+import { responseStore } from './response-store.js'
 import type { Datasource } from './types.js'
 
 const OPTIONS = { maxRows: 100, timeoutMs: 5000 }
@@ -135,6 +136,92 @@ describe('http source', () => {
     opened.push(source)
     await expect(source.query('DELETE FROM t', {}, OPTIONS)).rejects.toThrow(/only SELECT/)
     await expect(source.query('SELECT 1', {}, OPTIONS)).rejects.toThrow(/names none of its tables/)
+  })
+  it('keeps at most `concurrency` requests in flight, across queries', async () => {
+    let active = 0
+    let peak = 0
+    const { server, url } = await serve((_req, _body, res) => {
+      active++
+      peak = Math.max(peak, active)
+      setTimeout(() => {
+        active--
+        res.end('[{"a":1}]')
+      }, 20)
+    })
+    servers.push(server)
+    const tables = Object.fromEntries(
+      Array.from({ length: 8 }, (_, i) => [`t${i}`, { url: `${url}/t${i}` }]),
+    )
+    const source = await openHttp('api', { type: 'http', concurrency: 3, tables })
+    opened.push(source)
+    await Promise.all(
+      Object.keys(tables).map((name) => source.query(`SELECT a FROM ${name}`, {}, OPTIONS)),
+    )
+    expect(peak).toBe(3)
+  })
+
+  it('waits out a 429 as Retry-After asks, then reads the rows', async () => {
+    let calls = 0
+    const { server, url } = await serve((_req, _body, res) => {
+      calls++
+      if (calls === 1) {
+        res.statusCode = 429
+        res.setHeader('Retry-After', '0')
+        res.end('slow down')
+      } else res.end('[{"a":1}]')
+    })
+    servers.push(server)
+    const source = await openHttp('api', { type: 'http', tables: { t: { url: `${url}/t` } } })
+    opened.push(source)
+    expect((await source.query('SELECT a FROM t', {}, OPTIONS)).rows).toEqual([{ a: 1 }])
+    expect(calls).toBe(2)
+  })
+
+  it('reuses a response another process saved, within the reuse window', async () => {
+    const root = mkdtempSync(join(tmpdir(), 'odd-responses-'))
+    let calls = 0
+    const { server, url } = await serve((_req, _body, res) => {
+      calls++
+      res.end(`[{"n":${calls}}]`)
+    })
+    servers.push(server)
+    const config = { type: 'http' as const, tables: { t: { url: `${url}/t`, cache: '0s' } } }
+    try {
+      const first = await openHttp('api', config, { store: responseStore(root) })
+      opened.push(first)
+      expect((await first.query('SELECT n FROM t', {}, OPTIONS)).rows).toEqual([{ n: 1 }])
+      const check = await openHttp('api', config, { store: responseStore(root), reuseMs: 60_000 })
+      opened.push(check)
+      expect((await check.query('SELECT n FROM t', {}, OPTIONS)).rows).toEqual([{ n: 1 }])
+      const fresh = await openHttp('api', config, { store: responseStore(root) })
+      opened.push(fresh)
+      expect((await fresh.query('SELECT n FROM t', {}, OPTIONS)).rows).toEqual([{ n: 2 }])
+    } finally {
+      rmSync(root, { recursive: true, force: true })
+    }
+  })
+})
+
+describe('request pacing', () => {
+  it('reads Retry-After as seconds or a date, else backs off', () => {
+    expect(retryDelay('3', 0)).toBe(3000)
+    expect(retryDelay(new Date(10_000).toUTCString(), 0, 8_000)).toBe(2000)
+    expect(retryDelay(null, 0)).toBe(1000)
+    expect(retryDelay('soon', 1)).toBe(2000)
+  })
+
+  it('runs tasks in the order they asked, no more than the limit at once', async () => {
+    const gate = limiter(1)
+    const order: number[] = []
+    await Promise.all(
+      [1, 2, 3].map((n) =>
+        gate(async () => {
+          order.push(n)
+          await new Promise((r) => setTimeout(r, 5))
+        }),
+      ),
+    )
+    expect(order).toEqual([1, 2, 3])
   })
 })
 

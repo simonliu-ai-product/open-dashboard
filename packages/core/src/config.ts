@@ -114,6 +114,8 @@ export interface HttpSource {
   /** Sent with every request — put tokens in `.env` and reference them here. */
   headers?: Record<string, string>
   tables: Record<string, HttpTable>
+  /** Requests in flight at once, across every panel. Default 4; a 429 is retried after its Retry-After. */
+  concurrency?: number
 }
 
 export interface McpTable extends JsonTable {
@@ -141,6 +143,8 @@ export interface McpSource {
    * tool never is.
    */
   allowUnannotated?: boolean
+  /** Tool calls in flight at once, across every panel. Default 4. */
+  concurrency?: number
 }
 
 export interface FileTable {
@@ -223,6 +227,12 @@ export interface CollectorConfig {
   source?: string
   /** Stopped after this long. Default '10m'. */
   timeout?: string
+  /**
+   * With a json or csv `source`, a run that leaves one of its files unreadable,
+   * or empties one that had rows, gets the previous file put back and counts as
+   * failed. List the tables that may legitimately turn empty, or `true` for all.
+   */
+  allowEmpty?: boolean | string[]
 }
 
 export interface OpenDashboardConfig {

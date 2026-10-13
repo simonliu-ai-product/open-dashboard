@@ -10,15 +10,23 @@ import { openMysql } from './mysql.js'
 import { openOracle } from './oracle.js'
 import { openPostgres } from './postgres.js'
 import { DRIVERS } from './registry.js'
+import { responseStore } from './response-store.js'
 import { openSnowflake } from './snowflake.js'
 import { openSqlite } from './sqlite.js'
 import { type Datasource, DatasourceError } from './types.js'
+
+export interface OpenOptions {
+  /** How old a saved API response may be and still be used: `check` sets minutes, so reruns spend no quota. */
+  reuseResponsesMs?: number
+}
 
 export function openDatasource(
   name: string,
   config: DatasourceConfig,
   root: string,
+  options: OpenOptions = {},
 ): Promise<Datasource> {
+  const reuse = { store: responseStore(root), reuseMs: options.reuseResponsesMs ?? 0 }
   switch (config.type) {
     case 'sqlite':
       return openSqlite(name, config, root)
@@ -39,9 +47,9 @@ export function openDatasource(
     case 'snowflake':
       return openSnowflake(name, config, root)
     case 'http':
-      return openHttp(name, config)
+      return openHttp(name, config, reuse)
     case 'mcp':
-      return openMcp(name, config)
+      return openMcp(name, config, reuse)
     case 'json':
     case 'csv':
       return openFiles(name, config, root)

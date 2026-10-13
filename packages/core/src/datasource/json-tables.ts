@@ -3,6 +3,7 @@ import { parseDuration } from '../ops/query-cache.js'
 import { sqlWords } from './guard.js'
 import { normalizeRows } from './normalize.js'
 import { MissingParamError } from './params.js'
+import type { ResponseStore } from './response-store.js'
 import { combineResults } from './scratch.js'
 import { type Datasource, DatasourceError, type QueryOptions, type ToolCatalog } from './types.js'
 
@@ -132,10 +133,31 @@ export interface JsonSourceSpec<T extends JsonTable> {
   fetch(table: string, spec: T, params: Record<string, ParamValue>): Promise<unknown>
   /** A key that is the same for two fetches that would return the same thing. */
   key(table: string, spec: T, params: Record<string, ParamValue>): string
+  /** Fetches in flight at once; the rest wait their turn. Default 4. */
+  concurrency?: number
+  /** Responses shared with other processes: a saved one within the table's cache (or `reuseMs`) is used instead of fetching. */
+  store?: ResponseStore
+  reuseMs?: number
   /** Where the rows are in what `fetch` returned. Default: the table's `rows`. */
   rowsPath?(spec: T): string | undefined
   tools?(): Promise<ToolCatalog>
   close?(): Promise<void>
+}
+
+/** A gate that lets `limit` calls run at once, in the order they asked. */
+export function limiter(limit: number): <R>(task: () => Promise<R>) => Promise<R> {
+  let active = 0
+  const waiting: (() => void)[] = []
+  return async (task) => {
+    if (active >= limit) await new Promise<void>((resolve) => waiting.push(resolve))
+    active++
+    try {
+      return await task()
+    } finally {
+      active--
+      waiting.shift()?.()
+    }
+  }
 }
 
 export function jsonSource<T extends JsonTable>(source: JsonSourceSpec<T>): Datasource {
@@ -149,6 +171,12 @@ export function jsonSource<T extends JsonTable>(source: JsonSourceSpec<T>): Data
   // Several panels usually read the same table: one fetch serves them all,
   // including requests that arrive while it is in flight.
   const recent = new Map<string, { at: number; ttl: number; value: Promise<QueryResult> }>()
+  // An empty response keeps the columns the table last had, so a join over
+  // it still yields rows with NULLs where its values would be.
+  const lastColumns = new Map<string, QueryResult['columns']>()
+  // A page opens with every panel at once; an API that limits requests per
+  // second answers the eighth with 429 unless they queue.
+  const gate = limiter(Math.max(1, source.concurrency ?? 4))
 
   const load = (table: string, params: Record<string, ParamValue>): Promise<QueryResult> => {
     const spec = source.tables[table] as T
@@ -158,14 +186,24 @@ export function jsonSource<T extends JsonTable>(source: JsonSourceSpec<T>): Data
     if (hit && Date.now() - hit.at < hit.ttl) return hit.value
     const started = performance.now()
     const where = `datasource "${source.name}" table "${table}"`
-    const value = source
-      .fetch(table, spec, params)
-      .then((body) =>
-        rowsToResult(
-          pickRows(body, source.rowsPath ? source.rowsPath(spec) : spec.rows, where),
-          performance.now() - started,
-        ),
+    const stored = `${source.type}\u0000${source.name}\u0000${key}`
+    const saved = source.store?.read(stored, Math.max(ttl, source.reuseMs ?? 0))
+    const response =
+      saved !== undefined
+        ? Promise.resolve(saved)
+        : gate(() => source.fetch(table, spec, params)).then((fetched) => {
+            source.store?.write(stored, fetched)
+            return fetched
+          })
+    const value = response.then((body) => {
+      const result = rowsToResult(
+        pickRows(body, source.rowsPath ? source.rowsPath(spec) : spec.rows, where),
+        performance.now() - started,
       )
+      if (result.columns.length > 0) lastColumns.set(table, result.columns)
+      else if (lastColumns.has(table)) result.columns = lastColumns.get(table) ?? []
+      return result
+    })
     recent.set(key, { at: Date.now(), ttl, value })
     value.catch(() => recent.delete(key))
     return value
@@ -183,7 +221,7 @@ export function jsonSource<T extends JsonTable>(source: JsonSourceSpec<T>): Data
       }
       const results = await Promise.all(used.map((table) => load(table, params)))
       const inputs = new Map(used.map((table, i) => [table, results[i] as QueryResult]))
-      return combineResults(sql, inputs, params, options.maxRows, source.type)
+      return combineResults(sql, inputs, params, options.maxRows, source.type, true)
     },
     async schema() {
       const tables: TableInfo[] = []

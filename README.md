@@ -153,6 +153,8 @@ FROM stocks ORDER BY CAST(TradeValue AS REAL) DESC LIMIT 10;
 - `mcp` calls only tools annotated `readOnlyHint`, never a `destructiveHint` tool; a tool that says neither needs `allowUnannotated: true`. The client is built in (no SDK dependency).
 - `:name` in a URL or tool argument is filled from the query's parameters, so filters reach the API too. Nested values arrive as JSON text — read them with `json_extract` / `json_each`.
 - Each table has its own `cache` (30 s by default); a failed call is not cached, so the next refresh retries only what failed.
+- At most 4 requests per source are in flight at once (`concurrency` changes it), so a page that opens with every panel does not trip a rate limit; a `429` or `503` is retried after its `Retry-After`.
+- `open-dashboard check` reuses responses up to 10 minutes old — the dev server's included — so rerunning it while you write does not spend an API's quota. `--fresh` fetches again.
 
 
 ### 📄 JSON and CSV files, queried with SQL
@@ -172,6 +174,8 @@ sheets: { type: 'csv', tables: { budget: { file: 'data/budget.csv' } } },
 
 - JSON Lines (`.jsonl`, `.ndjson`) is read one record per line; nested values arrive as JSON text for `json_extract` / `json_each`.
 - A CSV column becomes numbers only when every value is a plain number, so a code like `0050` stays text. `.tsv` is tab-separated; `delimiter` overrides.
+- A column of whole numbers is an INTEGER, as a database would type it: `home || ':' || away` reads `2:6`, and `wins / games` divides as integers — write `wins * 1.0 / games` for a rate. The same holds for `http` and `mcp` tables.
+- An empty file (or `[]`) is a table with no rows, not an error: its panels show they have no data, and a table that had columns keeps them.
 - Files are read only from inside the workspace, never written, and never served to the page as files. Edit one and the panels that read it refresh.
 
 ### 🔄 Collectors keep the data fresh
@@ -185,6 +189,8 @@ collectors: {
 ```
 
 `open-dashboard dev` runs each collector on its schedule; `open-dashboard collect [name]` runs it now. The data source's page shows when it last ran — with the end of its output if it failed — and an **Update now** button; afterwards every panel refetches. The command runs in the workspace root with `.env` loaded, so its keys stay in `.env`. The page names a collector from the config and never sends a command, and its output is masked like every other message.
+
+When `source` is a `json` or `csv` source, a run cannot take a working page down: a file it leaves unreadable, or empties when it had rows, is put back as it was and the run is reported as failed with the reason. A table that may legitimately turn empty goes in `allowEmpty: ['live']` (or `allowEmpty: true` for all).
 
 ### 🔗 Cross-database queries
 
@@ -369,7 +375,7 @@ No database to hand? `init my-dashboards --sample` adds a small generated SQLite
 | `open-dashboard schema [source] [--json]` | Tables, columns, keys and row counts |
 | `open-dashboard query "<sql>" [--source s] [--param k=v]` | Run read-only SQL against a datasource |
 | `open-dashboard query --dashboard <id> --name <query>` | Run one of a dashboard's named queries |
-| `open-dashboard check [id] [--json]` | Run every query, verify every panel; non-zero exit on errors |
+| `open-dashboard check [id] [--json] [--fresh]` | Run every query, verify every panel; non-zero exit on errors |
 | `open-dashboard charts [--json]` | Every chart this workspace can use — the 41 built-ins and `charts/` — and the dashboards using each |
 | `open-dashboard build [id...] [--out site] [--max-runs 100]` | Static site of the dashboards with their results taken now |
 | `open-dashboard render <id> [--panel title] [--filter k=v] [--theme dark]` | A dashboard or one panel as a PNG, for an agent to look at (needs Playwright) |

@@ -110,3 +110,51 @@ describe('collectors', () => {
     expect(ran).toEqual(['due'])
   })
 })
+
+describe('collectors over json files', () => {
+  async function withJson(collectors: string): Promise<Workspace> {
+    fixture = await makeFixture()
+    fixture.write('data/games.json', JSON.stringify([{ id: 1 }, { id: 2 }]))
+    fixture.write('data/live.json', JSON.stringify({ items: [{ pitch: 1 }] }))
+    fixture.write(
+      'open-dashboard.config.mjs',
+      `export default { datasources: { files: { type: 'json', tables: { games: { file: 'data/games.json' }, live: { file: 'data/live.json', rows: 'items' } } } }, collectors: ${collectors} }\n`,
+    )
+    workspace = new Workspace(await loadConfig(fixture.root))
+    return workspace
+  }
+  const read = (path: string) => readFileSync(join(workspace?.config.root ?? '', path), 'utf8')
+  const writes = (files: Record<string, string>) =>
+    node(
+      Object.entries(files)
+        .map(
+          ([path, text]) =>
+            `require('fs').writeFileSync(${JSON.stringify(path)}, ${JSON.stringify(text)})`,
+        )
+        .join(';'),
+    )
+
+  it('puts back a file the run emptied or broke, and counts the run as failed', async () => {
+    const ws = await withJson(
+      `{ season: { run: ${writes({ 'data/games.json': '[]', 'data/live.json': '{"items": [' })}, source: 'files' } }`,
+    )
+    const run = await runCollector(ws, 'season')
+    expect(run.ok).toBe(false)
+    expect(run.kept).toEqual(['data/games.json', 'data/live.json'])
+    expect(run.output).toContain('kept the previous data/games.json: the new one had no rows')
+    expect(run.output).toContain('data/live.json: the new one is not valid JSON')
+    expect(JSON.parse(read('data/games.json'))).toEqual([{ id: 1 }, { id: 2 }])
+    expect(JSON.parse(read('data/live.json')).items).toHaveLength(1)
+  })
+
+  it('writes through new rows, and an empty table the config allows', async () => {
+    const ws = await withJson(
+      `{ live: { run: ${writes({ 'data/games.json': '[{"id":3}]', 'data/live.json': '{"items": []}' })}, source: 'files', allowEmpty: ['live'] } }`,
+    )
+    const run = await runCollector(ws, 'live')
+    expect(run.ok).toBe(true)
+    expect(run.kept).toBeUndefined()
+    expect(JSON.parse(read('data/games.json'))).toEqual([{ id: 3 }])
+    expect(JSON.parse(read('data/live.json'))).toEqual({ items: [] })
+  })
+})

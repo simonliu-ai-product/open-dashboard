@@ -1,6 +1,8 @@
 import { spawn } from 'node:child_process'
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs'
 import { dirname, join } from 'node:path'
+import type { CsvSource, FileTable, JsonFileSource } from '../config.js'
+import { fileRowCount, tableFiles } from '../datasource/files.js'
 import { redact } from '../datasource/redact.js'
 import { errorMessage } from '../datasource/types.js'
 import type { ResolvedCollector, ResolvedConfig, Workspace } from '../workspace.js'
@@ -14,6 +16,8 @@ export interface CollectorRun {
   durationMs: number
   /** The end of what it printed, masked like every other message. */
   output: string
+  /** Files it broke or emptied, put back as they were before the run. */
+  kept?: string[]
 }
 
 export interface CollectorStatus {
@@ -115,6 +119,79 @@ function execute(collector: ResolvedCollector, root: string): Promise<CollectorR
   })
 }
 
+interface GuardedFile {
+  file: string
+  table: string
+  spec: FileTable
+  glob: boolean
+  text: string
+}
+
+/**
+ * The files a collector's json or csv source reads that have rows now. An
+ * upstream that answers with nothing for a while, or a script that dies
+ * halfway through a write, should not take a working page down with it.
+ */
+function guardFiles(config: ResolvedConfig, collector: ResolvedCollector): GuardedFile[] {
+  const source = collector.source ? config.datasources[collector.source] : undefined
+  if (collector.allowEmpty === true || (source?.type !== 'json' && source?.type !== 'csv')) {
+    return []
+  }
+  const guarded: GuardedFile[] = []
+  for (const [table, spec] of Object.entries(source.tables ?? {})) {
+    if (Array.isArray(collector.allowEmpty) && collector.allowEmpty.includes(table)) continue
+    let files: string[]
+    try {
+      files = tableFiles(config.root, spec.file)
+    } catch {
+      continue
+    }
+    for (const file of files) {
+      try {
+        const text = readFileSync(join(config.root, file), 'utf8')
+        if (fileRowCount(source, spec, file, text) > 0) {
+          guarded.push({ file, table, spec, glob: /[*?[{]/.test(spec.file), text })
+        }
+      } catch {
+        // Missing or already broken: there is nothing good to keep.
+      }
+    }
+  }
+  return guarded
+}
+
+/** Puts back each guarded file the run broke or emptied, and says why. */
+function restoreFiles(
+  config: ResolvedConfig,
+  source: JsonFileSource | CsvSource,
+  guarded: GuardedFile[],
+): { file: string; note: string }[] {
+  const kept: { file: string; note: string }[] = []
+  for (const before of guarded) {
+    const path = join(config.root, before.file)
+    let reason: string | undefined
+    if (!existsSync(path)) {
+      if (before.glob) continue
+      reason = 'was removed'
+    } else {
+      const text = readFileSync(path, 'utf8')
+      if (text === before.text) continue
+      try {
+        if (fileRowCount(source, before.spec, before.file, text) === 0) reason = 'had no rows'
+      } catch {
+        reason = `is not valid ${source.type.toUpperCase()}`
+      }
+    }
+    if (!reason) continue
+    writeFileSync(path, before.text)
+    kept.push({
+      file: before.file,
+      note: `kept the previous ${before.file}: the new one ${reason} (allowEmpty: ['${before.table}'] accepts that)`,
+    })
+  }
+  return kept
+}
+
 /**
  * Runs a collector named in the config — the only commands this will start.
  * One run at a time per collector: asking again while it runs joins that run.
@@ -126,7 +203,21 @@ export function runCollector(workspace: Workspace, id: string): Promise<Collecto
   const running = workspace.collecting.get(id) as Promise<CollectorRun> | undefined
   if (running) return running
   const config = workspace.config
-  const run = execute(collector, config.root).then((result) => {
+  const guarded = guardFiles(config, collector)
+  const run = execute(collector, config.root).then((ran) => {
+    const source = config.datasources[collector.source ?? ''] as JsonFileSource | CsvSource
+    const kept = guarded.length > 0 ? restoreFiles(config, source, guarded) : []
+    const result: CollectorRun =
+      kept.length === 0
+        ? ran
+        : {
+            ...ran,
+            ok: false,
+            kept: kept.map((k) => k.file),
+            output: redact(
+              `${ran.output}\n${kept.map((k) => k.note).join('\n')}`.trim().slice(-OUTPUT_TAIL),
+            ),
+          }
     writeRun(config, id, result)
     workspace.cache.clear()
     return result

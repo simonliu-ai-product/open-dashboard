@@ -153,6 +153,8 @@ FROM stocks ORDER BY CAST(TradeValue AS REAL) DESC LIMIT 10;
 - `mcp` 只呼叫標示 `readOnlyHint` 的工具，絕不呼叫標示 `destructiveHint` 的工具；兩者都沒標示的工具，需要設定 `allowUnannotated: true`。用戶端是內建的（不依賴 SDK）。
 - 網址或工具參數中的 `:name` 會由查詢參數填入，所以篩選條件也能傳到 API。巢狀值會以 JSON 文字傳入——用 `json_extract`／`json_each` 讀取。
 - 每張表有自己的 `cache`（預設 30 秒）；失敗的呼叫不會被快取，下次重新整理只會重試失敗的部分。
+- 每個來源同時最多送出 4 個請求（用 `concurrency` 調整），整頁面板一起打開時才不會撞到限流；收到 `429` 或 `503` 時，會等 `Retry-After` 指定的時間再重試。
+- `open-dashboard check` 會沿用 10 分鐘內抓過的回應（包括 dev server 抓的），寫 Dashboard 時反覆執行也不會耗掉 API 額度；加上 `--fresh` 則重新抓取。
 
 
 ### 📄 JSON 與 CSV 檔案，也能用 SQL 查
@@ -172,6 +174,8 @@ sheets: { type: 'csv', tables: { budget: { file: 'data/budget.csv' } } },
 
 - JSON Lines（`.jsonl`、`.ndjson`）一行一筆；巢狀的值會以 JSON 文字傳入，用 `json_extract`／`json_each` 讀取。
 - CSV 的欄位只有在每個值都是純數字時才轉成數字，所以 `0050` 這種代號會保留為文字。`.tsv` 以 Tab 分隔，也可以用 `delimiter` 指定。
+- 全是整數的欄位會存成 INTEGER，和資料庫的型別一致：`home || ':' || away` 會得到 `2:6`，而 `wins / games` 會做整數除法，算比率請寫 `wins * 1.0 / games`。`http` 與 `mcp` 的表也一樣。
+- 空檔案（或 `[]`）是沒有資料列的表，不是錯誤：讀它的面板會顯示沒有資料；原本有欄位的表會保留欄位。
 - 只讀取 workspace 裡的檔案，絕不寫入，也不會讓網頁直接下載原始檔。檔案一改，讀它的面板就會重新整理。
 
 ### 🔄 用收集器讓資料保持最新
@@ -185,6 +189,8 @@ collectors: {
 ```
 
 `open-dashboard dev` 會依排程執行每個收集器；`open-dashboard collect [name]` 則立刻執行。資料來源頁面會顯示上次執行的時間——失敗時附上輸出的結尾——以及「立即更新」按鈕；跑完之後，所有面板都會重新取資料。指令在 workspace 根目錄執行並載入 `.env`，金鑰留在 `.env` 裡就好。網頁只能點名設定檔裡的收集器，永遠不會送出指令；輸出和其他訊息一樣會遮蔽機密。
+
+`source` 是 `json` 或 `csv` 來源時，收集器不會把正常的頁面弄壞：執行後讀不了的檔案，或原本有資料、卻被清空的檔案，會還原成執行前的內容，這次執行則記為失敗並附上原因。本來就可能變空的表（例如今天的即時比賽）寫進 `allowEmpty: ['live']`，或用 `allowEmpty: true` 全部放行。
 
 ### 🔗 跨資料庫查詢
 
@@ -371,7 +377,7 @@ pnpm dev                     # http://localhost:5473
 | `open-dashboard schema [source] [--json]` | 資料表、欄位、鍵與筆數 |
 | `open-dashboard query "<sql>" [--source s] [--param k=v]` | 在資料來源上執行唯讀 SQL |
 | `open-dashboard query --dashboard <id> --name <query>` | 執行某張 Dashboard 的具名查詢 |
-| `open-dashboard check [id] [--json]` | 執行每條查詢、驗證每個面板；有錯誤時以非零狀態結束 |
+| `open-dashboard check [id] [--json] [--fresh]` | 執行每條查詢、驗證每個面板；有錯誤時以非零狀態結束 |
 | `open-dashboard charts [--json]` | 這個 workspace 能用的所有圖表——41 種內建與 `charts/`——以及使用它們的 Dashboard |
 | `open-dashboard build [id...] [--out site] [--max-runs 100]` | 把 Dashboard 連同此刻的結果輸出成靜態網站 |
 | `open-dashboard render <id> [--panel title] [--filter k=v] [--theme dark]` | 把 Dashboard 或單一面板畫成 PNG，給 Agent 看（需要 Playwright） |

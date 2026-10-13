@@ -146,11 +146,26 @@ function jsonRows(text: string, file: string, where: string): unknown {
         }
       })
   }
+  if (text.trim() === '') return []
   try {
     return JSON.parse(text) as unknown
   } catch (error) {
     throw new DatasourceError(`${where}: ${file} is not JSON — ${(error as Error).message}`)
   }
+}
+
+/** How many rows a table reads from one file's text; throws when the text does not parse. */
+export function fileRowCount(
+  config: JsonFileSource | CsvSource,
+  spec: FileTable,
+  file: string,
+  text: string,
+): number {
+  if (config.type === 'csv') {
+    return csvRows(text, config.delimiter ?? (/\.tsv$/i.test(file) ? '\t' : ',')).length
+  }
+  return pickRows(jsonRows(text, file, file), GLOB.test(spec.file) ? undefined : spec.rows, file)
+    .length
 }
 
 /**

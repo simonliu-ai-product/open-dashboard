@@ -107,6 +107,48 @@ describe('JSON', () => {
     utimesSync(join(root, 'n.json'), new Date(), new Date(Date.now() + 5000))
     expect((await source.query('SELECT n FROM n', {}, OPTIONS)).rows).toEqual([{ n: 22 }])
   })
+
+  it('keeps whole numbers whole, as a database column would', async () => {
+    write('g.json', JSON.stringify([{ home: 2, away: 6, era: 3.5 }]))
+    const source = await open({ type: 'json', tables: { g: { file: 'g.json' } } })
+    const { rows } = await source.query(
+      "SELECT home || ':' || away AS score, typeof(era) AS era, home / 4 AS quarter FROM g",
+      {},
+      OPTIONS,
+    )
+    expect(rows).toEqual([{ score: '2:6', era: 'real', quarter: 0 }])
+  })
+
+  it('reads an empty file as a table with no rows', async () => {
+    write('a.json', JSON.stringify([{ id: 1, team: 'x' }]))
+    write('b.json', '')
+    write('c.json', '[]')
+    const source = await open({
+      type: 'json',
+      tables: { a: { file: 'a.json' }, b: { file: 'b.json' }, c: { file: 'c.json' } },
+    })
+    expect((await source.query('SELECT team FROM b', {}, OPTIONS)).rows).toEqual([])
+    expect((await source.query('SELECT count(*) AS n FROM c', {}, OPTIONS)).rows).toEqual([
+      { n: 0 },
+    ])
+    expect(
+      (await source.query('SELECT a.id FROM a LEFT JOIN c ON c.id = a.id', {}, OPTIONS)).rows,
+    ).toEqual([])
+  })
+
+  it('keeps the columns a table had when its file turns empty', async () => {
+    write('a.json', JSON.stringify([{ id: 1 }]))
+    write('c.json', JSON.stringify([{ id: 1, note: 'kept' }]))
+    const source = await open({
+      type: 'json',
+      tables: { a: { file: 'a.json' }, c: { file: 'c.json' } },
+    })
+    const sql = 'SELECT a.id, c.note FROM a LEFT JOIN c USING (id)'
+    expect((await source.query(sql, {}, OPTIONS)).rows).toEqual([{ id: 1, note: 'kept' }])
+    write('c.json', '[]')
+    utimesSync(join(root, 'c.json'), new Date(), new Date(Date.now() + 5000))
+    expect((await source.query(sql, {}, OPTIONS)).rows).toEqual([{ id: 1, note: null }])
+  })
 })
 
 describe('file safety', () => {

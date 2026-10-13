@@ -90,7 +90,9 @@ export default {
 
   `rows: 'a.b'` picks the array inside a JSON document. Look at one file before
   writing SQL: nested values arrive as JSON text (`json_extract`, `json_each`),
-  CSV columns are numbers only when every value is.
+  CSV columns are numbers only when every value is. A column of whole numbers
+  is an INTEGER, so `wins / games` divides as integers — write
+  `wins * 1.0 / games` for a rate.
 - **Data that has to be fetched** — an API saved into SQLite, a nightly export
   — gets a collector beside the source, so it stays fresh without anyone
   remembering to run the script:
@@ -105,6 +107,9 @@ export default {
   schedule while `dev` runs, or now with `pnpm exec open-dashboard collect stocks`.
   Write the collector to replace its output in one step (write a new file, then
   rename) so a panel never reads half a database.
+  Over a `json` or `csv` source, a run that leaves a file unreadable or empties
+  one that had rows gets the old file put back and fails; list tables that may
+  turn empty for real (today's live game, say) in `allowEmpty: ['live']`.
 - Keep the file plain: `import type` and `satisfies` only — it is loaded by
   Node's own TypeScript support, which does not run enums or decorators.
 - Check `.gitignore` contains `.env`. Add it if not.

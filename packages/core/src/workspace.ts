@@ -42,6 +42,7 @@ export interface ResolvedCollector {
   every: string | undefined
   source: string | undefined
   timeoutMs: number
+  allowEmpty: boolean | string[]
 }
 
 const COLLECTOR_ID = /^[A-Za-z0-9][A-Za-z0-9_-]*$/
@@ -68,6 +69,12 @@ function resolveCollectors(
         )
       return ms
     }
+    const allowEmpty = collector.allowEmpty ?? false
+    if (
+      typeof allowEmpty !== 'boolean' &&
+      !(Array.isArray(allowEmpty) && allowEmpty.every((table) => typeof table === 'string'))
+    )
+      throw new DatasourceError(`collectors.${id}.allowEmpty must be true or a list of tables`)
     out[id] = {
       id,
       run,
@@ -75,6 +82,7 @@ function resolveCollectors(
       every: collector.every,
       source: collector.source,
       timeoutMs: duration('timeout', collector.timeout) ?? 600_000,
+      allowEmpty,
     }
   }
   return out
@@ -236,6 +244,8 @@ export class Workspace {
   readonly cache = new QueryCache<QueryRun>()
   /** Collectors running now, by id: a second request joins the run instead of starting another. */
   readonly collecting = new Map<string, Promise<unknown>>()
+  /** Saved API responses this old are used instead of fetching (`check` sets minutes). */
+  reuseResponsesMs = 0
 
   constructor(public config: ResolvedConfig) {}
 
@@ -265,6 +275,7 @@ export class Workspace {
         name,
         this.config.datasources[name] as DatasourceConfig,
         this.config.root,
+        { reuseResponsesMs: this.reuseResponsesMs },
       )
       pending.catch(() => this.sources.delete(name))
       this.sources.set(name, pending)

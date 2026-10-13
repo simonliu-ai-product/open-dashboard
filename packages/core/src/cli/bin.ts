@@ -64,7 +64,10 @@ Options:
   --param <key=value>    Bind :key in the SQL; repeatable. "null" binds NULL
   --limit <n>            Rows to print for query (default 50)
   --json                 Machine-readable output (schema, query, check, sources, charts)
+  --fresh                With check, fetch http and mcp tables again instead of reusing responses up to 10 min old
 `
+
+const CHECK_REUSE_MS = 10 * 60_000
 
 function flag(argv: string[], name: string): string | undefined {
   const index = argv.indexOf(`--${name}`)
@@ -225,6 +228,8 @@ export async function run(argv: string[]): Promise<number> {
   }
 
   const workspace = new Workspace(await loadConfig(root))
+  // Rerunning check while writing a dashboard should not spend an API's hourly quota.
+  if (command === 'check' && !argv.includes('--fresh')) workspace.reuseResponsesMs = CHECK_REUSE_MS
   try {
     if (command === 'render') {
       const id = positional(argv)[0]
