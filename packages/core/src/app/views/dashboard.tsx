@@ -17,7 +17,7 @@ import { applyProps } from '../../runtime/convert.js'
 import { EditContext } from '../../runtime/edit.js'
 import { downloadBlob, downloadDashboard, exportName } from '../../runtime/export-panel.js'
 import { useT } from '../../runtime/i18n.js'
-import { snapshot } from '../../runtime/snapshot.js'
+import { readOnly, snapshot } from '../../runtime/snapshot.js'
 import type { DashboardTheme } from '../../runtime/theme.js'
 import type { DashboardMeta, PanelInfo, QueryRun } from '../../runtime/types.js'
 import { Assistant, useAssistantEnabled } from '../components/assistant.js'
@@ -297,7 +297,7 @@ export function DashboardView({ id, preview }: { id: string; preview?: ThemePrev
       meta,
       tick,
       refresh,
-      inspectable: !preview && !taken,
+      inspectable: !preview && !readOnly(),
       inspect: (panel, run) => {
         setInspecting({ panel, run })
         focus.current = { panel: panel.title, ...(panel.query ? { query: panel.query } : {}) }
@@ -333,7 +333,7 @@ export function DashboardView({ id, preview }: { id: string; preview?: ThemePrev
         return pending
       },
     }
-  }, [id, meta, tick, refresh, preview, taken, filterOverride])
+  }, [id, meta, tick, refresh, preview, filterOverride])
 
   if (error) {
     return (
@@ -365,6 +365,7 @@ export function DashboardView({ id, preview }: { id: string; preview?: ThemePrev
                   : timeOf(updatedAt)
               }
               frozen={taken !== undefined}
+              readOnly={readOnly()}
               refreshSetting={refreshSetting ?? 'off'}
               refreshChoices={refreshChoices}
               onRefreshSetting={chooseRefresh}
@@ -378,8 +379,8 @@ export function DashboardView({ id, preview }: { id: string; preview?: ThemePrev
                 editor.editState.stage({ kind: 'meta', key: 'theme', value: value || null })
               }
               standalone={snapshot()?.single === true}
-              // HTML is built by the server; a snapshot has none.
-              formats={taken ? ['png', 'svg', 'pdf'] : ['png', 'svg', 'pdf', 'html']}
+              // HTML is built by the dev server; a snapshot or `serve` has none.
+              formats={readOnly() ? ['png', 'svg', 'pdf'] : ['png', 'svg', 'pdf', 'html']}
               onDownload={async (format) => {
                 if (format === 'html') {
                   const blob = await api.exportHtml(id, window.location.search)

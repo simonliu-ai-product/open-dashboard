@@ -235,6 +235,17 @@ export interface CollectorConfig {
   allowEmpty?: boolean | string[]
 }
 
+export interface ServeConfig {
+  /**
+   * Host names the server answers to, besides localhost: `'dash.example.com'`,
+   * or `'.run.app'` for every subdomain. A request for any other Host is
+   * refused, so a DNS-rebinding page cannot reach it.
+   */
+  allowedHosts?: string[]
+  /** Offer the chat assistant to readers. Default false: every question is billed to your key. */
+  assistant?: boolean
+}
+
 export interface OpenDashboardConfig {
   /** Where dashboards live. Default `dashboards`. */
   dashboardsDir?: string
@@ -258,6 +269,8 @@ export interface OpenDashboardConfig {
   assistant?: AssistantConfig
   /** Commands that refresh datasources, by name: `open-dashboard collect <name>`. */
   collectors?: Record<string, CollectorConfig>
+  /** `open-dashboard serve`: the read-only server for readers. */
+  serve?: ServeConfig
 }
 
 export type ColumnType = 'number' | 'string' | 'date' | 'boolean' | 'unknown'

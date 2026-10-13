@@ -8,7 +8,7 @@ import type { QueryHistory } from '../../ops/history.js'
 import type { DashboardLayout, LayoutEdit } from '../../ops/layout.js'
 import type { SourceDetail, SourceStatus } from '../../ops/sources.js'
 import type { ThemeFile, ThemeList } from '../../ops/themes.js'
-import { snapshot } from '../../runtime/snapshot.js'
+import { served, snapshot } from '../../runtime/snapshot.js'
 import type { DashboardTheme } from '../../runtime/theme.js'
 import type { QueryRun } from '../../runtime/types.js'
 import { staticApi } from './static-api.js'
@@ -142,5 +142,34 @@ export const liveApi = {
 
 export type Api = typeof liveApi
 
+const refused = (): Promise<never> => Promise.reject(new Error('not available on this server'))
+
+/**
+ * `open-dashboard serve` answers only what a reader needs: dashboards, their
+ * results, themes, and the assistant when it is on. The rest is empty here,
+ * not a request the server would refuse anyway.
+ */
+function servedApi(): Api {
+  return {
+    ...liveApi,
+    sources: async () => [],
+    sourceDetail: refused,
+    databaseDoc: refused,
+    schema: refused,
+    queryHistory: refused,
+    comments: async () => [],
+    comment: refused,
+    current: async () => {},
+    layout: refused,
+    saveLayout: refused,
+    charts: async () => [],
+    chartQuery: refused,
+    collectors: async () => [],
+    collect: refused,
+    exportHtml: refused,
+    saveTheme: refused,
+  }
+}
+
 /** A page built by `open-dashboard build` reads stored results; the dev server is not there. */
-export const api: Api = snapshot() ? staticApi() : liveApi
+export const api: Api = snapshot() ? staticApi() : served() ? servedApi() : liveApi

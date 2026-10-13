@@ -2,7 +2,7 @@ import { driverFor } from '../../datasource/registry.js'
 import type { DashboardSummary } from '../../ops/dashboards.js'
 import type { SourceStatus } from '../../ops/sources.js'
 import { useT } from '../../runtime/i18n.js'
-import { snapshot } from '../../runtime/snapshot.js'
+import { readOnly } from '../../runtime/snapshot.js'
 import { CommandButton } from '../components/command-button.js'
 import { CheckIcon } from '../components/icons.js'
 import { intervalLabel } from '../lib/refresh.js'
@@ -11,7 +11,7 @@ import { linkProps } from '../lib/router.js'
 const COMMANDS = ['/create-dashboard', '/create-chart', '/connect-database', '/apply-comments']
 
 function DashboardRow({ dashboard }: { dashboard: DashboardSummary }) {
-  const live = snapshot() === undefined
+  const live = !readOnly()
   const t = useT()
   return (
     <li>
@@ -91,7 +91,7 @@ export function HomeView({
   error: string | undefined
 }) {
   // A built snapshot has no connections to show and nothing to set up.
-  const live = snapshot() === undefined
+  const live = !readOnly()
   const t = useT()
 
   return (

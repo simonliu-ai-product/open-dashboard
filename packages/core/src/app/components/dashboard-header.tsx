@@ -25,6 +25,8 @@ export interface DashboardHeaderProps {
   onDownload?: (format: ImageFormat) => Promise<void>
   /** A built snapshot: results are fixed, nothing can be edited or refreshed. */
   frozen?: boolean
+  /** A page for readers: no notes, no edit mode. */
+  readOnly?: boolean
   /** A one-file export: no list to go back to, no address worth copying. */
   standalone?: boolean
   formats?: ImageFormat[]
@@ -61,7 +63,7 @@ export function DashboardHeader(props: DashboardHeaderProps) {
       </nav>
 
       <div className="odd-header-actions">
-        {props.notes.length > 0 && !props.frozen ? (
+        {props.notes.length > 0 && !props.readOnly ? (
           <button
             type="button"
             className="odd-notes-pill"
@@ -141,7 +143,7 @@ export function DashboardHeader(props: DashboardHeaderProps) {
             </select>
           </label>
         ) : null}
-        {props.frozen ? null : (
+        {props.readOnly ? null : (
           <fieldset className="odd-mode">
             <legend className="odd-sr-only">{t('Mode')}</legend>
             <button

@@ -24,6 +24,7 @@ import { loadConfig, Workspace } from '../workspace.js'
 import { buildSite } from './build.js'
 import { dev } from './dev.js'
 import { renderDashboard } from './render.js'
+import { type ServeOptions, serve } from './serve.js'
 import { formatResult } from './table.js'
 
 const USAGE = `open-dashboard — describe a dashboard to your agent, get a live one over your database
@@ -34,6 +35,7 @@ Usage:
 Commands:
   dev                       Start the viewer with hot reload (default port 5473)
   build [id...]             Static site of the dashboards with their results taken now (default out: site/)
+  serve                     Serve the dashboards to readers, read-only, with live results (port: --port, PORT)
   drivers                   Supported databases, the package each needs, how it stays read-only
   sources                   List datasources and test each connection
   schema [source]           Print tables, columns, keys and row counts
@@ -50,9 +52,10 @@ Commands:
 Options:
   --help                 Show this, from any command
   --root <dir>           Workspace root (default: cwd)
-  --port <n>             Port for dev
-  --host <host>          Bind address for dev
+  --port <n>             Port for dev and serve
+  --host <host>          Bind address for dev and serve (serve default: 127.0.0.1)
   --open                 Open a browser (dev)
+  --build-only           Build the viewer for serve and stop — in a Docker image, so the container starts at once
   --out <path>           Output folder for build (default: site), or PNG file for render
   --panel <title>        Render one panel, by its title
   --filter <key=value>   A filter value for render, as the URL has it; repeatable
@@ -153,6 +156,23 @@ export async function run(argv: string[]): Promise<number> {
     const host = flag(argv, 'host')
     if (host) options.host = host
     await dev(options)
+    return new Promise<number>(() => {})
+  }
+
+  if (command === 'serve') {
+    const options: ServeOptions = { root, buildOnly: argv.includes('--build-only') }
+    const port = flag(argv, 'port')
+    if (port) options.port = Number(port)
+    const host = flag(argv, 'host')
+    if (host) options.host = host
+    const served = await serve(options)
+    if (options.buildOnly) return 0
+    // A container stops with SIGTERM: finish what is in flight, close the pools.
+    for (const signal of ['SIGTERM', 'SIGINT'] as const) {
+      process.once(signal, () => {
+        served.close().then(() => process.exit(0))
+      })
+    }
     return new Promise<number>(() => {})
   }
 

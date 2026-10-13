@@ -103,7 +103,7 @@ export async function snapshotFiles(
  * `single`, everything lands in one script — no chunks to fetch — for a file
  * that opens from disk.
  */
-async function bundleViewer(
+export async function bundleViewer(
   workspace: Workspace,
   ids: string[],
   outDir: string,

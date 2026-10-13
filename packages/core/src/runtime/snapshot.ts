@@ -13,10 +13,23 @@ export interface Snapshot {
   single?: boolean
 }
 
-const store = globalThis as typeof globalThis & { __ODD_SNAPSHOT__?: Snapshot }
+const store = globalThis as typeof globalThis & {
+  __ODD_SNAPSHOT__?: Snapshot
+  __ODD_SERVED__?: boolean
+}
 
 export function snapshot(): Snapshot | undefined {
   return store.__ODD_SNAPSHOT__
+}
+
+/** Set by `open-dashboard serve`: live results, but nothing that edits, writes or shows SQL. */
+export function served(): boolean {
+  return store.__ODD_SERVED__ === true
+}
+
+/** A page for readers — a snapshot or `serve` — rather than the author's dev server. */
+export function readOnly(): boolean {
+  return snapshot() !== undefined || served()
 }
 
 /** "Now" for relative time ranges: a snapshot keeps the day it was taken. */

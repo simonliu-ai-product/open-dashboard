@@ -290,6 +290,28 @@ pnpm exec open-dashboard build sales --out public
 
 The site holds query results, so `site/` is git-ignored in a new workspace: publish it deliberately.
 
+### 🚀 Put it online: `open-dashboard serve`
+
+When the data has to stay live — a game in progress, today's orders — `open-dashboard serve` serves the dashboards to readers with results queried as they look, on the same cache and collector schedule as `dev`, and none of the authoring: no edit mode, no notes, no inspector, no data sources page, no SQL or file path in any reply, and nothing that writes. The refresh button reads the server's cache, so a reader cannot make every panel hit the database. The viewer is built once (and again only when a dashboard, a chart or core changes), so there is no Vite at runtime.
+
+```ts
+serve: { allowedHosts: ['.run.app'], assistant: false },
+```
+
+```dockerfile
+FROM node:24-slim
+WORKDIR /app
+RUN corepack enable
+COPY . .
+RUN pnpm install --frozen-lockfile && pnpm exec open-dashboard serve --build-only
+CMD ["pnpm", "exec", "open-dashboard", "serve", "--host", "0.0.0.0"]
+```
+
+- It listens on `PORT` (Cloud Run, Fly, Render set it), else `--port`, else 5473; on 127.0.0.1 unless `--host` says otherwise.
+- It answers only localhost and the hosts in `serve.allowedHosts` (`'.run.app'` matches every subdomain), and refuses API calls from another origin.
+- **It has no sign-in.** Put it behind one — IAP, Cloudflare Access, a proxy with auth — unless the dashboards are meant to be public.
+- The assistant is off unless `serve.assistant: true`: every reader's question is billed to your key.
+
 ### 💬 An optional assistant that answers from the page
 
 When the workspace configures one, a chat button appears at the bottom right of every dashboard. Ask *"which region grew the most?"* and the answer comes from the panels' results exactly as you see them, under the filters you have set, with the metric definitions from `-- description:` and the notes in `database.md`. The model never runs a query or writes SQL: it reads what the page already loaded. Without a configuration there is no button at all.
@@ -378,6 +400,7 @@ No database to hand? `init my-dashboards --sample` adds a small generated SQLite
 | `open-dashboard check [id] [--json] [--fresh]` | Run every query, verify every panel; non-zero exit on errors |
 | `open-dashboard charts [--json]` | Every chart this workspace can use — the 41 built-ins and `charts/` — and the dashboards using each |
 | `open-dashboard build [id...] [--out site] [--max-runs 100]` | Static site of the dashboards with their results taken now |
+| `open-dashboard serve [--port n] [--host h] [--build-only]` | Serve the dashboards to readers, read-only, with live results |
 | `open-dashboard render <id> [--panel title] [--filter k=v] [--theme dark]` | A dashboard or one panel as a PNG, for an agent to look at (needs Playwright) |
 | `open-dashboard collect [name...]` | Run the config's collectors now; non-zero exit if one fails |
 | `open-dashboard mcp [--allow-sql]` | The MCP tools over stdio, for a client that starts the server (needs `@open-dashboard/mcp`) |

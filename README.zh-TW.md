@@ -290,6 +290,28 @@ pnpm exec open-dashboard build sales --out public
 
 網站裡有查詢結果，所以新的 workspace 會把 `site/` 列進 `.gitignore`：要公開請刻意發佈。
 
+### 🚀 放上線：`open-dashboard serve`
+
+資料必須保持即時的時候（進行中的比賽、今天的訂單），`open-dashboard serve` 會把 Dashboard 提供給讀者，結果在讀者打開時即時查詢，快取和收集器排程都跟 `dev` 一樣；但編寫用的功能一律不提供：沒有編輯模式、沒有備註、沒有檢視器、沒有資料來源頁，任何回應裡都不會出現 SQL 或檔案路徑，也沒有任何會寫入的功能。重新整理按鈕讀的是伺服器的快取，讀者無法讓每個面板都直接打資料庫。檢視器只編譯一次（Dashboard、自訂圖表或 core 有變動時才重新編譯），執行時不需要 Vite。
+
+```ts
+serve: { allowedHosts: ['.run.app'], assistant: false },
+```
+
+```dockerfile
+FROM node:24-slim
+WORKDIR /app
+RUN corepack enable
+COPY . .
+RUN pnpm install --frozen-lockfile && pnpm exec open-dashboard serve --build-only
+CMD ["pnpm", "exec", "open-dashboard", "serve", "--host", "0.0.0.0"]
+```
+
+- 監聽 `PORT`（Cloud Run、Fly、Render 會自動設定），沒有的話用 `--port`，再沒有就是 5473；除非用 `--host` 指定，否則只綁 127.0.0.1。
+- 只回應 localhost 和 `serve.allowedHosts` 裡的主機（`'.run.app'` 涵蓋所有子網域），並拒絕來自其他網站的 API 呼叫。
+- **它沒有登入機制。** 除非 Dashboard 本來就要公開，否則請放在 IAP、Cloudflare Access 或有驗證的反向代理後面。
+- 對話助理預設關閉，要設 `serve.assistant: true` 才會開：每個讀者的提問都會算在你的金鑰上。
+
 ### 💬 選用的對話助理，只根據畫面回答
 
 workspace 設定了助理時，每張 Dashboard 右下角會出現對話按鈕。問「哪一區成長最多？」，回答會根據面板的查詢結果——就是你在畫面上看到的、套用目前篩選條件的那些數字——以及 `-- description:` 的指標定義與 `database.md` 的說明。模型不會執行查詢，也不會寫 SQL：它只讀頁面已經載入的資料。沒有設定時，連按鈕都不會出現。
@@ -380,6 +402,7 @@ pnpm dev                     # http://localhost:5473
 | `open-dashboard check [id] [--json] [--fresh]` | 執行每條查詢、驗證每個面板；有錯誤時以非零狀態結束 |
 | `open-dashboard charts [--json]` | 這個 workspace 能用的所有圖表——41 種內建與 `charts/`——以及使用它們的 Dashboard |
 | `open-dashboard build [id...] [--out site] [--max-runs 100]` | 把 Dashboard 連同此刻的結果輸出成靜態網站 |
+| `open-dashboard serve [--port n] [--host h] [--build-only]` | 把 Dashboard 以唯讀方式提供給讀者，結果即時查詢 |
 | `open-dashboard render <id> [--panel title] [--filter k=v] [--theme dark]` | 把 Dashboard 或單一面板畫成 PNG，給 Agent 看（需要 Playwright） |
 | `open-dashboard collect [name...]` | 立刻執行設定檔裡的收集器；有失敗時以非零狀態結束 |
 | `open-dashboard mcp [--allow-sql]` | 透過 stdio 提供 MCP 工具，給會自己啟動 server 的用戶端（需要 `@open-dashboard/mcp`） |

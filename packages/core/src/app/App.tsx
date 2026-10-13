@@ -3,7 +3,7 @@ import { driverFor } from '../datasource/registry.js'
 import type { DashboardSummary } from '../ops/dashboards.js'
 import type { SourceStatus } from '../ops/sources.js'
 import { LocaleProvider, useT } from '../runtime/i18n.js'
-import { snapshot } from '../runtime/snapshot.js'
+import { readOnly, snapshot } from '../runtime/snapshot.js'
 import { ChevronIcon } from './components/icons.js'
 import { SettingsMenu } from './components/settings-menu.js'
 import { api } from './lib/api.js'
@@ -83,7 +83,7 @@ function Shell() {
   const shownSource = sources?.find((s) => s.default)?.name ?? sources?.[0]?.name
   const [menuOpen, setMenuOpen] = useState(false)
   // A built snapshot has dashboards and nothing that needs the database or writes a file.
-  const live = snapshot() === undefined
+  const live = !readOnly()
 
   // biome-ignore lint/correctness/useExhaustiveDependencies: close the menu whenever the route changes
   useEffect(() => setMenuOpen(false), [route])

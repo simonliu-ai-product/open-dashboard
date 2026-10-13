@@ -32,6 +32,7 @@ export interface ResolvedConfig {
   /** Resolved and usable, or undefined when off or incomplete. */
   assistant: ResolvedAssistant | undefined
   collectors: Record<string, ResolvedCollector>
+  serve: { allowedHosts: string[]; assistant: boolean }
   configFile: string | undefined
 }
 
@@ -86,6 +87,19 @@ function resolveCollectors(
     }
   }
   return out
+}
+
+function resolveServe(input: OpenDashboardConfig['serve']): ResolvedConfig['serve'] {
+  const allowedHosts = input?.allowedHosts ?? []
+  if (
+    !Array.isArray(allowedHosts) ||
+    !allowedHosts.every((host) => typeof host === 'string' && host)
+  )
+    throw new DatasourceError('serve.allowedHosts must be a list of host names')
+  return {
+    allowedHosts: allowedHosts.map((host) => host.toLowerCase()),
+    assistant: input?.assistant === true,
+  }
 }
 
 export interface ResolvedAssistant {
@@ -230,6 +244,7 @@ export async function loadConfig(
     theme: user.theme,
     assistant,
     collectors: resolveCollectors(user.collectors),
+    serve: resolveServe(user.serve),
     configFile: file,
   }
 }
