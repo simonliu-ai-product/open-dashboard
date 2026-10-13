@@ -22,7 +22,7 @@
   ],
   "type": "module",
   "bin": {
-    "create-open-dashboard": "./bin.js"
+    "create-open-dashboard": "bin.js"
   },
   "files": [
     "dist",
