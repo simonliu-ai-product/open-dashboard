@@ -30,10 +30,10 @@ When implementing new features and shipping a release for `open-dashboard`, foll
 - Bump version numbers in `packages/core/package.json`, `packages/cli/package.json`, `packages/mcp/package.json` (including `peerDependencies`), and `SECURITY.md`.
 - Run `pnpm build` (which also syncs skills into `packages/cli/template/skills`), commit `Release <version>`, tag `v<version>`, push to `origin main` + `--tags`, and create the GitHub Release via `gh release create v<version>`.
 
-### 5. Minimalist Visual Promo Video & Multi-Platform Social Copy
-- **Visual-First Promo Video (`videos/open-dashboard-v<ver>-visual/`)**:
-  - Build a Hyperframes composition (`npx --yes hyperframes@0.8.155 check && npx --yes hyperframes@0.8.155 render`) in `tools/playground/open-dashboard-sample/videos/`.
-  - **Design Rule**: Keep slides ultra-minimalist (`頁面越簡潔越好，能用圖像呈現，就不要描述`). Show real UI screenshots, interactive pill badges, red/green Git diffs, and visual architecture nodes instead of descriptive paragraphs. Ensure `hyperframes check` passes with 0 lint, layout, motion, or contrast errors.
+### 5. Live Interaction Promo Video (with Bottom Bilingual Subtitles) & Multi-Platform Social Copy
+- **Live Browser Promo Video (`open-dashboard-v<ver>-live-subtitled.mp4`)**:
+  - Record real browser interactions in 1920×1080 Chromium via Playwright (`recordVideo`) with a visible cursor + click ripple indicator and a sleek **bottom bilingual subtitle dock (English primary in bold white, Traditional Chinese secondary below)** synchronized to each live feature action, then encode to H.264 MP4 (`ffmpeg -crf 18 -pix_fmt yuv420p`).
+  - Save the final MP4 under `tools/playground/open-dashboard-sample/videos/open-dashboard-v<ver>-visual/renders/`.
 - **Social Media Copy (4 Platforms)**:
   - Provide ready-to-post copy tailored to platform character limits and tone:
     - **Facebook**: Story-driven hook + numbered feature highlights + GitHub release link + hashtags.

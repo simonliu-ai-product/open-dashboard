@@ -153,6 +153,6 @@ Hand-written SVG, no chart dependency. The visual rules follow the dataviz metho
    - (2) Functional correctness (URL sync, SQL param expansion, live KPI updates)
    - (3) Overall user experience
 3. **GitHub Release**: Bump versions in `packages/{core,cli,mcp}/package.json` and `SECURITY.md`, rebuild, commit `Release x.y.z`, tag `vx.y.z`, `git push origin main && git push origin vx.y.z`, and publish release notes with `gh release create vx.y.z`.
-4. **Minimalist Visual Video (Hyperframes)**: Render an ultra-clean, visual-first promo video (`npx --yes hyperframes@0.8.155 check && npx --yes hyperframes@0.8.155 render`) under `tools/playground/open-dashboard-sample/videos/`. Prioritize real screenshots, interactive UI pills, visual diffs, and architecture diagrams over descriptive text ("能用圖像呈現，就不要描述").
+4. **Live Interaction Promo Video (Bottom Bilingual Subtitles)**: Record a 1920×1080 real-browser screen recording via Playwright (`recordVideo`) with a visible cursor + click ripple and a **bottom bilingual subtitle dock (English primary, Traditional Chinese secondary)** synchronized to each live UI interaction, encoded via `ffmpeg` under `tools/playground/open-dashboard-sample/videos/`.
 5. **Social Posts**: Provide ready-to-publish copy for **Facebook**, **LinkedIn** (ZH/EN), **X / Twitter** (≤ 280 chars), and **Threads** (≤ 500 chars).
 
