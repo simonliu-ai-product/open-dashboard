@@ -30,6 +30,9 @@ pnpm exec open-dashboard schema [source]         # tables, columns, keys, row co
 pnpm exec open-dashboard query "SELECT …"        # run read-only SQL, see rows + types
 pnpm exec open-dashboard query --dashboard <id> --name <query> --param from=2026-01-01
 pnpm exec open-dashboard check [id]              # run every query, verify every panel
+pnpm exec open-dashboard diff [id]               # compare current query outputs against last baseline
+pnpm exec open-dashboard report [id] --format md # generate markdown/JSON inspection report (+ optional --webhook)
+pnpm exec open-dashboard deploy gcp [up|status|pull|push|stop|start|down] # 1-CLI Cloud Run + GCS FUSE + Remote MCP deploy
 pnpm exec open-dashboard charts                  # every chart you can use — built-in and charts/ — before making a new one
 pnpm exec open-dashboard collect [name]          # run the config's collectors: commands that refresh a datasource
 pnpm exec open-dashboard build                   # static site of the dashboards with today's results → site/
@@ -38,7 +41,7 @@ pnpm exec open-dashboard sync-skills             # after upgrading @open-dashboa
 
 ## Rules
 
-- **SQL lives in `.sql` files, referenced by name.** Never put SQL in JSX.
+- **SQL lives in `.sql` files, referenced by name.** Never put SQL in JSX. Shared SQL lives in `queries/*.sql`.
 - **Never invent a number.** Every figure comes from a query against the
   user's database. No hard-coded targets or benchmarks.
 - **Look at the data before writing a chart** — `schema`, then `query`.
