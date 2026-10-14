@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import type { ColumnInfo } from '../config.js'
 import { formatValue } from '../runtime/format.js'
 import { useT } from '../runtime/i18n.js'
@@ -46,6 +46,8 @@ export interface TableProps extends PanelProps {
   pageSize?: number
   /** Show a summary footer row (`true` defaults numeric columns to `'sum'`). */
   summary?: boolean | TableSummaryKind
+  /** Open a slide-over detail drawer when a row is clicked to inspect all fields and copy JSON. */
+  detail?: boolean
 }
 
 const IDENTIFIER = /(^id$|_id$|^id_)/i
@@ -125,10 +127,21 @@ function DataTable({ run, props }: { run: QueryRun; props: TableProps }) {
   const [sort, setSort] = useState<string | undefined>(props.sort)
   const [query, setQuery] = useState('')
   const [page, setPage] = useState(0)
+  const [detailRow, setDetailRow] = useState<Record<string, unknown> | null>(null)
+  const [copiedJson, setCopiedJson] = useState(false)
   const types = new Map<string, ColumnInfo['type']>(run.result.columns.map((c) => [c.name, c.type]))
   const columns: TableColumn[] = (props.columns ?? run.result.columns.map((c) => c.name)).map(
     (column) => (typeof column === 'string' ? { key: column } : column),
   )
+
+  useEffect(() => {
+    if (!detailRow) return
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') setDetailRow(null)
+    }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [detailRow])
 
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase()
@@ -236,94 +249,108 @@ function DataTable({ run, props }: { run: QueryRun; props: TableProps }) {
           </tr>
         </thead>
         <tbody>
-          {visibleRows.map((row, i) => (
-            <tr
-              // biome-ignore lint/suspicious/noArrayIndexKey: rows have no identity of their own
-              key={i}
-              data-active={drill?.isActive(row[drill.column ?? drill.filter]) || undefined}
-              tabIndex={drill ? 0 : undefined}
-              onClick={drill ? () => drill.pick(row[drill.column ?? drill.filter]) : undefined}
-              onKeyDown={
-                drill
-                  ? (event) => {
-                      if (event.key === 'Enter' || event.key === ' ') {
-                        event.preventDefault()
-                        drill.pick(row[drill.column ?? drill.filter])
-                      }
-                    }
-                  : undefined
+          {visibleRows.map((row, i) => {
+            const interactive = Boolean(drill || props.detail)
+            const handleRowActivate = () => {
+              if (drill) drill.pick(row[drill.column ?? drill.filter])
+              if (props.detail) {
+                setCopiedJson(false)
+                setDetailRow(row)
               }
-              className={drill ? 'odd-drillable' : undefined}
-            >
-              {columns.map((column) => {
-                const numeric = types.get(column.key) === 'number'
-                const value = row[column.key]
-                const max = maxima.get(column.key)
-                const scale = scales.get(column.key)
-                const numVal = Number(value)
-                const scalePct =
-                  scale && Number.isFinite(numVal)
-                    ? scale.max === scale.min
-                      ? 14
-                      : Math.round(4 + ((numVal - scale.min) / (scale.max - scale.min)) * 22)
-                    : 0
-                const colFormat =
-                  column.format ??
-                  props.format?.[column.key] ??
-                  (IDENTIFIER.test(column.key) ? ID_FORMAT : undefined)
-                const formatted = formatValue(value, colFormat, ctx)
-                const inner = column.sparkline ? (
-                  <CellSparkline value={value} />
-                ) : column.badge && value !== null && value !== undefined ? (
-                  <span className="odd-cell-badge" data-tone={badgeTone(value)}>
-                    {formatted}
-                  </span>
-                ) : column.delta && Number.isFinite(numVal) && value !== null ? (
-                  <span
-                    className="odd-cell-delta"
-                    data-tone={numVal > 0 ? 'good' : numVal < 0 ? 'bad' : 'neutral'}
-                  >
-                    {numVal > 0 ? '▲ ' : numVal < 0 ? '▼ ' : ''}
-                    {formatted}
-                  </span>
-                ) : (
-                  formatted
-                )
-                return (
-                  <td
-                    key={column.key}
-                    style={{
-                      textAlign: column.align ?? (numeric ? 'right' : 'left'),
-                      background:
-                        scalePct > 0
-                          ? `color-mix(in srgb, var(--odd-accent) ${scalePct}%, transparent)`
-                          : undefined,
-                    }}
-                    data-numeric={numeric || undefined}
-                  >
-                    {max ? (
-                      <span className="odd-cell-bar">
-                        <span style={{ width: `${Math.max(0, (Number(value) / max) * 100)}%` }} />
-                      </span>
-                    ) : null}
-                    {column.href && value !== null && value !== undefined ? (
-                      <a
-                        href={interpolateHref(column.href, value, row)}
-                        className="odd-cell-link"
-                        target={column.href.startsWith('http') ? '_blank' : undefined}
-                        rel={column.href.startsWith('http') ? 'noopener noreferrer' : undefined}
-                        onClick={(e) => e.stopPropagation()}
-                      >
-                        {inner}
-                      </a>
-                    ) : (
-                      inner
-                    )}
-                  </td>
-                )
-              })}
-            </tr>
-          ))}
+            }
+            return (
+              <tr
+                // biome-ignore lint/suspicious/noArrayIndexKey: rows have no identity of their own
+                key={i}
+                data-active={
+                  drill?.isActive(row[drill.column ?? drill.filter]) ||
+                  detailRow === row ||
+                  undefined
+                }
+                tabIndex={interactive ? 0 : undefined}
+                onClick={interactive ? handleRowActivate : undefined}
+                onKeyDown={
+                  interactive
+                    ? (event) => {
+                        if (event.key === 'Enter' || event.key === ' ') {
+                          event.preventDefault()
+                          handleRowActivate()
+                        }
+                      }
+                    : undefined
+                }
+                className={interactive ? 'odd-drillable' : undefined}
+              >
+                {columns.map((column) => {
+                  const numeric = types.get(column.key) === 'number'
+                  const value = row[column.key]
+                  const max = maxima.get(column.key)
+                  const scale = scales.get(column.key)
+                  const numVal = Number(value)
+                  const scalePct =
+                    scale && Number.isFinite(numVal)
+                      ? scale.max === scale.min
+                        ? 14
+                        : Math.round(4 + ((numVal - scale.min) / (scale.max - scale.min)) * 22)
+                      : 0
+                  const colFormat =
+                    column.format ??
+                    props.format?.[column.key] ??
+                    (IDENTIFIER.test(column.key) ? ID_FORMAT : undefined)
+                  const formatted = formatValue(value, colFormat, ctx)
+                  const inner = column.sparkline ? (
+                    <CellSparkline value={value} />
+                  ) : column.badge && value !== null && value !== undefined ? (
+                    <span className="odd-cell-badge" data-tone={badgeTone(value)}>
+                      {formatted}
+                    </span>
+                  ) : column.delta && Number.isFinite(numVal) && value !== null ? (
+                    <span
+                      className="odd-cell-delta"
+                      data-tone={numVal > 0 ? 'good' : numVal < 0 ? 'bad' : 'neutral'}
+                    >
+                      {numVal > 0 ? '▲ ' : numVal < 0 ? '▼ ' : ''}
+                      {formatted}
+                    </span>
+                  ) : (
+                    formatted
+                  )
+                  return (
+                    <td
+                      key={column.key}
+                      style={{
+                        textAlign: column.align ?? (numeric ? 'right' : 'left'),
+                        background:
+                          scalePct > 0
+                            ? `color-mix(in srgb, var(--odd-accent) ${scalePct}%, transparent)`
+                            : undefined,
+                      }}
+                      data-numeric={numeric || undefined}
+                    >
+                      {max ? (
+                        <span className="odd-cell-bar">
+                          <span style={{ width: `${Math.max(0, (Number(value) / max) * 100)}%` }} />
+                        </span>
+                      ) : null}
+                      {column.href && value !== null && value !== undefined ? (
+                        <a
+                          href={interpolateHref(column.href, value, row)}
+                          className="odd-cell-link"
+                          target={column.href.startsWith('http') ? '_blank' : undefined}
+                          rel={column.href.startsWith('http') ? 'noopener noreferrer' : undefined}
+                          onClick={(e) => e.stopPropagation()}
+                        >
+                          {inner}
+                        </a>
+                      ) : (
+                        inner
+                      )}
+                    </td>
+                  )
+                })}
+              </tr>
+            )
+          })}
         </tbody>
         {hasSummary && rows.length > 0 ? (
           <tfoot>
@@ -389,6 +416,68 @@ function DataTable({ run, props }: { run: QueryRun; props: TableProps }) {
             n: Math.min(rows.length, 1000).toLocaleString(),
           })}
         </p>
+      ) : null}
+      {detailRow ? (
+        // biome-ignore lint/a11y/useKeyWithClickEvents lint/a11y/noStaticElementInteractions: Escape key handled via window listener
+        <div
+          className="odd-row-drawer-backdrop"
+          data-export-skip=""
+          onClick={(e) => {
+            if (e.target === e.currentTarget) setDetailRow(null)
+          }}
+        >
+          <aside className="odd-row-drawer" aria-label={t('Row details')}>
+            <header className="odd-row-drawer-head">
+              <strong>
+                {props.title ? `${props.title} — ${t('Row details')}` : t('Row details')}
+              </strong>
+              <div className="odd-row-drawer-actions">
+                <button
+                  type="button"
+                  className="odd-chip-btn"
+                  onClick={() => {
+                    navigator.clipboard?.writeText(JSON.stringify(detailRow, null, 2))
+                    setCopiedJson(true)
+                  }}
+                >
+                  {copiedJson ? t('Copied') : t('Copy JSON')}
+                </button>
+                <button
+                  type="button"
+                  className="odd-icon-button"
+                  aria-label={t('Close')}
+                  onClick={() => setDetailRow(null)}
+                >
+                  ×
+                </button>
+              </div>
+            </header>
+            <dl className="odd-row-drawer-list">
+              {run.result.columns.map((col) => {
+                const rawVal = detailRow[col.name]
+                const colSpec = columns.find((c) => c.key === col.name)
+                const colFormat =
+                  colSpec?.format ??
+                  props.format?.[col.name] ??
+                  (IDENTIFIER.test(col.name) ? ID_FORMAT : undefined)
+                const formatted = formatValue(rawVal, colFormat, ctx)
+                return (
+                  <div key={col.name} className="odd-row-drawer-item">
+                    <dt>
+                      <span>{colSpec?.label ?? humanize(col.name)}</span>
+                      <code>{col.name}</code>
+                    </dt>
+                    <dd>{formatted}</dd>
+                  </div>
+                )
+              })}
+            </dl>
+            <details className="odd-row-drawer-raw">
+              <summary>{t('Raw JSON')}</summary>
+              <pre>{JSON.stringify(detailRow, null, 2)}</pre>
+            </details>
+          </aside>
+        </div>
       ) : null}
     </div>
   )

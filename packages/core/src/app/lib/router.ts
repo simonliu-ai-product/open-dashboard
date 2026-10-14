@@ -7,6 +7,7 @@ export type Route =
   | { name: 'data'; source?: string }
   | { name: 'charts'; id?: string }
   | { name: 'themes'; id?: string }
+  | { name: 'changes' }
 
 export function parseRoute(pathname: string): Route {
   const dashboard = /^\/d\/([^/]+)\/?$/.exec(pathname)
@@ -14,6 +15,7 @@ export function parseRoute(pathname: string): Route {
   const data = /^\/data(?:\/([^/]+))?\/?$/.exec(pathname)
   if (data)
     return data[1] ? { name: 'data', source: decodeURIComponent(data[1]) } : { name: 'data' }
+  if (/^\/changes\/?$/.test(pathname)) return { name: 'changes' }
   for (const name of ['charts', 'themes'] as const) {
     const match = new RegExp(`^/${name}(?:/([^/]+))?/?$`).exec(pathname)
     if (match) return match[1] ? { name, id: decodeURIComponent(match[1]) } : { name }

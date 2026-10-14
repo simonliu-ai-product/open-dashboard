@@ -368,10 +368,25 @@ export const meta: DashboardMeta = {
 ```
 
 - **`TimeRange`**：綁定 `:from`／`:to`（`today`、`7d`、`30d`、`90d`、`6m`、`12m`、`ytd`、`all`），支援 `allowCustom`（自訂起訖日期 `YYYY-MM-DD..YYYY-MM-DD`）與 `compare`（自動計算並綁定等長的前一期 `:prev_from`／`:prev_to` 供環比分析），也能透過 `<LineChart brush />`／`<AreaChart brush />` 直接在圖表上拖曳框選時間區間。
-- **`Select`、`SearchInput`、`Toggle`**：由查詢提供選項的下拉選單、防抖關鍵字搜尋框（`:q`），以及布林切換按鈕（`0`／`1`）。
+- **`Select`、`MultiSelect`、`SearchInput`、`Toggle`**：單選下拉選單、多選膠囊篩選器（`:region` 綁定逗號分隔字串或 `NULL`）、防抖關鍵字搜尋框（`:q`），以及布林切換按鈕（`0`／`1`）。
+- **資料列詳情抽屜（`<Table detail />`）**：在 `<Table>` 加上 `detail` 屬性，點擊任一列即可滑出側邊詳情面板，檢視該筆紀錄的所有欄位與可複製的 Raw JSON。
 - **預設檢視（`meta.views`）與分頁（`<Tabs>`／`<Tab>`）**：一鍵切換常用的篩選組合，並支援與網址同步（`?tab=`）的多分頁版面配置。
 - **跨 Dashboard 下鑽（`drill` + `drillTo`）**：在面板上設定 `drill="category" drillTo="product-analysis"`，點擊圖表或表格時會直接跳轉至 `/d/product-analysis?category=…` 並保留當前的時間範圍與篩選參數。
+- **Git 變更檢視與一鍵還原（`/changes`）**：在瀏覽器內直接檢視你或 AI Agent 對 `dashboards/`、`queries/`、`charts/`、`themes/`、`databases/` 所做的未提交修改（Unified Diff），並支援單檔一鍵還原。
 - **Kiosk 全螢幕模式與命令面板（`⌘K`）**：加上 `?kiosk=1`（或點標題列按鈕，按 `Escape` 退出）可隱藏側欄與工具列供電視牆展示；隨時按 **`⌘K`／`Ctrl+K`** 即可模糊搜尋並跳轉至任何 Dashboard、定位並高亮當前頁面的任一圖表面板、套用預設檢視或切換主題。
+
+### ☁️ 一鍵部署至 Google Cloud Run + GCS FUSE + 遠端 MCP
+
+一條指令將整個 Workspace 部署至 Google Cloud Run，自動掛載 Cloud Storage（GCS FUSE）保存修改，並開啟受 Bearer Token 保護的 `/mcp` 端點，讓 Antigravity 或 Claude 直接連線操作雲端看板：
+
+```bash
+open-dashboard deploy gcp check                 # 檢查 gcloud CLI、登入狀態、專案與 API
+open-dashboard deploy gcp up --project <id>     # 建立 GCS 儲存桶、同步檔案並部署至 Cloud Run
+open-dashboard deploy gcp status                # 查看雲端服務狀態、網址與 Antigravity MCP 設定片段
+open-dashboard deploy gcp pull                  # 將雲端修改同步回本地（GCS → local）
+open-dashboard deploy gcp push                  # 將本地修改推送至雲端（local → GCS）
+open-dashboard deploy gcp stop / start / down   # 鎖定對外存取（縮容至 0）或完整卸載服務
+```
 
 ### 🖱️ 檢視任何面板、SQL 執行計畫（Explain）、閾值警報，並留備註給 Agent
 
@@ -421,6 +436,7 @@ pnpm dev                     # http://localhost:5473
 | --- | --- |
 | `open-dashboard dev [--port 5473] [--host] [--open]` | 啟動有熱更新的檢視器 |
 | `open-dashboard dev --mcp [--allow-sql]` | 同時在 `/mcp` 提供 MCP server（需要 `@open-dashboard/mcp`） |
+| `open-dashboard deploy gcp [check\|up\|status\|pull\|push\|stop\|start\|down]` | 一鍵部署至 Google Cloud Run（整合 GCS FUSE 持久化與遠端 MCP） |
 | `open-dashboard drivers` | 支援的資料庫、各自需要的套件，以及如何保持唯讀 |
 | `open-dashboard sources` | 列出資料來源並測試連線 |
 | `open-dashboard schema [source] [--json]` | 資料表、欄位、鍵與筆數 |

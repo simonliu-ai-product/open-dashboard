@@ -45,9 +45,13 @@ ORDER BY 1;
   `30s`, `5m`, `1h`, `off`. Default: the config's `cache` (30 s). Use `off` for
   a "right now" number on a live board, and longer for heavy or billed queries
   (BigQuery). The refresh button always runs fresh; `check` never uses the cache.
+- `-- alert:` (optional) threshold alert expression checked against the first row, e.g.
+  `-- alert: revenue < 50000 warn "Revenue below $50k"` or `-- alert: error_rate > 0.05 error "High error rate"`.
+  Shows a warning/error badge on the panel header and is included in `open-dashboard report`.
 - `-- uses:` (optional) — see *Across databases* below.
 - Those header lines must come **directly** after `-- name:`.
 - A trailing `;` is fine. One statement per query.
+- **Shared queries (`queries/*.sql`)**: Named queries placed in top-level `queries/*.sql` are automatically inherited by all dashboards (a dashboard's own `queries.sql` overrides on name collision).
 
 ### HTTP and MCP sources
 
@@ -101,13 +105,20 @@ Postgres `::casts`, a colon is left alone.
 | Filter | Binds |
 | --- | --- |
 | `<TimeRange />` | `:from` (inclusive) and `:to` (exclusive), as `'YYYY-MM-DD'` |
+| `<TimeRange compare />` | also binds `:prev_from` and `:prev_to` for previous-period comparison |
 | `<TimeRange name="signup" />` | `:signup_from`, `:signup_to` |
 | `<Select name="region" />` | `:region` — a string, or **NULL when "All"** is chosen |
+| `<MultiSelect name="region" />` | `:region` — comma-separated string (`'North,South'`), or **NULL when "All"** is chosen |
+| `<SearchInput name="q" />` | `:q` — trimmed search string, or **NULL when empty** |
+| `<Toggle name="paid_only" />` | `:paid_only` — `1` or `0` |
 
 So always write:
 
 - time: `col >= :from AND col < :to` — `:to` is exclusive (tomorrow, for "today").
 - select: `(:region IS NULL OR region = :region)`.
+- multi-select: `(:region IS NULL OR ',' || :region || ',' LIKE '%,' || region || ',%')`.
+- search: `(:q IS NULL OR name LIKE '%' || :q || '%')`.
+- toggle: `(:paid_only = 0 OR status = 'paid')`.
 
 A query that uses a placeholder no filter provides fails with
 `missing parameter :x — no filter on the dashboard provides it`.

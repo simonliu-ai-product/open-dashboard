@@ -76,3 +76,51 @@ export function writeDashboardFile(
   writeFileSync(path, content)
   return { file: relative(config.root, path), hash: hashSource(content), created: !exists }
 }
+
+const SHARED_SQL_NAME = /^[A-Za-z0-9][A-Za-z0-9_-]*\.sql$/
+
+/** Every workspace-level shared `.sql` file under `queries/`, with a hash of each. */
+export function readSharedQueryFiles(config: ResolvedConfig): {
+  dir: string
+  files: DashboardFile[]
+} {
+  const dir = join(config.root, 'queries')
+  if (!existsSync(dir)) return { dir: 'queries', files: [] }
+  const files = readdirSync(dir)
+    .filter((name) => SHARED_SQL_NAME.test(name))
+    .sort((a, b) => a.localeCompare(b))
+    .map((name) => {
+      const content = readFileSync(join(dir, name), 'utf8')
+      return { name, content, hash: hashSource(content) }
+    })
+  return { dir: 'queries', files }
+}
+
+/** Writes one workspace-level shared `.sql` file under `queries/`, with optimistic hash check. */
+export function writeSharedQueryFile(
+  config: ResolvedConfig,
+  name: string,
+  content: string,
+  expected = '',
+): { file: string; hash: string; created: boolean } {
+  if (!SHARED_SQL_NAME.test(name)) {
+    throw new OpsError(`"${name}" is not a shared query file — write <name>.sql`)
+  }
+  const dir = join(config.root, 'queries')
+  const path = join(dir, name)
+  const exists = existsSync(path)
+  const current = exists ? hashSource(readFileSync(path, 'utf8')) : ''
+  if (current !== expected) {
+    throw new OpsError(
+      exists
+        ? expected
+          ? `${name} changed since it was read — read shared queries again and reapply the change`
+          : `${name} already exists — read shared queries and pass its hash as expected`
+        : `${name} does not exist — pass no expected hash to create it`,
+      409,
+    )
+  }
+  mkdirSync(dir, { recursive: true })
+  writeFileSync(path, content)
+  return { file: relative(config.root, path), hash: hashSource(content), created: !exists }
+}

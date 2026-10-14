@@ -83,5 +83,7 @@ export function staticApi(): Api {
     themes: () => load('themes.json'),
     theme: (id) => load(`themes/${encodeURIComponent(id)}.json`),
     saveTheme: unavailable,
+    changes: async () => ({ available: false, branch: null, files: [] }),
+    revertChange: unavailable,
   }
 }

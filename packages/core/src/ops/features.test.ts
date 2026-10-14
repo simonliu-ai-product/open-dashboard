@@ -1,6 +1,15 @@
+import { execFileSync } from 'node:child_process'
 import { mkdir, mkdtemp, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
+import {
+  buildGcloudDeployArgs,
+  defaultBucketName,
+  formatAntigravityMcpSnippet,
+  generateDockerfile,
+  generateEntrypointScript,
+  sanitizeKebab,
+} from '../cli/deploy-gcp.js'
 import { openFiles, parseMarkdownTable } from '../datasource/files.js'
 import { loadQueries, loadSharedQueries } from '../queries/load.js'
 import { parseQueryFile } from '../queries/parse.js'
@@ -15,6 +24,8 @@ import {
 import { loadConfig, Workspace } from '../workspace.js'
 import { evaluateAlerts } from './alerts.js'
 import { analyzeDashboard } from './analyze.js'
+import { readWorkspaceChanges, revertWorkspaceFile } from './changes.js'
+import { readSharedQueryFiles, writeSharedQueryFile } from './dashboard-files.js'
 import { diffWorkspace } from './diff.js'
 import { explainDashboardQuery } from './explain.js'
 import { generateReport } from './report.js'
@@ -46,15 +57,16 @@ describe('Feature 1: Interactive Filters & Custom/Compare Time Ranges', () => {
     })
   })
 
-  it('analyzes SearchInput, Toggle, TimeRange compare, and Tabs/Tab components', () => {
+  it('analyzes SearchInput, Toggle, MultiSelect, TimeRange compare, and Tabs/Tab components', () => {
     const analysis = analyzeDashboard(
       `
-      import { Dashboard, TimeRange, SearchInput, Toggle, Tabs, Tab, Row, Stat } from '@open-dashboard/core'
+      import { Dashboard, TimeRange, SearchInput, Toggle, MultiSelect, Tabs, Tab, Row, Stat } from '@open-dashboard/core'
       export default (
         <Dashboard>
           <TimeRange default="30d" compare allowCustom />
           <SearchInput name="q" label="Keyword" default="pro" />
           <Toggle name="active_only" label="Active only" default={true} />
+          <MultiSelect name="region" label="Regions" options={['North', 'South']} default={['North', 'South']} />
           <Tabs default="overview">
             <Tab id="overview" label="Overview">
               <Row><Stat title="Total" query="headline" /></Row>
@@ -68,6 +80,7 @@ describe('Feature 1: Interactive Filters & Custom/Compare Time Ranges', () => {
       ['TimeRange', undefined, '30d', true],
       ['SearchInput', 'q', 'pro', undefined],
       ['Toggle', 'active_only', '1', undefined],
+      ['MultiSelect', 'region', 'North,South', undefined],
     ])
     expect(analysis.panels).toHaveLength(1)
     expect(analysis.panels[0]?.query).toBe('headline')
@@ -244,5 +257,108 @@ describe('Feature 5 & Batch 2: Markdown Datasource, Shared Queries, Explain, Dif
     } finally {
       await rm(root, { recursive: true, force: true })
     }
+  })
+})
+
+describe('Phase 3: Shared Queries API, Git Changes & GCP Deploy Helpers', () => {
+  it('reads and writes shared query files in queries/*.sql', async () => {
+    const root = await mkdtemp(join(tmpdir(), 'odd-shared-'))
+    try {
+      const config = await loadConfig(root)
+      const written = writeSharedQueryFile(
+        config,
+        'common.sql',
+        '-- name: active_regions\nSELECT 1 AS id;\n',
+      )
+      expect(written.file).toBe('queries/common.sql')
+      expect(written.created).toBe(true)
+      const read = readSharedQueryFiles(config)
+      expect(read.files).toHaveLength(1)
+      expect(read.files[0]?.name).toBe('common.sql')
+      expect(read.files[0]?.content).toContain('active_regions')
+    } finally {
+      await rm(root, { recursive: true, force: true })
+    }
+  })
+
+  it('tracks uncommitted workspace git changes and reverts modified or untracked files', async () => {
+    const root = await mkdtemp(join(tmpdir(), 'odd-git-'))
+    try {
+      const config = await loadConfig(root)
+      execFileSync('git', ['init', '-q'], { cwd: root })
+      execFileSync('git', ['config', 'user.email', 'test@example.com'], { cwd: root })
+      execFileSync('git', ['config', 'user.name', 'Test'], { cwd: root })
+      await mkdir(join(root, 'dashboards', 'demo'), { recursive: true })
+      await writeFile(join(root, 'dashboards', 'demo', 'queries.sql'), '-- name: q1\nSELECT 1;\n')
+      execFileSync('git', ['add', '-A'], { cwd: root })
+      execFileSync('git', ['commit', '-q', '-m', 'init'], { cwd: root })
+
+      // Modify tracked file + add untracked file
+      await writeFile(join(root, 'dashboards', 'demo', 'queries.sql'), '-- name: q1\nSELECT 2;\n')
+      await writeFile(join(root, 'dashboards', 'demo', 'extra.sql'), '-- name: q2\nSELECT 3;\n')
+
+      const before = await readWorkspaceChanges(config)
+      expect(before.available).toBe(true)
+      expect(before.files.map((f) => [f.path, f.status])).toEqual([
+        ['dashboards/demo/extra.sql', 'added'],
+        ['dashboards/demo/queries.sql', 'modified'],
+      ])
+
+      await revertWorkspaceFile(config, 'dashboards/demo/queries.sql')
+      const afterRevert1 = await readWorkspaceChanges(config)
+      expect(afterRevert1.files.map((f) => f.path)).toEqual(['dashboards/demo/extra.sql'])
+
+      await revertWorkspaceFile(config, 'dashboards/demo/extra.sql')
+      const afterRevert2 = await readWorkspaceChanges(config)
+      expect(afterRevert2.files).toEqual([])
+    } finally {
+      await rm(root, { recursive: true, force: true })
+    }
+  })
+
+  it('generates Cloud Run Dockerfile, entrypoint, deploy args, and Antigravity MCP config', () => {
+    expect(sanitizeKebab('@my-org/Sales_Dashboard!')).toBe('sales-dashboard')
+    expect(defaultBucketName('my-gcp-proj', 'sales-board')).toBe('my-gcp-proj-sales-board-data')
+
+    const dockerfile = generateDockerfile({
+      packageManager: 'pnpm',
+      syncedDirs: ['dashboards', 'queries'],
+      mode: 'editable',
+    })
+    expect(dockerfile).toContain('FROM node:22-slim')
+    expect(dockerfile).toContain('OPEN_DASHBOARD_CLOUD=1')
+
+    const entrypoint = generateEntrypointScript({
+      syncedDirs: ['dashboards', 'queries'],
+      mode: 'editable',
+    })
+    expect(entrypoint).toContain('npx open-dashboard dev --host 0.0.0.0')
+
+    const args = buildGcloudDeployArgs({
+      userCwd: '/tmp/app',
+      dashboardsDir: 'dashboards',
+      chartsDir: 'charts',
+      syncedDirs: ['dashboards', 'queries'],
+      project: 'demo-proj',
+      region: 'asia-east1',
+      service: 'demo-board',
+      bucket: 'demo-proj-demo-board-data',
+      mode: 'editable',
+      memory: '1Gi',
+      mcpToken: 'odd_mcp_secret',
+      packageManager: 'pnpm',
+    })
+    expect(args).toContain('--execution-environment')
+    expect(args).toContain(
+      'name=open-dashboard-storage,type=cloud-storage,bucket=demo-proj-demo-board-data',
+    )
+
+    const snippet = JSON.parse(
+      formatAntigravityMcpSnippet('demo-board', 'https://demo-board.run.app/', 'odd_mcp_secret'),
+    )
+    expect(snippet.mcpServers['demo-board-cloud']).toEqual({
+      serverUrl: 'https://demo-board.run.app/mcp',
+      headers: { Authorization: 'Bearer odd_mcp_secret' },
+    })
   })
 })

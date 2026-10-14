@@ -4,6 +4,8 @@ import {
   chartCatalog,
   checkWorkspace,
   errorMessage,
+  explainDashboardQuery,
+  generateReport,
   getCurrent,
   listCollectors,
   listComments,
@@ -15,8 +17,11 @@ import {
   readDashboardFiles,
   readDatabaseDoc,
   readSchema,
+  readSharedQueryFiles,
   readTheme,
+  readWorkspaceChanges,
   renderDashboard,
+  revertWorkspaceFile,
   runCollector,
   runDashboardQuery,
   runSql,
@@ -24,6 +29,7 @@ import {
   type Workspace,
   writeDashboardFile,
   writeDatabaseDoc,
+  writeSharedQueryFile,
   writeTheme,
 } from '@open-dashboard/core/node'
 import { z } from 'zod'
@@ -397,6 +403,93 @@ export function registerTools(server: McpServer, workspace: Workspace, options: 
       annotations: { readOnlyHint: false, destructiveHint: false, openWorldHint: true },
     },
     ({ id }) => run(() => runCollector(workspace, id)),
+  )
+
+  server.registerTool(
+    'explain_query',
+    {
+      title: 'Explain a query execution plan',
+      description:
+        'Run EXPLAIN QUERY PLAN (SQLite) or EXPLAIN (Postgres) on a named dashboard query to see whether it uses an index or performs a full table scan.',
+      inputSchema: z.object({
+        id: z.string().describe('the dashboard id'),
+        query: z.string().describe('the named query'),
+        params: PARAMS,
+      }),
+      annotations: { readOnlyHint: true },
+    },
+    ({ id, query, params }) => run(() => explainDashboardQuery(workspace, id, query, params ?? {})),
+  )
+
+  server.registerTool(
+    'report_workspace',
+    {
+      title: 'Generate inspection report',
+      description:
+        'Run every dashboard query under default filters, collect first-row KPI snapshots, and evaluate all SQL `-- alert:` thresholds.',
+      inputSchema: z.object({
+        id: z.string().optional().describe('optional dashboard id; omit for all dashboards'),
+      }),
+      annotations: { readOnlyHint: true },
+    },
+    ({ id }) => run(() => generateReport(workspace, id)),
+  )
+
+  server.registerTool(
+    'read_shared_queries',
+    {
+      title: 'Read workspace shared SQL files',
+      description:
+        'Every shared .sql file in queries/*.sql, inherited by all dashboards unless overridden locally, with its content hash.',
+      inputSchema: z.object({}),
+      annotations: { readOnlyHint: true },
+    },
+    () => run(() => readSharedQueryFiles(config())),
+  )
+
+  server.registerTool(
+    'write_shared_query',
+    {
+      title: 'Write a workspace shared SQL file',
+      description:
+        'Write queries/<file>.sql so every dashboard can reference its `-- name:` queries. Pass `expected` (the hash from read_shared_queries) when updating an existing file.',
+      inputSchema: z.object({
+        file: z.string().describe('<name>.sql under queries/'),
+        content: z.string().describe('the complete SQL file content'),
+        expected: z.string().optional().describe('hash of the file as read; omit for a new file'),
+      }),
+      annotations: { readOnlyHint: false, destructiveHint: false },
+    },
+    ({ file, content, expected }) =>
+      run(() => writeSharedQueryFile(config(), file, content, expected ?? '')),
+  )
+
+  server.registerTool(
+    'list_changes',
+    {
+      title: 'List uncommitted Git changes',
+      description:
+        'Uncommitted changes across dashboards/, queries/, charts/, themes/ and databases/, with unified diff hunks and +/- line counts.',
+      inputSchema: z.object({}),
+      annotations: { readOnlyHint: true },
+    },
+    () => run(() => readWorkspaceChanges(config())),
+  )
+
+  server.registerTool(
+    'revert_change',
+    {
+      title: 'Revert an uncommitted file',
+      description:
+        'Restore one modified or untracked file in dashboards/, queries/, charts/, themes/ or databases/ back to HEAD.',
+      inputSchema: z.object({
+        path: z
+          .string()
+          .describe('relative path from list_changes, e.g. dashboards/sales/index.tsx'),
+      }),
+      annotations: { readOnlyHint: false, destructiveHint: true },
+    },
+    ({ path }) => run(() => revertWorkspaceFile(config(), path)),
   )
 
   if (options.allowSql) {

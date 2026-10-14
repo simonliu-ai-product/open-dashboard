@@ -368,10 +368,25 @@ export const meta: DashboardMeta = {
 ```
 
 - **`TimeRange`**: binds `:from` / `:to` (`today`, `7d`, `30d`, `90d`, `6m`, `12m`, `ytd`, `all`), supports `allowCustom` (`YYYY-MM-DD..YYYY-MM-DD` date pickers), and `compare` (automatically binds equal-length `:prev_from` / `:prev_to` for period-over-period comparisons). Also integrates with `<LineChart brush />` / `<AreaChart brush />` drag-to-zoom.
-- **`Select`, `SearchInput`, `Toggle`**: dropdowns from SQL queries, debounced keyword search (`:q`), and boolean `0`/`1` pill toggles.
+- **`Select`, `MultiSelect`, `SearchInput`, `Toggle`**: single-value dropdowns, multi-value chip selectors (`:region` as comma-separated values or `NULL`), debounced keyword search (`:q`), and boolean `0`/`1` pill toggles.
+- **Row-Detail Drawer (`<Table detail />`)**: add `detail` to any `<Table>` so clicking a row opens a slide-over drawer showing every column and a collapsible Raw JSON inspector with one-click copy.
 - **Saved Views (`meta.views`) & Tabs (`<Tabs>` / `<Tab>`)**: one-click filter presets in the subbar and URL-synced (`?tab=`) multi-tab dashboard sections.
 - **Cross-dashboard drill-through (`drill` + `drillTo`)**: `drill="category" drillTo="product-analysis"` on a chart or table makes clicking a mark navigate straight to `/d/product-analysis?category=…` while carrying over active time ranges and filters.
+- **In-Browser Git Changes (`/changes`)**: review uncommitted edits made by you or your AI agent across `dashboards/`, `queries/`, `charts/`, `themes/`, and `databases/` with unified diffs and one-click file revert.
 - **Kiosk / TV Mode & Command Palette (`⌘K`)**: toggle `?kiosk=1` (`Escape` to exit) to hide the sidebar and chrome for wall displays; press **`⌘K` / `Ctrl+K`** anywhere to fuzzy-search dashboards, jump to and highlight any panel on the current page, apply saved views, or switch themes.
+
+### ☁️ One-Command Cloud Run + GCS FUSE + Remote MCP Deployment
+
+Deploy your workspace to Google Cloud Run with persistent Cloud Storage (`gs://`) and a Bearer-authenticated `/mcp` endpoint so Antigravity or Claude can edit cloud dashboards directly:
+
+```bash
+open-dashboard deploy gcp check                 # Verify gcloud CLI, auth, project & APIs
+open-dashboard deploy gcp up --project <id>     # Provision GCS bucket, sync files & deploy to Cloud Run
+open-dashboard deploy gcp status                # Inspect service status, URL & Antigravity MCP snippet
+open-dashboard deploy gcp pull                  # Sync cloud edits (GCS → local workspace)
+open-dashboard deploy gcp push                  # Sync local edits (local workspace → GCS)
+open-dashboard deploy gcp stop / start / down   # Lock public access (0 instances) or tear down
+```
 
 ### 🖱️ Inspect any panel, Explain SQL plans, Alerts, and leave a note for your agent
 
@@ -421,6 +436,7 @@ No database to hand? `init my-dashboards --sample` adds a small generated SQLite
 | --- | --- |
 | `open-dashboard dev [--port 5473] [--host] [--open]` | Viewer with hot reload |
 | `open-dashboard dev --mcp [--allow-sql]` | Also serve the MCP server at `/mcp` (needs `@open-dashboard/mcp`) |
+| `open-dashboard deploy gcp [check\|up\|status\|pull\|push\|stop\|start\|down]` | Deploy to Google Cloud Run with GCS FUSE persistence and Remote MCP |
 | `open-dashboard drivers` | Supported databases, the package each needs, how it stays read-only |
 | `open-dashboard sources` | List datasources and test each connection |
 | `open-dashboard schema [source] [--json]` | Tables, columns, keys and row counts |

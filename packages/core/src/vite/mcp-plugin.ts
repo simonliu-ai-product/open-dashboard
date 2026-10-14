@@ -72,7 +72,28 @@ export function mcpPlugin(
         allowSql: options.allowSql,
         version: coreVersion(),
       })
-      server.middlewares.use(MCP_ENDPOINT, middleware)
+      server.middlewares.use(MCP_ENDPOINT, (req, res, next) => {
+        const expectedToken = process.env.OPEN_DASHBOARD_MCP_TOKEN?.trim()
+        if (expectedToken) {
+          const headers = (req as { headers?: Record<string, string | string[] | undefined> })
+            .headers
+          const authHeader = headers?.authorization
+          const rawAuth = Array.isArray(authHeader) ? authHeader[0] : authHeader
+          const token = rawAuth?.replace(/^Bearer\s+/i, '').trim()
+          if (token !== expectedToken) {
+            const httpRes = res as {
+              statusCode: number
+              setHeader(k: string, v: string): void
+              end(body: string): void
+            }
+            httpRes.statusCode = 401
+            httpRes.setHeader('Content-Type', 'application/json')
+            httpRes.end(JSON.stringify({ error: 'Unauthorized: invalid or missing Bearer token' }))
+            return
+          }
+        }
+        middleware(req, res, next)
+      })
     },
   }
 }

@@ -12,7 +12,7 @@ type Node = {
 }
 
 export interface FilterDecl {
-  kind: 'TimeRange' | 'Select' | 'SearchInput' | 'Toggle'
+  kind: 'TimeRange' | 'Select' | 'MultiSelect' | 'SearchInput' | 'Toggle'
   name: string | undefined
   default: string | null | undefined
   /** TimeRange only: whether it also binds `:prev_from` and `:prev_to`. */
@@ -275,7 +275,13 @@ export function analyzeDashboard(
     const attrs = attributes(node)
     const read = (key: string) => (attrs.has(key) ? literal(attrs.get(key), constants) : undefined)
 
-    if (name === 'TimeRange' || name === 'Select' || name === 'SearchInput' || name === 'Toggle') {
+    if (
+      name === 'TimeRange' ||
+      name === 'Select' ||
+      name === 'MultiSelect' ||
+      name === 'SearchInput' ||
+      name === 'Toggle'
+    ) {
       const raw = read('default')
       const query = read('query')
       const decl: FilterDecl = {
@@ -284,11 +290,13 @@ export function analyzeDashboard(
         default:
           typeof raw === 'string' || raw === null
             ? raw
-            : typeof raw === 'boolean'
-              ? raw
-                ? '1'
-                : '0'
-              : undefined,
+            : Array.isArray(raw)
+              ? raw.map(String).join(',')
+              : typeof raw === 'boolean'
+                ? raw
+                  ? '1'
+                  : '0'
+                : undefined,
         allowAll: read('allowAll') !== false,
         line: line(node),
       }

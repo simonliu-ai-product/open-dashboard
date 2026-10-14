@@ -157,4 +157,7 @@ export const PANELS: Record<string, string> = {
   Next: '다음',
   Expand: '확대 보기',
   Collapse: '축소',
+  'Row details': '행 상세 정보',
+  'Copy JSON': 'JSON 복사',
+  'Raw JSON': '원시 JSON',
 }

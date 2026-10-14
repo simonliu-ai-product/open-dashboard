@@ -10,6 +10,7 @@ import { SettingsMenu } from './components/settings-menu.js'
 import { api } from './lib/api.js'
 import { linkProps, useRoute } from './lib/router.js'
 import { useTheme } from './lib/theme.js'
+import { ChangesView } from './views/changes.js'
 import { ChartsView } from './views/charts.js'
 import { DashboardView } from './views/dashboard.js'
 import { DataSourcesView } from './views/data.js'
@@ -49,6 +50,23 @@ function useSources(): SourceStatus[] | undefined {
     return () => import.meta.hot?.off?.('odd:queries-changed', reload)
   }, [])
   return list
+}
+
+function useChangesCount(live: boolean): number {
+  const [count, setCount] = useState(0)
+  useEffect(() => {
+    if (!live) return
+    const load = () =>
+      api.changes().then(
+        (res) => setCount(res.files.length),
+        () => setCount(0),
+      )
+    load()
+    const reload = () => load()
+    import.meta.hot?.on('odd:queries-changed', reload)
+    return () => import.meta.hot?.off?.('odd:queries-changed', reload)
+  }, [live])
+  return count
 }
 
 const SOURCES_OPEN = 'odd:nav-sources'
@@ -91,6 +109,7 @@ function Shell() {
   )
   // A built snapshot has dashboards and nothing that needs the database or writes a file.
   const live = !readOnly()
+  const changesCount = useChangesCount(live)
 
   // biome-ignore lint/correctness/useExhaustiveDependencies: close the menu whenever the route changes
   useEffect(() => {
@@ -219,6 +238,13 @@ function Shell() {
               >
                 {t('Themes')}
               </a>
+              <a
+                {...linkProps('/changes')}
+                aria-current={route.name === 'changes' ? 'page' : undefined}
+              >
+                {t('Changes')}
+                {changesCount > 0 ? <span className="odd-count">{changesCount}</span> : null}
+              </a>
             </>
           ) : null}
           <h2 className="odd-nav-heading">
@@ -252,6 +278,8 @@ function Shell() {
           />
         ) : route.name === 'data' ? (
           <DataSourcesView sources={sources} {...(route.source ? { source: route.source } : {})} />
+        ) : route.name === 'changes' ? (
+          <ChangesView />
         ) : (
           <HomeView dashboards={dashboards.list} sources={sources} error={dashboards.error} />
         )}

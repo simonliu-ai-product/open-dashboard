@@ -1,5 +1,6 @@
 import type { ParamValue, SchemaInfo } from '../../config.js'
 import type { SwitchedFilter } from '../../ops/assistant.js'
+import type { WorkspaceChanges } from '../../ops/changes.js'
 import type { CatalogEntry } from '../../ops/charts.js'
 import type { CollectorRun, CollectorStatus } from '../../ops/collectors.js'
 import type { DashboardSummary } from '../../ops/dashboards.js'
@@ -149,6 +150,8 @@ export const liveApi = {
   theme: (id: string) => request<ThemeFile>(`theme?id=${encodeURIComponent(id)}`),
   saveTheme: (id: string, hash: string, theme: DashboardTheme) =>
     post<{ hash: string }>('theme', { id, hash, theme }),
+  changes: () => request<WorkspaceChanges>('changes'),
+  revertChange: (path: string) => post<{ reverted: string }>('changes/revert', { path }),
 }
 
 export type Api = typeof liveApi
@@ -180,6 +183,8 @@ function servedApi(): Api {
     collect: refused,
     exportHtml: refused,
     saveTheme: refused,
+    changes: async () => ({ available: false, branch: null, files: [] }),
+    revertChange: refused,
   }
 }
 

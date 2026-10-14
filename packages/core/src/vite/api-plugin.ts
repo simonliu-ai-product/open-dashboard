@@ -28,6 +28,8 @@ import {
   readLayout,
   readSchema,
   readTheme,
+  readWorkspaceChanges,
+  revertWorkspaceFile,
   runChartQuery,
   runDashboardQuery,
   schemaToText,
@@ -307,6 +309,16 @@ export function apiPlugin(workspace: Workspace, overrides: ConfigOverrides): Plu
               return json(res, 400, { error: 'id, panel and text are required' })
             }
             return json(res, 200, addComment(config, body.id, body.panel, body.text))
+          }
+          if (route === 'changes' && req.method === 'GET') {
+            return json(res, 200, await readWorkspaceChanges(config))
+          }
+          if (route === 'changes/revert' && req.method === 'POST') {
+            const body = await readBody(req)
+            if (typeof body.path !== 'string') {
+              return json(res, 400, { error: 'path is required' })
+            }
+            return json(res, 200, await revertWorkspaceFile(config, body.path))
           }
           return json(res, 404, { error: `unknown route ${route}` })
         } catch (error) {

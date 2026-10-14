@@ -24,6 +24,18 @@ import { exportName } from '../runtime/export-panel.js'
 import { coreVersion, importMcp, MCP_INSTALL } from '../vite/mcp-plugin.js'
 import { loadConfig, Workspace } from '../workspace.js'
 import { buildSite } from './build.js'
+import {
+  type DeployMode,
+  type GcpDeployFlags,
+  runGcpCheck,
+  runGcpDown,
+  runGcpPull,
+  runGcpPush,
+  runGcpStart,
+  runGcpStatus,
+  runGcpStop,
+  runGcpUp,
+} from './deploy-gcp.js'
 import { dev } from './dev.js'
 import { renderDashboard } from './render.js'
 import { type ServeOptions, serve } from './serve.js'
@@ -38,6 +50,7 @@ Commands:
   dev                       Start the viewer with hot reload (default port 5473)
   build [id...]             Static site of the dashboards with their results taken now (default out: site/)
   serve                     Serve the dashboards to readers, read-only, with live results (port: --port, PORT)
+  deploy gcp [action]       Deploy to Google Cloud Run + GCS FUSE + Remote MCP (check|up|status|pull|push|stop|start|down)
   drivers                   Supported databases, the package each needs, how it stays read-only
   sources                   List datasources and test each connection
   schema [source]           Print tables, columns, keys and row counts
@@ -70,7 +83,7 @@ Options:
   --source <name>        Datasource for query/schema (default: defaultSource)
   --param <key=value>    Bind :key in the SQL; repeatable. "null" binds NULL
   --limit <n>            Rows to print for query (default 50)
-  --json                 Machine-readable output (schema, query, check, sources, charts)
+  --json                 Machine-readable output (schema, query, check, sources, charts, deploy)
   --fresh                With check, fetch http and mcp tables again instead of reusing responses up to 10 min old
 `
 
@@ -107,6 +120,13 @@ const VALUE_FLAGS = new Set([
   '--width',
   '--webhook',
   '--format',
+  '--project',
+  '--region',
+  '--service',
+  '--bucket',
+  '--mode',
+  '--memory',
+  '--token',
 ])
 
 function positional(argv: string[]): string[] {
@@ -230,6 +250,79 @@ export async function run(argv: string[]): Promise<number> {
     const names = syncSkills(root)
     out(`updated ${names.length} skills in ${SKILL_DIRS.join(' and ')}: ${names.join(', ')}\n`)
     return 0
+  }
+
+  if (command === 'deploy') {
+    const pos = positional(argv)
+    const provider = pos[0]
+    const action = pos[1] ?? 'up'
+    if (provider !== 'gcp') {
+      process.stderr.write(
+        'Usage: open-dashboard deploy gcp [check|up|status|pull|push|stop|start|down]\n',
+      )
+      return 1
+    }
+    const modeFlag = flag(argv, 'mode')
+    const mode: DeployMode | undefined =
+      modeFlag === 'serve' || modeFlag === 'editable' ? modeFlag : undefined
+    const projectFlag = flag(argv, 'project')
+    const regionFlag = flag(argv, 'region')
+    const serviceFlag = flag(argv, 'service')
+    const bucketFlag = flag(argv, 'bucket')
+    const memoryFlag = flag(argv, 'memory')
+    const tokenFlag = flag(argv, 'token')
+    const gcpFlags: GcpDeployFlags = {
+      ...(projectFlag ? { project: projectFlag } : {}),
+      ...(regionFlag ? { region: regionFlag } : {}),
+      ...(serviceFlag ? { service: serviceFlag } : {}),
+      ...(bucketFlag ? { bucket: bucketFlag } : {}),
+      ...(mode ? { mode } : {}),
+      ...(memoryFlag ? { memory: memoryFlag } : {}),
+      ...(tokenFlag ? { token: tokenFlag } : {}),
+      dryRun: argv.includes('--dry-run'),
+      yes: argv.includes('--yes') || argv.includes('-y'),
+      json,
+      delete: argv.includes('--delete'),
+      pull: argv.includes('--pull'),
+      skipPull: argv.includes('--skip-pull'),
+      purgeStorage: argv.includes('--purge-storage'),
+    }
+    if (action === 'check') {
+      const report = await runGcpCheck(gcpFlags, root)
+      return report.ready ? 0 : 1
+    }
+    if (action === 'up') {
+      await runGcpUp(gcpFlags, root)
+      return 0
+    }
+    if (action === 'status') {
+      await runGcpStatus(gcpFlags, root)
+      return 0
+    }
+    if (action === 'pull') {
+      await runGcpPull(gcpFlags, root)
+      return 0
+    }
+    if (action === 'push') {
+      await runGcpPush(gcpFlags, root)
+      return 0
+    }
+    if (action === 'stop') {
+      await runGcpStop(gcpFlags, root)
+      return 0
+    }
+    if (action === 'start') {
+      await runGcpStart(gcpFlags, root)
+      return 0
+    }
+    if (action === 'down') {
+      await runGcpDown(gcpFlags, root)
+      return 0
+    }
+    process.stderr.write(
+      `unknown deploy gcp action "${action}" — expected check|up|status|pull|push|stop|start|down\n`,
+    )
+    return 1
   }
 
   if (command === 'drivers') {

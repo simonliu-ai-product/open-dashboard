@@ -1,6 +1,7 @@
 export * from './alerts.js'
 export * from './analyze.js'
 export * from './assistant.js'
+export * from './changes.js'
 export * from './charts.js'
 export * from './check.js'
 export * from './collectors.js'

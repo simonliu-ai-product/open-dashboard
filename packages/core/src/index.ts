@@ -18,6 +18,8 @@ export { DotPlot, type DotPlotProps } from './components/dot-plot.js'
 export { Dumbbell, type DumbbellProps } from './components/dumbbell.js'
 export { EcdfChart, type EcdfChartProps } from './components/ecdf-chart.js'
 export {
+  MultiSelect,
+  type MultiSelectProps,
   SearchInput,
   type SearchInputProps,
   Select,

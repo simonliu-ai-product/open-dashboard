@@ -246,6 +246,15 @@ export interface ServeConfig {
   assistant?: boolean
 }
 
+export interface GcpDeployConfig {
+  project?: string
+  region?: string
+  service?: string
+  bucket?: string
+  mode?: 'editable' | 'serve'
+  memory?: string
+}
+
 export interface OpenDashboardConfig {
   /** Where dashboards live. Default `dashboards`. */
   dashboardsDir?: string
@@ -271,6 +280,10 @@ export interface OpenDashboardConfig {
   collectors?: Record<string, CollectorConfig>
   /** `open-dashboard serve`: the read-only server for readers. */
   serve?: ServeConfig
+  /** Cloud deployment defaults (`open-dashboard deploy gcp`). */
+  deploy?: {
+    gcp?: GcpDeployConfig
+  }
 }
 
 export type ColumnType = 'number' | 'string' | 'date' | 'boolean' | 'unknown'

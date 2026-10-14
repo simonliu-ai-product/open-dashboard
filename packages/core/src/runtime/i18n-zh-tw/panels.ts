@@ -151,4 +151,7 @@ export const PANELS: Record<string, string> = {
   Next: '下一頁',
   Expand: '放大檢視',
   Collapse: '縮小',
+  'Row details': '資料列明細',
+  'Copy JSON': '複製 JSON',
+  'Raw JSON': '原始 JSON',
 }

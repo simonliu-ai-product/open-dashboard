@@ -33,6 +33,7 @@ export interface ResolvedConfig {
   assistant: ResolvedAssistant | undefined
   collectors: Record<string, ResolvedCollector>
   serve: { allowedHosts: string[]; assistant: boolean }
+  deploy?: OpenDashboardConfig['deploy']
   configFile: string | undefined
 }
 
@@ -245,6 +246,7 @@ export async function loadConfig(
     assistant,
     collectors: resolveCollectors(user.collectors),
     serve: resolveServe(user.serve),
+    deploy: user.deploy,
     configFile: file,
   }
 }

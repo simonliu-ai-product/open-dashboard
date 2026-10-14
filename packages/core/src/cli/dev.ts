@@ -23,7 +23,9 @@ export async function dev(
   const config = await loadConfig(options.root ?? process.cwd(), overrides)
   const workspace = new Workspace(config)
   const inline = viteConfigFor(workspace, overrides)
-  if (options.host) inline.server = { ...inline.server, host: options.host }
+  if (options.host) {
+    inline.server = { ...inline.server, host: options.host, allowedHosts: true }
+  }
   let mcpMissing = false
   if (options.mcp) {
     inline.plugins = [

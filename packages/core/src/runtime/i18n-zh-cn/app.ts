@@ -315,4 +315,12 @@ export const APP: Record<string, string> = {
   Plan: '执行计划',
   'Index used': '使用索引',
   'Full scan': '全表扫描',
+  Changes: '变更',
+  'Uncommitted changes across dashboards, shared queries, charts and themes.':
+    '所有 Dashboard、共享查询、自定义图表与主题中尚未提交的变更。',
+  'This workspace is not in a git repository.': '此工作区不在 git 仓库中。',
+  'Working tree clean — no uncommitted changes in dashboards or queries.':
+    '工作区干净 — 当前没有未提交的看板或查询变更。',
+  'Revert file': '还原文件',
+  'Reverting…': '还原中…',
 }

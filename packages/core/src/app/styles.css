@@ -5126,3 +5126,256 @@ input.odd-table-search {
   font-family: var(--odd-mono);
   font-size: 11.5px;
 }
+
+/* MultiSelect filter */
+
+.odd-filter-multiselect {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+
+.odd-multiselect-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  padding: 3px;
+  border-radius: 7px;
+  background: var(--odd-surface);
+  box-shadow: 0 0 0 1px var(--odd-border-strong);
+}
+
+.odd-multiselect-chip {
+  padding: 3px 9px;
+  border: 0;
+  border-radius: 5px;
+  background: transparent;
+  color: var(--odd-ink-2);
+  font: inherit;
+  font-size: 12px;
+  font-weight: 500;
+  cursor: pointer;
+  transition:
+    background 120ms ease,
+    color 120ms ease;
+}
+
+.odd-multiselect-chip:hover {
+  background: var(--odd-hover);
+  color: var(--odd-ink);
+}
+
+.odd-multiselect-chip[data-active] {
+  background: color-mix(in srgb, var(--odd-accent) 16%, var(--odd-surface));
+  color: var(--odd-accent);
+  font-weight: 600;
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--odd-accent) 42%, transparent);
+}
+
+/* Table Row Detail Drawer */
+
+.odd-row-drawer-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 1250;
+  display: flex;
+  justify-content: flex-end;
+  background: rgba(15, 14, 12, 0.35);
+  backdrop-filter: blur(2px);
+}
+
+.odd-row-drawer {
+  width: min(460px, 92vw);
+  height: 100%;
+  overflow-y: auto;
+  background: var(--odd-surface);
+  box-shadow:
+    -8px 0 32px rgba(0, 0, 0, 0.22),
+    -1px 0 0 var(--odd-border-strong);
+  padding: 20px 22px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.odd-row-drawer-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding-bottom: 12px;
+  border-bottom: 1px solid var(--odd-border);
+}
+
+.odd-row-drawer-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.odd-row-drawer-list {
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.odd-row-drawer-item {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  padding: 9px 12px;
+  border-radius: 7px;
+  background: var(--odd-page);
+  box-shadow: 0 0 0 1px var(--odd-border);
+}
+
+.odd-row-drawer-item dt {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  font-size: 11.5px;
+  color: var(--odd-muted);
+}
+
+.odd-row-drawer-item dt code {
+  font-family: var(--odd-mono);
+  font-size: 11px;
+}
+
+.odd-row-drawer-item dd {
+  margin: 0;
+  font-size: 13.5px;
+  font-weight: 550;
+  color: var(--odd-ink);
+  word-break: break-word;
+}
+
+.odd-row-drawer-raw {
+  margin-top: auto;
+  border-top: 1px solid var(--odd-border);
+  padding-top: 12px;
+}
+
+.odd-row-drawer-raw summary {
+  cursor: pointer;
+  font-size: 12px;
+  font-weight: 560;
+  color: var(--odd-muted);
+}
+
+.odd-row-drawer-raw pre {
+  margin: 8px 0 0;
+  padding: 10px 12px;
+  border-radius: 7px;
+  background: var(--odd-page);
+  box-shadow: 0 0 0 1px var(--odd-border);
+  font-family: var(--odd-mono);
+  font-size: 11.5px;
+  overflow-x: auto;
+}
+
+/* Workspace Changes View */
+
+.odd-changes-meta {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.odd-branch-pill {
+  padding: 4px 10px;
+  border-radius: 999px;
+  background: var(--odd-surface);
+  box-shadow: 0 0 0 1px var(--odd-border-strong);
+  font-family: var(--odd-mono);
+  font-size: 12px;
+  color: var(--odd-ink-2);
+}
+
+.odd-changes-list {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.odd-change-card {
+  border-radius: var(--odd-radius);
+  background: var(--odd-surface);
+  box-shadow: var(--odd-shadow);
+  overflow: hidden;
+}
+
+.odd-change-card-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 12px 16px;
+  border-bottom: 1px solid var(--odd-border);
+}
+
+.odd-change-file-meta {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+}
+
+.odd-change-status {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: 20px;
+  border-radius: 5px;
+  font-family: var(--odd-mono);
+  font-size: 11px;
+  font-weight: 700;
+  background: color-mix(in srgb, var(--odd-accent) 16%, transparent);
+  color: var(--odd-accent);
+}
+
+.odd-change-status[data-status="added"] {
+  background: color-mix(in srgb, var(--odd-good) 16%, transparent);
+  color: var(--odd-good);
+}
+
+.odd-change-status[data-status="deleted"] {
+  background: color-mix(in srgb, var(--odd-bad) 16%, transparent);
+  color: var(--odd-bad);
+}
+
+.odd-change-path {
+  font-family: var(--odd-mono);
+  font-size: 13px;
+  font-weight: 560;
+  color: var(--odd-ink);
+}
+
+.odd-change-counts {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-family: var(--odd-mono);
+  font-size: 12px;
+}
+
+.odd-change-add {
+  color: var(--odd-good);
+  font-weight: 600;
+}
+
+.odd-change-del {
+  color: var(--odd-bad);
+  font-weight: 600;
+}
+
+.odd-change-diff {
+  margin: 0;
+  max-height: 360px;
+  overflow: auto;
+  border-radius: 0;
+  box-shadow: none;
+}

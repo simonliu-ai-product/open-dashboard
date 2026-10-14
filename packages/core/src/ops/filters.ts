@@ -11,7 +11,7 @@ import { dashboardFile, runDashboardQuery } from './dashboards.js'
 export interface FilterChoice {
   /** The key in the URL (`time`, `region`). */
   key: string
-  kind: 'TimeRange' | 'Select' | 'SearchInput' | 'Toggle'
+  kind: 'TimeRange' | 'Select' | 'MultiSelect' | 'SearchInput' | 'Toggle'
   label: string
   /** Every value on offer, as the page holds it — strings, `null` for All. */
   options: (string | null)[]
@@ -122,13 +122,13 @@ export async function dashboardFilters(
       const name = decl.name
       const choice: FilterChoice = {
         key: name,
-        kind: 'Select',
+        kind: decl.kind === 'MultiSelect' ? 'MultiSelect' : 'Select',
         label: decl.label ?? humanize(name),
         options: [...(decl.allowAll ? [null] : []), ...(decl.options ?? [])],
         labels: { ...decl.optionLabels },
         current: name in set ? (set[name] ?? null) : (decl.default ?? null),
         produces: [name],
-        params: (value) => ({ [name]: value }),
+        params: (value) => ({ [name]: value && value.trim() !== '' ? value.trim() : null }),
       }
       choices.push(choice)
       allowAll.set(choice, decl.allowAll)

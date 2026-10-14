@@ -9,8 +9,9 @@ All from `@open-dashboard/core`. Every panel takes the common props:
 | `span` | 1–12 | width in the row's 12 columns; default: row split evenly |
 | `height` | number | px; default: the row's `height`, else the panel's own |
 | `drill` | string or object | click a mark to filter by it — see below |
+| `drillTo` | string or `{ dashboard, filter?, param?, keepFilters? }` | navigate to another dashboard on click (while preserving active filters by default) |
 
-### Drill-down: `drill`
+### Drill-down: `drill` and `drillTo`
 
 Clicking a bar, line point, pie slice or table row sets a filter to that value;
 clicking it again clears it. Marks that do not match the active value dim.
@@ -18,13 +19,13 @@ clicking it again clears it. Marks that do not match the active value dim.
 ```tsx
 <BarChart title="Revenue by region" query="by_region" x="region" y="revenue" drill="region" />
 <Table title="Accounts" query="accounts" drill={{ filter: 'account', column: 'account_id' }} />
-<BarChart title="By plan" query="by_plan" x="plan" y="mrr" drill={{ filter: 'plan', dashboard: 'plan-detail' }} />
+<BarChart title="By plan" query="by_plan" x="plan" y="mrr" drill="plan" drillTo="plan-detail" />
 ```
 
 - a string names a `<Select>` on this dashboard; the clicked category (x, pie
   label, or the table column of the same name) becomes its value
 - `column` reads the value from another column (tables)
-- `dashboard` opens that dashboard with the filter set in its URL instead
+- `dashboard` (or `drillTo`) opens that dashboard with the filter set in its URL instead
 - a chart that drills should usually **not** be filtered by the same select in
   its own SQL, so every category stays clickable
 - `open-dashboard check` warns when `drill` names a filter the dashboard lacks
@@ -33,11 +34,11 @@ clicking it again clears it. Marks that do not match the active value dim.
 ## Structure
 
 ### `<Dashboard>`
-The root. Renders `meta.title` / `meta.description`, the filter bar, and the
-grid. Children: `<Filters>`, `<Row>`, `<Section>`, or bare panels (full width).
+The root. Renders `meta.title` / `meta.description`, the filter bar, `meta.views` preset pills, and the
+grid. Children: `<Filters>`, `<Row>`, `<Section>`, `<Tabs>`, or bare panels (full width).
 
 ### `<Filters>`
-Direct child of `<Dashboard>`. Holds `<TimeRange>` and `<Select>`.
+Direct child of `<Dashboard>`. Holds `<TimeRange>`, `<Select>`, `<MultiSelect>`, `<SearchInput>`, and `<Toggle>`.
 
 ### `<Row height?>`
 A 12-column band.
@@ -45,12 +46,17 @@ A 12-column band.
 ### `<Section title description?>`
 A heading spanning the grid, with rows inside.
 
+### `<Tabs defaultValue? param?>` and `<Tab value label>`
+Tabbed layout container synced with the URL (`?tab=<value>` or `?<param>=<value>`).
+
 ## Filters
 
-### `<TimeRange name? label? default? options?>`
+### `<TimeRange name? label? default? options? allowCustom? compare?>`
 - binds `:from` / `:to` (or `:<name>_from` / `:<name>_to`), `'YYYY-MM-DD'`, `:to` exclusive
 - `default`: `'today' | '7d' | '30d' | '90d' | '6m' | '12m' | 'mtd' | 'ytd' | 'all'` (default `'30d'`)
 - `options`: which presets to offer, in order
+- `allowCustom`: lets the reader pick custom start/end dates (`YYYY-MM-DD..YYYY-MM-DD`)
+- `compare`: also binds `:prev_from` / `:prev_to` (or `:<name>_prev_from` / `:<name>_prev_to`) of equal duration immediately preceding `:from`
 - `'all'` binds `0001-01-01` … `9999-12-31`
 
 ### `<Select name label? query? options? default? allowAll? allLabel?>`
@@ -59,6 +65,17 @@ A heading spanning the grid, with rows inside.
 - `options`: static `['a', 'b']` or `[{ value, label }]`
 - `default`: initial value (default: All / NULL)
 - `allowAll={false}`: no "All"; starts on `default`, else the first option
+
+### `<MultiSelect name label? query? options? default? allLabel?>`
+- multi-value dropdown with checkboxes; binds `:<name>` as comma-separated string (`'a,b'`) or NULL when all/none selected
+- `query` or `options`: same as `<Select>`
+- `default`: string or `string[]`
+
+### `<SearchInput name label? placeholder? default?>`
+- debounced text search input; binds `:<name>` as trimmed string, or NULL when empty
+
+### `<Toggle name label default?>`
+- boolean pill toggle; binds `:<name>` as `1` (true) or `0` (false)
 
 ## Panels
 
@@ -70,30 +87,43 @@ Reads the **first row**.
 - `invert`: down is good
 - `spark={{ query?, y, x? }}`: small trend line under the value; `query` defaults to the Stat's
 
-### `<LineChart query x? y? series? format? stacked? area? labels?>`
+### `<LineChart query x? y? series? format? stacked? area? labels? target? targetLabel? brush?>`
 - `x`: category/time column (default: first non-numeric)
 - `y`: column or array of columns (default: every numeric column)
 - `series`: long-form pivot column (then `y` is one column)
 - `area`: wash under the lines; `stacked`: stack series
 - `labels={{ col: 'Nice name' }}`: rename series
+- `target`: number or column name to draw a horizontal reference line (`targetLabel` labels it)
+- `brush`: drag across the x-axis to zoom into a slice of points (with Reset zoom button)
 - Hover: crosshair + tooltip with every series
 
 ### `<AreaChart …>`
 Same props as LineChart, filled. `stacked` for parts of a whole over time.
 
-### `<BarChart query x? y? series? format? stacked? horizontal? labels?>`
+### `<BarChart query x? y? series? format? stacked? horizontal? labels? target? targetLabel?>`
 - vertical columns by default; `horizontal` for rankings / long labels (also
   prints each bar's value at its tip when there is one series and ≤ 16 bars)
 - several `y` (or a `series`) → grouped bars; add `stacked` to stack
+- `target` / `targetLabel`: reference line across the measure axis
 
 ### `<PieChart query label? value? format? maxSlices?>`
 Donut with total in the middle and a legend with value and share. Slices
 sorted by size; beyond `maxSlices` (default 6) folded into "Other".
 Negative/zero values are dropped.
 
-### `<Table query columns? format? sort?>`
+### `<Table query columns? format? sort? searchable? pageSize? summary? detail?>`
 - `columns`: `['name', { key: 'revenue', label: 'Revenue', format: 'currency', align: 'right', bar: true }]`
   — `bar` draws an inline bar against the column's max
+  — `badge`: `true` or `{ paid: 'good', pending: 'warning', failed: 'critical' }` status pill
+  — `sparkline`: `true` to render JSON/CSV number arrays as inline SVG sparklines
+  — `colorScale`: `true | 'blue' | 'green' | 'amber' | 'red' | 'diverging'` heatmap cell background
+  — `delta`: `true` or `{ invert?: boolean }` signed ▲/▼ badge
+  — `href`: URL template with `{col}` placeholders, e.g. `"/orders/{id}"`
+  — `summary`: `'sum' | 'avg' | 'min' | 'max' | 'count' | false` footer aggregation
+- `searchable`: client-side search filter input in the table header
+- `pageSize`: paginate rows with page size selector (`10 / 25 / 50 / 100`)
+- `summary`: `true` to show a footer totals row (auto-sums numeric columns)
+- `detail`: `true` to open a slide-over drawer with all columns + raw JSON when clicking any row
 - `format={{ revenue: 'currency' }}`: formats when `columns` is not given
 - `sort`: initial sort, `'revenue'` or `'-revenue'`; headers are click-to-sort
 - numbers right-aligned with tabular figures; `id` / `*_id` columns are not grouped

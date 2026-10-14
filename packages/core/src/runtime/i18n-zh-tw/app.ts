@@ -315,4 +315,12 @@ export const APP: Record<string, string> = {
   Plan: '執行計畫',
   'Index used': '使用索引',
   'Full scan': '全表掃描',
+  Changes: '變更',
+  'Uncommitted changes across dashboards, shared queries, charts and themes.':
+    '所有 Dashboard、共用查詢、自訂圖表與主題中尚未 commit 的變更。',
+  'This workspace is not in a git repository.': '這個工作區不在 git 版本庫中。',
+  'Working tree clean — no uncommitted changes in dashboards or queries.':
+    '工作目錄乾淨 — 目前沒有未提交的看板或查詢變更。',
+  'Revert file': '還原檔案',
+  'Reverting…': '還原中…',
 }

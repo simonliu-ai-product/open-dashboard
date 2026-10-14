@@ -249,3 +249,108 @@ export function Toggle(props: ToggleProps) {
   )
 }
 Toggle.filterSpec = toggleSpec as unknown as (props: Record<string, unknown>) => FilterSpec
+
+export interface MultiSelectProps {
+  /**
+   * Binds `:<name>` as a comma-separated list of selected values (e.g. `'North,South'`),
+   * or `NULL` when "All" is selected.
+   * Write `(:name IS NULL OR (',' || :name || ',') LIKE ('%,' || col || ',%'))` in SQL.
+   */
+  name: string
+  label?: string
+  /** A query whose first column is the value and optional second column the label. */
+  query?: string
+  options?: (string | { value: string; label: string })[]
+  default?: string[] | string | null
+  allLabel?: string
+}
+
+function normalizeMultiDefault(raw: MultiSelectProps['default']): string | null {
+  if (Array.isArray(raw)) {
+    const cleaned = raw.map((item) => String(item).trim()).filter(Boolean)
+    return cleaned.length > 0 ? cleaned.join(',') : null
+  }
+  if (typeof raw === 'string' && raw.trim() !== '') return raw.trim()
+  return null
+}
+
+function multiSelectSpec(props: MultiSelectProps): FilterSpec {
+  const fallback = normalizeMultiDefault(props.default)
+  return {
+    key: props.name,
+    default: fallback,
+    params: (value) => ({ [props.name]: value && value.trim() !== '' ? value.trim() : null }),
+  }
+}
+
+export function MultiSelect(props: MultiSelectProps) {
+  const t = useT()
+  const { values, set } = useFilters()
+  const state = useQuery(props.query)
+  const fallback = normalizeMultiDefault(props.default)
+  const raw = props.name in values ? values[props.name] : fallback
+  const selected = raw
+    ? raw
+        .split(',')
+        .map((item) => item.trim())
+        .filter(Boolean)
+    : []
+
+  let options: { value: string; label: string }[] = (props.options ?? []).map((option) =>
+    typeof option === 'string' ? { value: option, label: option } : option,
+  )
+  const result = state.run?.result
+  if (result && result.columns.length > 0) {
+    const valueColumn = result.columns[0]?.name as string
+    const labelColumn = (result.columns[1] ?? result.columns[0])?.name as string
+    options = result.rows.map((row) => ({
+      value: String(row[valueColumn]),
+      label: String(row[labelColumn] ?? row[valueColumn]),
+    }))
+  }
+
+  function toggleValue(optionValue: string) {
+    const next = selected.includes(optionValue)
+      ? selected.filter((item) => item !== optionValue)
+      : [...selected, optionValue]
+    set(props.name, next.length > 0 ? next.join(',') : null)
+  }
+
+  return (
+    <div className="odd-filter odd-filter-multiselect">
+      <span>{props.label ?? humanize(props.name)}</span>
+      <div className="odd-multiselect-chips">
+        <button
+          type="button"
+          className="odd-multiselect-chip"
+          data-active={selected.length === 0 || undefined}
+          onClick={() => set(props.name, null)}
+        >
+          {props.allLabel ?? t('All')}
+        </button>
+        {options.map((option) => {
+          const active = selected.includes(option.value)
+          return (
+            <button
+              key={option.value}
+              type="button"
+              className="odd-multiselect-chip"
+              data-active={active || undefined}
+              onClick={() => toggleValue(option.value)}
+            >
+              {option.label}
+            </button>
+          )
+        })}
+      </div>
+      {state.status === 'error' ? (
+        <em className="odd-filter-error" title={state.error}>
+          !
+        </em>
+      ) : null}
+    </div>
+  )
+}
+MultiSelect.filterSpec = multiSelectSpec as unknown as (
+  props: Record<string, unknown>,
+) => FilterSpec

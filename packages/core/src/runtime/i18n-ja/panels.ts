@@ -159,4 +159,7 @@ export const PANELS: Record<string, string> = {
   Next: '次へ',
   Expand: '拡大表示',
   Collapse: '元のサイズに戻す',
+  'Row details': '行の詳細',
+  'Copy JSON': 'JSONをコピー',
+  'Raw JSON': '生JSON',
 }

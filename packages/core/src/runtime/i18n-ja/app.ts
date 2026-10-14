@@ -315,4 +315,13 @@ export const APP: Record<string, string> = {
   Plan: '実行計画',
   'Index used': 'インデックス使用',
   'Full scan': 'フルスキャン',
+  Changes: '変更',
+  'Uncommitted changes across dashboards, shared queries, charts and themes.':
+    'ダッシュボード、共有クエリ、チャート、テーマの未コミット変更。',
+  'This workspace is not in a git repository.':
+    'このワークスペースは git リポジトリではありません。',
+  'Working tree clean — no uncommitted changes in dashboards or queries.':
+    '未コミットの変更はありません。',
+  'Revert file': '元に戻す',
+  'Reverting…': '復元中…',
 }

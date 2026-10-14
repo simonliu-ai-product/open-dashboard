@@ -137,6 +137,12 @@ export function CommandPalette(props: {
         label: t('Themes'),
         run: () => navigate('/themes'),
       })
+      list.push({
+        id: 'nav:changes',
+        group: t('Main'),
+        label: t('Changes'),
+        run: () => navigate('/changes'),
+      })
     }
 
     const q = query.trim().toLowerCase()
