@@ -2,6 +2,46 @@
 
 Read [CLAUDE.md](CLAUDE.md) — it is the guide for this repository, for every agent.
 
+## Standard End-to-End Development & Release Workflow (SOP)
+
+When implementing new features and shipping a release for `open-dashboard`, follow this 5-stage pipeline:
+
+### 1. Implementation & Docs Sync
+- Implement all core logic in `packages/core/src/ops/` first, then wire thin shells in `vite/api-plugin.ts`, `cli/bin.ts`, and `packages/mcp/src/tools.ts`.
+- Add translations for every new UI string across all 4 locale dictionaries (`runtime/i18n-{zh-tw,zh-cn,ja,ko}/{app,panels}.ts`).
+- Update built-in skills in `packages/core/skills/dashboard-authoring/` (`SKILL.md`, `references/components.md`).
+- Update both `README.md` (English) and `README.zh-TW.md` (Traditional Chinese).
+
+### 2. CLI & Automated Verification
+- Run the full quality gate in `tools/open-dashboard`:
+  ```bash
+  pnpm check && pnpm typecheck && pnpm test && pnpm build && pnpm audit --prod
+  ```
+- Verify new features in the sample playground (`tools/playground/open-dashboard-sample`) using `open-dashboard check` and any new CLI subcommands (e.g., `--dry-run`, `diff`, `report`).
+
+### 3. Real Browser (Playwright Chromium) UI/UX & Experience Evaluation
+- Launch the playground dev server (`rm -rf node_modules/.vite && pnpm dev --port 4321`) and drive headless Chromium via Playwright (`NODE_PATH=/Users/simonliuyuwei/workspace/tools/open-dashboard/node_modules node --input-type=module`) to interact with the real UI and capture high-resolution screenshots.
+- Explicitly evaluate and report on 3 dimensions with embedded screenshot proof:
+  1. **UI/UX Layout Quality (排版是否 OK)**: Verify alignment, spacing, dark/light contrast, badge placement, and drawer/modal overlays.
+  2. **Functional Correctness (功能是否正常)**: Verify URL query param sync, SQL parameter binding, live KPI recalculation, interactive drawers/modals, and confirm `0` Console/Page errors.
+  3. **User Experience (是否能夠有好的體驗)**: Verify end-to-end flow smoothness, keyboard shortcuts (`⌘K`, `ESC`), and visual feedback.
+
+### 4. Version Bump & GitHub Release
+- Bump version numbers in `packages/core/package.json`, `packages/cli/package.json`, `packages/mcp/package.json` (including `peerDependencies`), and `SECURITY.md`.
+- Run `pnpm build` (which also syncs skills into `packages/cli/template/skills`), commit `Release <version>`, tag `v<version>`, push to `origin main` + `--tags`, and create the GitHub Release via `gh release create v<version>`.
+
+### 5. Minimalist Visual Promo Video & Multi-Platform Social Copy
+- **Visual-First Promo Video (`videos/open-dashboard-v<ver>-visual/`)**:
+  - Build a Hyperframes composition (`npx --yes hyperframes@0.8.155 check && npx --yes hyperframes@0.8.155 render`) in `tools/playground/open-dashboard-sample/videos/`.
+  - **Design Rule**: Keep slides ultra-minimalist (`頁面越簡潔越好，能用圖像呈現，就不要描述`). Show real UI screenshots, interactive pill badges, red/green Git diffs, and visual architecture nodes instead of descriptive paragraphs. Ensure `hyperframes check` passes with 0 lint, layout, motion, or contrast errors.
+- **Social Media Copy (4 Platforms)**:
+  - Provide ready-to-post copy tailored to platform character limits and tone:
+    - **Facebook**: Story-driven hook + numbered feature highlights + GitHub release link + hashtags.
+    - **LinkedIn** (ZH-TW & EN): Engineering & architecture perspective + bulleted capabilities.
+    - **X (Twitter)** (ZH-TW & EN): Strictly **≤ 280 characters**, punchy bullet points + release URL.
+    - **Threads**: Strictly **≤ 500 characters**, conversational and fast-paced summary.
+
+
 <!-- BEGIN:turborepo-agent-rules -->
 
 # This is NOT the Turborepo you know

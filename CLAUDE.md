@@ -144,3 +144,15 @@ Hand-written SVG, no chart dependency. The visual rules follow the dataviz metho
 ## Naming
 
 `dashboards/<id>/index.tsx` + `*.sql` · `charts/<id>/index.tsx` (`defineChart`) · `themes/<id>.json` · `open-dashboard.config.ts` · CLI `open-dashboard` · dev port **5473** · API prefix `/__odd/api/` · CSS vars `--odd-*`, classes `odd-*` · marker `@dashboard-comment` · current view `node_modules/.open-dashboard/current.json` · HMR event `odd:queries-changed`
+
+## Release, Browser Verification & Launch Media Workflow
+
+1. **Quality Gate & Docs**: Run `pnpm check && pnpm typecheck && pnpm test && pnpm build && pnpm audit --prod`. Sync `README.md`, `README.zh-TW.md`, i18n dictionaries (`zh-tw`, `zh-cn`, `ja`, `ko`), and `packages/core/skills/dashboard-authoring/`.
+2. **CLI + Chromium Real-Browser Verification**: Start the sample workspace (`tools/playground/open-dashboard-sample`) on a dev port, automate interactions via Playwright Chromium, capture screenshots, verify `0` console/page errors, and evaluate:
+   - (1) UI/UX layout & visual alignment
+   - (2) Functional correctness (URL sync, SQL param expansion, live KPI updates)
+   - (3) Overall user experience
+3. **GitHub Release**: Bump versions in `packages/{core,cli,mcp}/package.json` and `SECURITY.md`, rebuild, commit `Release x.y.z`, tag `vx.y.z`, `git push origin main && git push origin vx.y.z`, and publish release notes with `gh release create vx.y.z`.
+4. **Minimalist Visual Video (Hyperframes)**: Render an ultra-clean, visual-first promo video (`npx --yes hyperframes@0.8.155 check && npx --yes hyperframes@0.8.155 render`) under `tools/playground/open-dashboard-sample/videos/`. Prioritize real screenshots, interactive UI pills, visual diffs, and architecture diagrams over descriptive text ("能用圖像呈現，就不要描述").
+5. **Social Posts**: Provide ready-to-publish copy for **Facebook**, **LinkedIn** (ZH/EN), **X / Twitter** (≤ 280 chars), and **Threads** (≤ 500 chars).
+
