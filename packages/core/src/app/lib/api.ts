@@ -4,6 +4,7 @@ import type { CatalogEntry } from '../../ops/charts.js'
 import type { CollectorRun, CollectorStatus } from '../../ops/collectors.js'
 import type { DashboardSummary } from '../../ops/dashboards.js'
 import type { DatabaseDoc } from '../../ops/database-doc.js'
+import type { QueryPlan } from '../../ops/explain.js'
 import type { QueryHistory } from '../../ops/history.js'
 import type { DashboardLayout, LayoutEdit } from '../../ops/layout.js'
 import type { SourceDetail, SourceStatus } from '../../ops/sources.js'
@@ -57,6 +58,10 @@ export const liveApi = {
   queryHistory: (id: string, name: string) =>
     request<QueryHistory>(
       `query-history?id=${encodeURIComponent(id)}&name=${encodeURIComponent(name)}`,
+    ),
+  explain: (id: string, name: string, params: Record<string, ParamValue>) =>
+    request<QueryPlan>(
+      `explain?id=${encodeURIComponent(id)}&name=${encodeURIComponent(name)}&params=${encodeURIComponent(JSON.stringify(params))}`,
     ),
   comments: (id: string) =>
     request<{ comments: { line: number; text: string }[] }>(
@@ -163,6 +168,7 @@ function servedApi(): Api {
     databaseDoc: refused,
     schema: refused,
     queryHistory: refused,
+    explain: refused,
     comments: async () => [],
     comment: refused,
     current: async () => {},

@@ -310,4 +310,9 @@ export const APP: Record<string, string> = {
   'Not committed to git yet': '尚未 commit 到 git',
   'Changed since the last commit': '上次 commit 之後有修改',
   'Switched to {names}': '已切換：{names}',
+  'Kiosk mode': '全螢幕展示模式',
+  'Exit kiosk': '離開全螢幕模式',
+  Plan: '執行計畫',
+  'Index used': '使用索引',
+  'Full scan': '全表掃描',
 }

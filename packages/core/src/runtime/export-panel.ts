@@ -49,12 +49,13 @@ const SVG_PROPS = [
 
 const COLOR_PROPS = new Set(['fill', 'stroke'])
 
-/** 'html' is the whole dashboard as one interactive file, built by the server. */
-export type ImageFormat = 'png' | 'svg' | 'pdf' | 'html'
+/** 'html' is the whole dashboard as one interactive file, built by the server; 'csv' and 'json' export a panel's rows. */
+export type ImageFormat = 'png' | 'svg' | 'pdf' | 'html' | 'csv' | 'json'
+export type PictureFormat = 'png' | 'svg' | 'pdf'
 
 async function encode(
   drawn: { svg: string; width: number; height: number },
-  format: Exclude<ImageFormat, 'html'>,
+  format: PictureFormat,
   background: string | undefined,
   title: string,
 ): Promise<Blob> {
@@ -74,7 +75,7 @@ async function encode(
 
 export async function downloadPanel(
   panel: HTMLElement,
-  format: Exclude<ImageFormat, 'html'>,
+  format: PictureFormat,
   name: string,
   title = name,
 ): Promise<void> {
@@ -85,13 +86,45 @@ export async function downloadPanel(
 /** The whole dashboard — title, filters and every panel — as one image, on the page's background. */
 export async function downloadDashboard(
   page: HTMLElement,
-  format: Exclude<ImageFormat, 'html'>,
+  format: PictureFormat,
   name: string,
   title = name,
 ): Promise<void> {
   const background = backgroundOf(page)
   const blob = await encode(elementToSvg(page, background), format, background, title)
   downloadBlob(blob, `${name}.${format}`)
+}
+
+function csvCell(value: unknown): string {
+  if (value === null || value === undefined) return ''
+  const s = typeof value === 'object' ? JSON.stringify(value) : String(value)
+  return /[",\r\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s
+}
+
+export function resultToCsv(result: {
+  columns: { name: string }[]
+  rows: Record<string, unknown>[]
+}): string {
+  const names = result.columns.map((c) => c.name)
+  const header = names.map(csvCell).join(',')
+  const body = result.rows.map((row) => names.map((n) => csvCell(row[n])).join(','))
+  return [header, ...body].join('\r\n')
+}
+
+export function downloadData(
+  result: { columns: { name: string }[]; rows: Record<string, unknown>[] },
+  format: 'csv' | 'json',
+  name: string,
+): void {
+  if (format === 'csv') {
+    const blob = new Blob([resultToCsv(result)], { type: 'text/csv;charset=utf-8' })
+    downloadBlob(blob, `${name}.csv`)
+    return
+  }
+  const blob = new Blob([JSON.stringify(result.rows, null, 2)], {
+    type: 'application/json;charset=utf-8',
+  })
+  downloadBlob(blob, `${name}.json`)
 }
 
 /** The first painted background at or above an element: what the page shows behind it. */

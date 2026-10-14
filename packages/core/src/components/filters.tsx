@@ -3,7 +3,9 @@ import { useFilters } from '../runtime/context.js'
 import { useT } from '../runtime/i18n.js'
 import { humanize } from '../runtime/shape.js'
 import {
-  isTimePreset,
+  isCustomTimeRange,
+  isTimeValue,
+  resolveTimeRange,
   TIME_PRESETS,
   type TimePreset,
   timeRangeParams,
@@ -18,17 +20,22 @@ export interface TimeRangeProps {
    */
   name?: string
   label?: string
-  default?: TimePreset
+  default?: TimePreset | string
   /** Presets offered, in order. Default: every preset. */
   options?: TimePreset[]
+  /** Also bind `:prev_from` and `:prev_to` (or `:<name>_prev_from` / `:<name>_prev_to`) for the equal-length preceding period. */
+  compare?: boolean
+  /** Allow picking custom start/end dates (`YYYY-MM-DD..YYYY-MM-DD`). */
+  allowCustom?: boolean
 }
 
 function timeSpec(props: TimeRangeProps): FilterSpec {
-  const fallback: TimePreset = props.default ?? '30d'
+  const fallback: string = isTimeValue(props.default) ? props.default : '30d'
   return {
     key: props.name ?? 'time',
     default: fallback,
-    params: (value) => timeRangeParams(props.name, isTimePreset(value) ? value : fallback),
+    params: (value) =>
+      timeRangeParams(props.name, isTimeValue(value) ? value : fallback, undefined, props.compare),
   }
 }
 
@@ -37,19 +44,56 @@ export function TimeRange(props: TimeRangeProps) {
   const id = useId()
   const { values, set } = useFilters()
   const spec = timeSpec(props)
-  const value = values[spec.key] ?? spec.default
+  const value = values[spec.key] ?? spec.default ?? '30d'
   const options = props.options ?? (Object.keys(TIME_PRESETS) as TimePreset[])
+  const custom = isCustomTimeRange(value)
+  const resolved = resolveTimeRange(value)
+
   return (
-    <label className="odd-filter" htmlFor={id}>
-      <span>{props.label ?? t('Time range')}</span>
-      <select id={id} value={value ?? ''} onChange={(event) => set(spec.key, event.target.value)}>
-        {options.map((preset) => (
-          <option key={preset} value={preset}>
-            {t(TIME_PRESETS[preset])}
-          </option>
-        ))}
-      </select>
-    </label>
+    <div className="odd-filter-group">
+      <label className="odd-filter" htmlFor={id}>
+        <span>{props.label ?? t('Time range')}</span>
+        <select
+          id={id}
+          value={custom ? 'custom' : value}
+          onChange={(event) => {
+            if (event.target.value === 'custom') {
+              set(spec.key, `${resolved.from}..${resolved.to}`)
+            } else {
+              set(spec.key, event.target.value)
+            }
+          }}
+        >
+          {options.map((preset) => (
+            <option key={preset} value={preset}>
+              {t(TIME_PRESETS[preset])}
+            </option>
+          ))}
+          {props.allowCustom || custom ? <option value="custom">{t('Custom range')}</option> : null}
+        </select>
+      </label>
+      {custom ? (
+        <div className="odd-filter odd-filter-dates" data-export-skip="">
+          <input
+            type="date"
+            aria-label={t('Start date')}
+            value={resolved.from}
+            onChange={(e) => {
+              if (e.target.value) set(spec.key, `${e.target.value}..${resolved.to}`)
+            }}
+          />
+          <span aria-hidden="true">–</span>
+          <input
+            type="date"
+            aria-label={t('End date')}
+            value={resolved.to}
+            onChange={(e) => {
+              if (e.target.value) set(spec.key, `${resolved.from}..${e.target.value}`)
+            }}
+          />
+        </div>
+      ) : null}
+    </div>
   )
 }
 TimeRange.filterSpec = timeSpec as (props: Record<string, unknown>) => FilterSpec
@@ -128,3 +172,80 @@ export function Select(props: SelectProps) {
   )
 }
 Select.filterSpec = selectSpec as unknown as (props: Record<string, unknown>) => FilterSpec
+
+export interface SearchInputProps {
+  /** Binds `:<name>`. Empty text binds NULL — write `(:name IS NULL OR col LIKE '%' || :name || '%')`. */
+  name: string
+  label?: string
+  placeholder?: string
+  default?: string | null
+}
+
+function searchSpec(props: SearchInputProps): FilterSpec {
+  const fallback = props.default && props.default.trim() !== '' ? props.default.trim() : null
+  return {
+    key: props.name,
+    default: fallback,
+    params: (value) => ({ [props.name]: value && value.trim() !== '' ? value.trim() : null }),
+  }
+}
+
+export function SearchInput(props: SearchInputProps) {
+  const t = useT()
+  const id = useId()
+  const { values, set } = useFilters()
+  const value = values[props.name] ?? ''
+  return (
+    <label className="odd-filter odd-filter-search" htmlFor={id}>
+      <span>{props.label ?? humanize(props.name)}</span>
+      <input
+        id={id}
+        type="search"
+        value={value}
+        placeholder={props.placeholder ?? t('Filter…')}
+        onChange={(event) =>
+          set(props.name, event.target.value.trim() === '' ? null : event.target.value)
+        }
+      />
+    </label>
+  )
+}
+SearchInput.filterSpec = searchSpec as unknown as (props: Record<string, unknown>) => FilterSpec
+
+export interface ToggleProps {
+  /** Binds `:<name>` as `1` (on) or `0` (off). */
+  name: string
+  label?: string
+  default?: boolean
+}
+
+function toggleSpec(props: ToggleProps): FilterSpec {
+  const fallback = props.default ? '1' : '0'
+  return {
+    key: props.name,
+    default: fallback,
+    params: (value) => ({
+      [props.name]: value === '1' || value === 'true' ? 1 : 0,
+    }),
+  }
+}
+
+export function Toggle(props: ToggleProps) {
+  const id = useId()
+  const { values, set } = useFilters()
+  const fallback = props.default ? '1' : '0'
+  const raw = values[props.name] ?? fallback
+  const checked = raw === '1' || raw === 'true'
+  return (
+    <label className="odd-filter odd-filter-toggle" htmlFor={id}>
+      <input
+        id={id}
+        type="checkbox"
+        checked={checked}
+        onChange={(event) => set(props.name, event.target.checked ? '1' : '0')}
+      />
+      <span>{props.label ?? humanize(props.name)}</span>
+    </label>
+  )
+}
+Toggle.filterSpec = toggleSpec as unknown as (props: Record<string, unknown>) => FilterSpec

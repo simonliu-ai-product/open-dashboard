@@ -10,7 +10,12 @@ import {
 import { useHost } from '../runtime/context.js'
 import { isPanelType } from '../runtime/convert.js'
 import { useEdit } from '../runtime/edit.js'
-import { downloadPanel, exportName, type ImageFormat } from '../runtime/export-panel.js'
+import {
+  downloadData,
+  downloadPanel,
+  exportName,
+  type ImageFormat,
+} from '../runtime/export-panel.js'
 import type { FormatContext } from '../runtime/format.js'
 import { useLocale, useT } from '../runtime/i18n.js'
 import type { QueryRun } from '../runtime/types.js'
@@ -28,6 +33,8 @@ export interface PanelProps {
   height?: number
   /** Click a mark to filter by it: a `<Select>` name, or `{ filter, column?, dashboard? }`. */
   drill?: Drill
+  /** Shorthand target dashboard id for cross-dashboard drill-through. */
+  drillTo?: string
 }
 
 interface FrameProps extends PanelProps {
@@ -60,6 +67,7 @@ export function PanelFrame(props: FrameProps) {
   const t = useT()
   const row = useRow()
   const ref = useRef<HTMLElement>(null)
+  const [expanded, setExpanded] = useState(false)
   const chrome = useEditChrome(
     ref,
     props.title,
@@ -70,6 +78,15 @@ export function PanelFrame(props: FrameProps) {
   const { span, height } = chrome
   const { state } = props
   const run = state.run
+
+  useEffect(() => {
+    if (!expanded) return
+    const onKey = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') setExpanded(false)
+    }
+    document.addEventListener('keydown', onKey)
+    return () => document.removeEventListener('keydown', onKey)
+  }, [expanded])
 
   let body: ReactNode
   if (state.status === 'error') {
@@ -96,97 +113,152 @@ export function PanelFrame(props: FrameProps) {
   }
 
   return (
-    <article
-      ref={ref}
-      className={`odd-panel odd-panel-${props.component.toLowerCase()}`}
-      style={
-        {
-          '--odd-span': span,
-          height: height === 'auto' ? undefined : height,
-          order: chrome.order,
-        } as CSSProperties
-      }
-      data-refreshing={state.refreshing || undefined}
-      data-panel-title={props.title}
-      data-sized={height === 'auto' ? undefined : ''}
-      data-editing={chrome.enabled || undefined}
-      data-dragging={chrome.dragging || undefined}
-      data-resizing={chrome.resizing || undefined}
-    >
-      <header className="odd-panel-head">
-        {chrome.grip}
-        <div className="odd-panel-titles">
-          <h3>{props.title}</h3>
-          {props.description ? <p>{props.description}</p> : null}
-        </div>
-        {run && props.aside ? <div className="odd-panel-aside">{props.aside(run)}</div> : null}
-        <div className="odd-panel-actions">
-          {chrome.enabled && (isPanelType(props.component) || props.component === 'Text') ? (
+    <>
+      {expanded ? (
+        <div className="odd-panel-backdrop" aria-hidden="true" onClick={() => setExpanded(false)} />
+      ) : null}
+      <article
+        ref={ref}
+        className={`odd-panel odd-panel-${props.component.toLowerCase()}`}
+        style={
+          {
+            '--odd-span': span,
+            height: expanded ? 'calc(100vh - 64px)' : height === 'auto' ? undefined : height,
+            order: chrome.order,
+          } as CSSProperties
+        }
+        data-refreshing={state.refreshing || undefined}
+        data-panel-title={props.title}
+        data-sized={expanded || height !== 'auto' ? '' : undefined}
+        data-expanded={expanded || undefined}
+        data-editing={chrome.enabled || undefined}
+        data-dragging={chrome.dragging || undefined}
+        data-resizing={chrome.resizing || undefined}
+      >
+        <header className="odd-panel-head">
+          {chrome.grip}
+          <div className="odd-panel-titles">
+            <h3>
+              {props.title}
+              {run?.alerts?.some((a) => a.triggered) ? (
+                <span
+                  className="odd-alert-badge"
+                  role="status"
+                  title={run.alerts
+                    .filter((a) => a.triggered)
+                    .map((a) => a.message || `${a.column} (${a.actual}) ${a.op} ${a.threshold}`)
+                    .join('\n')}
+                >
+                  ▲ {t('Alert')}
+                </span>
+              ) : null}
+            </h3>
+            {props.description ? <p>{props.description}</p> : null}
+          </div>
+          {run && props.aside ? <div className="odd-panel-aside">{props.aside(run)}</div> : null}
+          <div className="odd-panel-actions">
+            {chrome.enabled && (isPanelType(props.component) || props.component === 'Text') ? (
+              <button
+                type="button"
+                className="odd-icon-button"
+                title={t('Change chart')}
+                aria-label={t('Change chart for {title}', { title: props.title })}
+                onClick={() => edit.configure(props.title)}
+              >
+                <svg viewBox="0 0 16 16" width="14" height="14" aria-hidden="true">
+                  <path
+                    d="M3 13V8M8 13V3M13 13v-7"
+                    stroke="currentColor"
+                    strokeWidth="1.6"
+                    strokeLinecap="round"
+                    fill="none"
+                  />
+                </svg>
+              </button>
+            ) : null}
             <button
               type="button"
               className="odd-icon-button"
-              title={t('Change chart')}
-              aria-label={t('Change chart for {title}', { title: props.title })}
-              onClick={() => edit.configure(props.title)}
+              title={expanded ? t('Collapse') : t('Expand')}
+              aria-label={expanded ? t('Collapse') : t('Expand')}
+              aria-pressed={expanded}
+              onClick={() => setExpanded((v) => !v)}
             >
               <svg viewBox="0 0 16 16" width="14" height="14" aria-hidden="true">
-                <path
-                  d="M3 13V8M8 13V3M13 13v-7"
-                  stroke="currentColor"
-                  strokeWidth="1.6"
-                  strokeLinecap="round"
-                  fill="none"
-                />
+                {expanded ? (
+                  <path
+                    d="M6 2v4H2M10 14v-4h4M10 2v4h4M6 14v-4H2"
+                    stroke="currentColor"
+                    strokeWidth="1.5"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    fill="none"
+                  />
+                ) : (
+                  <path
+                    d="M2 6V2h4M14 10v4h-4M10 2h4v4M6 14H2v-4"
+                    stroke="currentColor"
+                    strokeWidth="1.5"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    fill="none"
+                  />
+                )}
               </svg>
             </button>
-          ) : null}
-          <DownloadMenu
-            save={async (format) => {
-              if (ref.current && format !== 'html')
-                await downloadPanel(
-                  ref.current,
-                  format,
-                  exportName(host.id, props.title),
-                  props.title,
-                )
-            }}
-            label={t('Download {title}', { title: props.title })}
-            disabled={
-              props.query
-                ? state.status !== 'ok' || !run || run.result.rows.length === 0
-                : state.status === 'error'
-            }
-          />
-          {host.inspectable === false ? null : (
-            <button
-              type="button"
-              className="odd-icon-button"
-              title={t('Inspect query and data')}
-              aria-label={t('Inspect {title}', { title: props.title })}
-              onClick={() =>
-                host.inspect(
-                  { title: props.title, component: props.component, query: props.query },
-                  run,
-                )
+            <DownloadMenu
+              formats={
+                run && run.result.rows.length > 0
+                  ? ['png', 'svg', 'pdf', 'csv', 'json']
+                  : ['png', 'svg', 'pdf']
               }
-            >
-              <svg viewBox="0 0 16 16" width="14" height="14" aria-hidden="true">
-                <path
-                  d="M2 4h12M2 8h12M2 12h7"
-                  stroke="currentColor"
-                  strokeWidth="1.5"
-                  strokeLinecap="round"
-                  fill="none"
-                />
-              </svg>
-            </button>
-          )}
-        </div>
-      </header>
-      <div className="odd-panel-body">{body}</div>
-      {state.refreshing ? <div className="odd-panel-progress" aria-hidden="true" /> : null}
-      {chrome.handles}
-    </article>
+              save={async (format) => {
+                const name = exportName(host.id, props.title)
+                if (format === 'csv' || format === 'json') {
+                  if (run) downloadData(run.result, format, name)
+                  return
+                }
+                if (ref.current && format !== 'html')
+                  await downloadPanel(ref.current, format, name, props.title)
+              }}
+              label={t('Download {title}', { title: props.title })}
+              disabled={
+                props.query
+                  ? state.status !== 'ok' || !run || run.result.rows.length === 0
+                  : state.status === 'error'
+              }
+            />
+            {host.inspectable === false ? null : (
+              <button
+                type="button"
+                className="odd-icon-button"
+                title={t('Inspect query and data')}
+                aria-label={t('Inspect {title}', { title: props.title })}
+                onClick={() =>
+                  host.inspect(
+                    { title: props.title, component: props.component, query: props.query },
+                    run,
+                  )
+                }
+              >
+                <svg viewBox="0 0 16 16" width="14" height="14" aria-hidden="true">
+                  <path
+                    d="M2 4h12M2 8h12M2 12h7"
+                    stroke="currentColor"
+                    strokeWidth="1.5"
+                    strokeLinecap="round"
+                    fill="none"
+                  />
+                </svg>
+              </button>
+            )}
+          </div>
+        </header>
+        <div className="odd-panel-body">{body}</div>
+        {state.refreshing ? <div className="odd-panel-progress" aria-hidden="true" /> : null}
+        {chrome.handles}
+      </article>
+    </>
   )
 }
 

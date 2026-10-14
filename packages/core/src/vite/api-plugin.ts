@@ -17,6 +17,7 @@ import {
   describeSource,
   docSourceOf,
   editLayout,
+  explainDashboardQuery,
   getCurrent,
   type LayoutEdit,
   listComments,
@@ -239,6 +240,16 @@ export function apiPlugin(workspace: Workspace, overrides: ConfigOverrides): Plu
             const name = q('name')
             if (!id || !name) return json(res, 400, { error: 'id and name are required' })
             return json(res, 200, await queryHistory(config, id, name))
+          }
+          if (route === 'explain' && req.method === 'GET') {
+            const id = q('id')
+            const name = q('name')
+            if (!id || !name) return json(res, 400, { error: 'id and name are required' })
+            return json(
+              res,
+              200,
+              await explainDashboardQuery(workspace, id, name, parseParams(q('params'))),
+            )
           }
           if (route === 'export-html' && req.method === 'GET') {
             const id = q('id')

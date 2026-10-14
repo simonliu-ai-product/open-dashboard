@@ -385,7 +385,7 @@ export function DashboardView({ id, preview }: { id: string; preview?: ThemePrev
                 if (format === 'html') {
                   const blob = await api.exportHtml(id, window.location.search)
                   downloadBlob(blob, `${exportName(id, '')}.html`)
-                } else if (page.current) {
+                } else if (page.current && format !== 'csv' && format !== 'json') {
                   await downloadDashboard(page.current, format, exportName(id, ''), meta?.title)
                 }
               }}

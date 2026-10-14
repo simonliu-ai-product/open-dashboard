@@ -108,15 +108,45 @@ export function parseCsv(text: string, delimiter = ','): string[][] {
 const NUMBER = /^-?(0|[1-9]\d*)(\.\d+)?([eE][-+]?\d+)?$/
 
 /**
- * CSV rows as objects. A column becomes numbers only when every non-empty
- * value is a plain number — `0050`, a code with a leading zero, stays text,
- * as does `1,234`. Empty cells are null.
+ * Parses the first GitHub-flavored Markdown pipe table (`| a | b |`) in `text`
+ * into rows of strings, skipping the `| --- | --- |` separator line.
+ */
+export function parseMarkdownTable(text: string): string[][] {
+  const lines = text.split(/\r?\n/)
+  const tableLines: string[] = []
+  let inside = false
+  for (const raw of lines) {
+    const line = raw.trim()
+    if (line.startsWith('|') && line.endsWith('|') && line.length > 2) {
+      inside = true
+      tableLines.push(line)
+    } else if (inside) {
+      break
+    }
+  }
+  if (tableLines.length === 0) return []
+  const splitRow = (line: string) =>
+    line
+      .slice(1, -1)
+      .split('|')
+      .map((cell) => cell.trim())
+  const rows = tableLines
+    .filter((line, idx) => !(idx === 1 && /^\|[\s:|-]+\|$/.test(line)))
+    .map(splitRow)
+  return rows
+}
+
+/**
+ * CSV (or Markdown table) rows as objects. A column becomes numbers only when
+ * every non-empty value is a plain number — `0050`, a code with a leading zero,
+ * stays text, as does `1,234`. Empty cells are null.
  */
 function csvRows(
   text: string,
   delimiter: string,
+  markdown = false,
 ): Record<string, unknown>[] & { [HEADER]?: string[] } {
-  const [header, ...lines] = parseCsv(text, delimiter)
+  const [header, ...lines] = markdown ? parseMarkdownTable(text) : parseCsv(text, delimiter)
   if (!header) return []
   const names = header.map((name, i) => name.trim() || `column${i + 1}`)
   const numeric = names.map((_, i) =>
@@ -166,7 +196,8 @@ export function fileRowCount(
   text: string,
 ): number {
   if (config.type === 'csv') {
-    return csvRows(text, config.delimiter ?? (/\.tsv$/i.test(file) ? '\t' : ',')).length
+    const md = /\.md$/i.test(file)
+    return csvRows(text, config.delimiter ?? (/\.tsv$/i.test(file) ? '\t' : ','), md).length
   }
   return pickRows(jsonRows(text, file, file), GLOB.test(spec.file) ? undefined : spec.rows, file)
     .length
@@ -219,7 +250,7 @@ export async function openFiles(
         }
         if (config.type === 'csv') {
           const delimiter = config.delimiter ?? (/\.tsv$/i.test(file) ? '\t' : ',')
-          const rows = csvRows(text, delimiter)
+          const rows = csvRows(text, delimiter, /\.md$/i.test(file))
           if (!glob) return rows
           header.push(...(rows[HEADER] ?? []))
           out.push(...rows.map((row) => ({ _file: file, ...row })))

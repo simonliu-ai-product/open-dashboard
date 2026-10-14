@@ -17,7 +17,16 @@ export { DivergingBar, type DivergingBarProps } from './components/diverging-bar
 export { DotPlot, type DotPlotProps } from './components/dot-plot.js'
 export { Dumbbell, type DumbbellProps } from './components/dumbbell.js'
 export { EcdfChart, type EcdfChartProps } from './components/ecdf-chart.js'
-export { Select, type SelectProps, TimeRange, type TimeRangeProps } from './components/filters.js'
+export {
+  SearchInput,
+  type SearchInputProps,
+  Select,
+  type SelectProps,
+  TimeRange,
+  type TimeRangeProps,
+  Toggle,
+  type ToggleProps,
+} from './components/filters.js'
 export { FunnelChart, type FunnelChartProps } from './components/funnel-chart.js'
 export { Gantt, type GanttProps } from './components/gantt.js'
 export { Gauge, type GaugeProps } from './components/gauge.js'
@@ -32,6 +41,10 @@ export {
   type RowProps,
   Section,
   type SectionProps,
+  Tab,
+  type TabProps,
+  Tabs,
+  type TabsProps,
 } from './components/layout.js'
 export { Marimekko, type MarimekkoProps } from './components/marimekko.js'
 export type { PanelProps } from './components/panel.js'
@@ -47,7 +60,12 @@ export { Stat, type StatProps } from './components/stat.js'
 export { StateTimeline, type StateTimelineProps } from './components/state-timeline.js'
 export { StripPlot, type StripPlotProps } from './components/strip-plot.js'
 export { SymbolMap, type SymbolMapProps } from './components/symbol-map.js'
-export { Table, type TableColumn, type TableProps } from './components/table.js'
+export {
+  Table,
+  type TableColumn,
+  type TableProps,
+  type TableSummaryKind,
+} from './components/table.js'
 export { Text, type TextProps } from './components/text.js'
 export { TileMap, type TileMapProps } from './components/tile-map.js'
 export { Timeline, type TimelineProps } from './components/timeline.js'
@@ -61,6 +79,7 @@ export {
   type BarChartProps,
   LineChart,
   type LineChartProps,
+  type ReferenceLine,
   type XYProps,
 } from './components/xy-chart.js'
 export type {
@@ -80,7 +99,15 @@ export { HostContext, type HostContextValue, useFilters, useHost } from './runti
 export { formatValue, tickFormatter } from './runtime/format.js'
 export { linear, niceDomain } from './runtime/scale.js'
 export { TIME_PRESETS, type TimePreset } from './runtime/time-range.js'
-export type { DashboardMeta, Format, NamedFormat, PanelInfo, QueryRun } from './runtime/types.js'
+export type {
+  DashboardMeta,
+  Format,
+  NamedFormat,
+  PanelInfo,
+  QueryAlertResult,
+  QueryRun,
+  SavedView,
+} from './runtime/types.js'
 export { type QueryState, useQuery } from './runtime/use-query.js'
 
 export function defineConfig<T extends import('./config.js').OpenDashboardConfig>(config: T): T {

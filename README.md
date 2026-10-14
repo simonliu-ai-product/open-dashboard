@@ -32,12 +32,14 @@ Dashboards are the output nobody wants to click together. Agents write excellent
 ### 🗂️ A dashboard is two files
 
 ```
+queries/
+  shared.sql      optional workspace-wide shared SQL inherited by every dashboard
 dashboards/sales-overview/
-  queries.sql     named SQL — runnable in any SQL tool
+  queries.sql     named SQL — runnable in any SQL tool (overrides shared queries of the same name)
   index.tsx       which panels, in what order, showing which columns
 ```
 
-"How the number is computed" and "how it is laid out" live apart. You can paste `queries.sql` into DBeaver to check a figure, and a pull request shows exactly which metric definition changed. Panels name a query; they never contain SQL. See [The file contract](#the-file-contract).
+"How the number is computed" and "how it is laid out" live apart. You can paste `queries.sql` into DBeaver to check a figure, and a pull request shows exactly which metric definition changed. Reusable queries placed in `queries/*.sql` at the workspace root are automatically inherited by every dashboard. Panels name a query; they never contain SQL. See [The file contract](#the-file-contract).
 
 ### 🤖 Agent-native authoring
 
@@ -112,7 +114,7 @@ SQL errors, unknown queries, unbound parameters and missing columns are errors, 
 | `http` | JSON HTTP API | built in | REST and open-data APIs — GET only |
 | `mcp` | MCP server | built in | remote (streamable HTTP) or local (stdio); read-only tools only |
 | `json` | JSON files | built in | JSON and JSON Lines under the workspace; a glob stacks a folder of files |
-| `csv` | CSV files | built in | CSV and TSV under the workspace, with a header row |
+| `csv` | CSV / TSV / Markdown files | built in | CSV, TSV, and GitHub-flavored Markdown pipe tables (`.md`) under the workspace |
 
 Configure as many as you like; each query names its `-- source:`. Drivers are optional peers, loaded only when a datasource of that type opens. Rows are normalised once on the server — integers, decimals and timestamps come back the same way from every engine — so a chart written against SQLite renders identically against Postgres. Every engine except BigQuery and Snowflake is exercised by the cross-driver conformance suite against a real server ([`conformance.test.ts`](packages/core/src/datasource/conformance.test.ts)); those two are tested against stand-ins for their SDKs.
 
@@ -157,9 +159,9 @@ FROM stocks ORDER BY CAST(TradeValue AS REAL) DESC LIMIT 10;
 - `open-dashboard check` reuses responses up to 10 minutes old — the dev server's included — so rerunning it while you write does not spend an API's quota. `--fresh` fetches again.
 
 
-### 📄 JSON and CSV files, queried with SQL
+### 📄 JSON, CSV, and Markdown (`.md`) tables, queried with SQL
 
-Results someone exported, a spreadsheet saved as CSV, a folder of evaluation logs: a `json` or `csv` source reads files in the workspace as tables, with the same SQL, filters, `check` and `-- uses:` joins as any database. Point a table at one file, or at a **glob** — every matching file is stacked into one table with its path in `_file`, so dropping a new file in the folder adds its rows.
+Results someone exported, a spreadsheet saved as CSV, a Markdown table of quarterly targets, or a folder of evaluation logs: a `json` or `csv` source reads files in the workspace as tables, with the same SQL, filters, `check` and `-- uses:` joins as any database. Point a table at one file, or at a **glob** — every matching file is stacked into one table with its path in `_file`, so dropping a new file in the folder adds its rows.
 
 ```ts
 evals: {
@@ -169,11 +171,17 @@ evals: {
     models: { file: 'data/models.json', rows: 'official' },  // the array at a dot path
   },
 },
-sheets: { type: 'csv', tables: { budget: { file: 'data/budget.csv' } } },
+sheets: {
+  type: 'csv',
+  tables: {
+    budget: { file: 'data/budget.csv' },
+    targets: { file: 'data/targets.md' },                  // GitHub-flavored Markdown pipe table
+  },
+},
 ```
 
 - JSON Lines (`.jsonl`, `.ndjson`) is read one record per line; nested values arrive as JSON text for `json_extract` / `json_each`.
-- A CSV column becomes numbers only when every value is a plain number, so a code like `0050` stays text. `.tsv` is tab-separated; `delimiter` overrides.
+- A CSV or `.md` column becomes numbers only when every value is a plain number, so a code like `0050` stays text. `.tsv` is tab-separated; `.md` parses GitHub-flavored Markdown pipe tables (`| col | col |`); `delimiter` overrides CSV/TSV delimiters.
 - A column of whole numbers is an INTEGER, as a database would type it: `home || ':' || away` reads `2:6`, and `wins / games` divides as integers — write `wins * 1.0 / games` for a rate. The same holds for `http` and `mcp` tables.
 - An empty file (or `[]`) is a table with no rows, not an error: its panels show they have no data, and a table that had columns keeps them.
 - Files are read only from inside the workspace, never written, and never served to the page as files. Edit one and the panels that read it refresh.
@@ -224,15 +232,15 @@ Column names do not say that refunded orders stay in `orders`, that prices are i
 | Kind | Panels |
 | --- | --- |
 | Headline | `Stat` (previous-period delta and sparkline), `Gauge`, `Text` |
-| Trend | `LineChart`, `AreaChart`, `BandChart`, `HorizonChart`, `ControlChart`, `Candlestick`, `CalendarHeatmap`, `SmallMultiples` |
-| Compare and rank | `BarChart` (grouped, stacked, horizontal), `DotPlot`, `Dumbbell`, `SlopeChart`, `BumpChart`, `BulletChart`, `DivergingBar`, `ParetoChart`, `Waterfall` |
+| Trend | `LineChart` (with `target`, `targetLabel`, `brush` zoom), `AreaChart` (`target`, `brush`), `BandChart`, `HorizonChart`, `ControlChart`, `Candlestick`, `CalendarHeatmap`, `SmallMultiples` |
+| Compare and rank | `BarChart` (grouped, stacked, horizontal, `target`), `DotPlot`, `Dumbbell`, `SlopeChart`, `BumpChart`, `BulletChart`, `DivergingBar`, `ParetoChart`, `Waterfall` |
 | Part of a whole | `PieChart` (donut), `Treemap`, `Marimekko`, `FunnelChart`, `UpSetChart` |
 | Distribution | `Histogram`, `BoxPlot`, `StripPlot`, `EcdfChart`, `ScatterChart`, `Heatmap` |
 | Flow and status | `Sankey`, `Timeline`, `Gantt`, `StateTimeline` |
 | Maps | `ChoroplethMap`, `SymbolMap`, `TileMap` |
-| Tables | `Table` (sortable, inline bars), `PivotTable`, `CohortTable` |
+| Tables | `Table` (`searchable`, `pageSize`, `summary` footer, inline `bar`, `colorScale` heatmap, `delta` ▲/▼, `badge`, `sparkline`, `href` links), `PivotTable`, `CohortTable` |
 
-No chart library: the core ships to every workspace, and the visual rules are fixed in the framework rather than left to each prompt — one y-axis (there is no dual-axis option), zero always in the domain, one tick format per axis, a validated eight-colour palette with separate dark-mode steps, and a ninth category folded into "Other".
+No chart library: the core ships to every workspace, and the visual rules are fixed in the framework rather than left to each prompt — one y-axis (there is no dual-axis option), zero always in the domain, one tick format per axis, a validated eight-colour palette with separate dark-mode steps, and a ninth category folded into "Other". Every panel also includes a one-click **Expand** modal button (`Escape` to close) for full-screen inspection.
 
 ### 🧩 Custom charts, when none of the 41 fit
 
@@ -271,11 +279,11 @@ The **Charts** page lists the 41 built-in panels and your custom charts side by 
 
 A theme is `themes/<id>.json` — chart palette, accent, up / down colours (red-up, green-down if that is your market's convention), page and panel backgrounds, grid, fonts and corner radius, each for light and dark. Anything left out keeps the built-in value, and the text drawn on a coloured mark picks black or white by contrast on its own. A dashboard picks one with `meta.theme` (or from the theme menu in Edit mode, which writes it into `index.tsx`); `theme` in the config sets the workspace default. Every chart draws through the `--odd-*` variables, so a theme restyles all 41 panels and every custom chart without touching them.
 
-### 🖼️ Download a panel — or the whole dashboard — as PNG, SVG, PDF or HTML
+### 🖼️ Download a panel — or the whole dashboard — as PNG, SVG, CSV, JSON, PDF or HTML
 
 <img src=".github/assets/download.png" alt="A panel's download menu with PNG and SVG." width="100%">
 
-Every panel has a **Download** menu. The export includes the title and legend, uses the dashboard's theme, and leaves out the buttons, tooltips and edit handles. SVG is real vectors — text as `<text>`, colours resolved, no `<foreignObject>` — so it renders outside a browser too (macOS Preview, for one); PNG is drawn from it at twice the size. The **download button in the header**, beside Preview / Edit, does the same for the whole dashboard — title, the filters as they are set, and every panel — as one image. Fonts are referenced by name, not embedded: an SVG opened on a machine without the dashboard's font falls back to another one, while the PNG always looks exactly as it did on screen.
+Every panel has a **Download** menu with **PNG**, **SVG**, **CSV** (RFC 4180), and **JSON** exports. The visual export includes the title and legend, uses the dashboard's theme, and leaves out the buttons, tooltips and edit handles. SVG is real vectors — text as `<text>`, colours resolved, no `<foreignObject>` — so it renders outside a browser too (macOS Preview, for one); PNG is drawn from it at twice the size. The **download button in the header**, beside Preview / Edit, does the same for the whole dashboard — title, the filters as they are set, and every panel — as one image. Fonts are referenced by name, not embedded: an SVG opened on a machine without the dashboard's font falls back to another one, while the PNG always looks exactly as it did on screen.
 
 **PDF** is the same picture on one page sized to it, ready to attach to an email; its text is part of the image, so it cannot be selected. **HTML** (the whole dashboard) is one file holding the viewer and the dashboard's results, opening at the filters you had set: send it, open it from disk with no server, and its filters, tooltips and downloads still work — the same contents rule as `open-dashboard build`, results only.
 
@@ -335,24 +343,43 @@ Give it your own instructions in Markdown — `assistant.md` at the workspace ro
 
 The key stays in `.env` and on the server; the page has no field for it and the API only ever reports whether the assistant is on. Replies stream in; while the model thinks, the chat shows its current step, and the full thinking opens from a toggle once it answers. `ASSISTANT_REASONING_EFFORT` in `.env` (`low`, `medium` or `high`) sets how long it thinks — Gemini defaults to `medium`, which shows its thinking and starts answering in roughly 10–20 seconds; `low` answers in a few seconds but sends no thinking to show. For `openai` it is sent only when set. A question sends the dashboard's data (up to `maxRows`, 200 by default, per query) to the provider you configured — keep that in mind for sensitive data.
 
-### 🎛️ Filters, drill-down, and links you can share
+### 🎛️ Rich filters, Tabs, Saved Views, Cross-Dashboard Drill, Kiosk Mode & `⌘K`
 
 ```tsx
+export const meta: DashboardMeta = {
+  title: 'Sales overview',
+  views: [
+    { name: 'All Regions', filters: { region: null, paid_only: '0' } },
+    { name: 'North America', filters: { region: 'North America' } },
+  ],
+}
+
 <Filters>
-  <TimeRange default="90d" />
-  <Select name="region" query="regions" />
+  <TimeRange default="90d" allowCustom compare />
+  <Select name="region" query="shared_regions" />
+  <SearchInput name="q" label="Customer" placeholder="Search customer…" />
+  <Toggle name="paid_only" label="Paid only" />
 </Filters>
+
+<Tabs default="trends">
+  <Tab value="trends" label="Revenue Trends">…</Tab>
+  <Tab value="orders" label="Orders & Targets">…</Tab>
+</Tabs>
 ```
 
-`TimeRange` binds `:from` / `:to` (`today`, `7d`, `30d`, `90d`, `6m`, `12m`, `ytd`); `Select` binds `:region` from a query of options. Filter values live in the URL, so a filtered view is a link. `drill="region"` on a panel makes clicking a bar set that filter — or open another dashboard. Auto-refresh defaults to `meta.refresh`, the reader can change it from the toolbar, and the interval is kept in the URL for a wall display.
+- **`TimeRange`**: binds `:from` / `:to` (`today`, `7d`, `30d`, `90d`, `6m`, `12m`, `ytd`, `all`), supports `allowCustom` (`YYYY-MM-DD..YYYY-MM-DD` date pickers), and `compare` (automatically binds equal-length `:prev_from` / `:prev_to` for period-over-period comparisons). Also integrates with `<LineChart brush />` / `<AreaChart brush />` drag-to-zoom.
+- **`Select`, `SearchInput`, `Toggle`**: dropdowns from SQL queries, debounced keyword search (`:q`), and boolean `0`/`1` pill toggles.
+- **Saved Views (`meta.views`) & Tabs (`<Tabs>` / `<Tab>`)**: one-click filter presets in the subbar and URL-synced (`?tab=`) multi-tab dashboard sections.
+- **Cross-dashboard drill-through (`drill` + `drillTo`)**: `drill="category" drillTo="product-analysis"` on a chart or table makes clicking a mark navigate straight to `/d/product-analysis?category=…` while carrying over active time ranges and filters.
+- **Kiosk / TV Mode & Command Palette (`⌘K`)**: toggle `?kiosk=1` (`Escape` to exit) to hide the sidebar and chrome for wall displays; press **`⌘K` / `Ctrl+K`** anywhere to fuzzy-search dashboards, jump to and highlight any panel on the current page, apply saved views, or switch themes.
 
-### 🖱️ Inspect any panel, leave a note for your agent
+### 🖱️ Inspect any panel, Explain SQL plans, Alerts, and leave a note for your agent
 
 <img src=".github/assets/inspect.png" alt="The inspector: the panel's query, source, row count, timing and SQL, with a note for the agent at the bottom." width="100%">
 
 <sub>The inspector: the panel's query, source, row count, timing, the file and line it is defined at, and a note for your agent.</sub>
 
-Hover a panel and open the inspector to see its SQL, parameters, rows and timing — and its **History**: who changed the query's definition, when and how, from git (`git log -L` over just that query's lines; author names, no e-mail). When a number moves, it tells you whether the data changed or the metric did. Type a note — *"split this by channel"* — and it is written into `index.tsx` beside that panel as a `@dashboard-comment` marker. Ask your agent to `/apply-comments` and it makes each change and clears the markers. The note is anchored to the source, not to a screenshot.
+Hover a panel and open the inspector to see its SQL, parameters, rows and timing — plus its **Explain** plan (`EXPLAIN QUERY PLAN` / `EXPLAIN`, with automatic warnings on full table scans) and its **History**: who changed the query's definition, when and how, from git (`git log -L` over just that query's lines; author names, no e-mail). Queries can also declare threshold assertions with `-- alert: refund_rate > 0.02 Refund rate above 2% SLA`, displaying a live alert badge on the panel header when triggered. Type a note — *"split this by channel"* — and it is written into `index.tsx` beside that panel as a `@dashboard-comment` marker. Ask your agent to `/apply-comments` and it makes each change and clears the markers.
 
 ### ✏️ Edit mode writes source, not state
 
@@ -400,6 +427,8 @@ No database to hand? `init my-dashboards --sample` adds a small generated SQLite
 | `open-dashboard query "<sql>" [--source s] [--param k=v]` | Run read-only SQL against a datasource |
 | `open-dashboard query --dashboard <id> --name <query>` | Run one of a dashboard's named queries |
 | `open-dashboard check [id] [--json] [--fresh]` | Run every query, verify every panel; non-zero exit on errors |
+| `open-dashboard diff [dir] [--dashboard id] [--json]` | Compare live query row counts and numeric sums against a built snapshot (`site/` by default) |
+| `open-dashboard report [id] [--format md\|json] [--webhook url]` | Generate a Markdown or JSON inspection report of headline metrics and active `-- alert:` rules (and optionally POST to a Slack/Discord/generic webhook) |
 | `open-dashboard charts [--json]` | Every chart this workspace can use — the 41 built-ins and `charts/` — and the dashboards using each |
 | `open-dashboard build [id...] [--out site] [--max-runs 100]` | Static site of the dashboards with their results taken now |
 | `open-dashboard serve [--port n] [--host h] [--build-only]` | Serve the dashboards to readers, read-only, with live results |
@@ -457,7 +486,7 @@ export default function SalesOverview() {
 }
 ```
 
-Query annotations: `-- name:` (required), `-- source:` (default: `defaultSource`), `-- uses:`, `-- cache:`, `-- description:` (shown in the inspector — where metric definitions belong).
+Query annotations: `-- name:` (required), `-- source:` (default: `defaultSource`), `-- uses:`, `-- cache:`, `-- description:` (shown in the inspector — where metric definitions belong), and `-- alert: <column> <op> <threshold> [message]` (evaluates threshold rules and renders a live alert badge when triggered).
 
 ```ts
 // open-dashboard.config.ts

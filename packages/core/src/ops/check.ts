@@ -22,12 +22,15 @@ export interface Finding {
   where?: string
 }
 
+import type { QueryAlertResult } from '../runtime/types.js'
+
 export interface QueryReport {
   name: string
   source?: string
   rows?: number
   columns?: string[]
   elapsedMs?: number
+  alerts?: QueryAlertResult[]
   error?: string
 }
 
@@ -56,7 +59,7 @@ export async function defaultParams(
     const where = `${file}:${filter.line}`
     if (filter.kind === 'TimeRange') {
       const preset = filter.default ?? '30d'
-      if (!isTimePreset(preset)) {
+      if (!isTimePreset(preset) && !/^\d{4}-\d{2}-\d{2}\.\.\d{4}-\d{2}-\d{2}$/.test(preset)) {
         findings.push({
           severity: 'error',
           message: `TimeRange default "${preset}" is not a preset`,
@@ -64,11 +67,20 @@ export async function defaultParams(
         })
         continue
       }
-      Object.assign(params, timeRangeParams(filter.name, preset, now))
+      Object.assign(params, timeRangeParams(filter.name, preset, now, filter.compare))
       continue
     }
     if (!filter.name) {
-      findings.push({ severity: 'error', message: 'Select needs a literal name', where })
+      findings.push({ severity: 'error', message: `${filter.kind} needs a literal name`, where })
+      continue
+    }
+    if (filter.kind === 'Toggle') {
+      params[filter.name] = filter.default === '1' || filter.default === 'true' ? 1 : 0
+      continue
+    }
+    if (filter.kind === 'SearchInput') {
+      params[filter.name] =
+        filter.default && filter.default.trim() !== '' ? filter.default.trim() : null
       continue
     }
     if (filter.default !== undefined) {
@@ -204,8 +216,11 @@ export async function checkDashboard(
       })
     }
   }
+  const isSharedQuery = (q: NamedQuery) =>
+    q.file.startsWith('queries/') || q.file.startsWith('queries\\')
+
   for (const [name, query] of queries) {
-    if (!reached.has(name)) {
+    if (!reached.has(name) && !isSharedQuery(query)) {
       findings.push({
         severity: 'warning',
         message: `query "${name}" is defined but no panel uses it`,
@@ -216,6 +231,7 @@ export async function checkDashboard(
 
   const results = new Map<string, string[]>()
   for (const [name, query] of queries) {
+    if (!reached.has(name) && isSharedQuery(query)) continue
     const entry: QueryReport = { name }
     const unbound = queryParams(workspace.config, query).filter(
       (param) => !(param in report.params),
@@ -250,6 +266,18 @@ export async function checkDashboard(
           message: `query "${name}" was truncated at ${workspace.config.maxRows} rows — aggregate in SQL`,
           where: `${query.file}:${query.line}`,
         })
+      }
+      if (run.alerts?.length) {
+        entry.alerts = run.alerts
+        for (const alert of run.alerts) {
+          if (alert.triggered) {
+            findings.push({
+              severity: 'warning',
+              message: `alert on "${name}": ${alert.message ?? `${alert.column} (${alert.actual}) ${alert.op} ${alert.threshold}`}`,
+              where: `${query.file}:${query.line}`,
+            })
+          }
+        }
       }
     } catch (error) {
       entry.error = errorMessage(error)

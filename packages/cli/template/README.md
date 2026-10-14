@@ -19,5 +19,7 @@ Then ask your coding agent:
 | --- | --- |
 | `dashboards/<id>/index.tsx` | a dashboard's layout |
 | `dashboards/<id>/*.sql` | its named queries |
+| `queries/*.sql` | shared SQL queries inherited by all dashboards |
 | `open-dashboard.config.ts` | datasources |
 | `.env` | connection strings (git-ignored) |
+

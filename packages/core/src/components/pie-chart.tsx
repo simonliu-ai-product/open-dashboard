@@ -34,7 +34,7 @@ function arc(cx: number, cy: number, r: number, inner: number, a0: number, a1: n
 function Donut({ run, props }: { run: QueryRun; props: PieChartProps }) {
   const ctx = useFormatContext()
   const t = useT()
-  const drill = useDrill(props.drill)
+  const drill = useDrill(props.drill, props.drillTo)
   const [ref, size] = useSize<HTMLDivElement>()
   const [hover, setHover] = useState<number | null>(null)
   const { columns, rows } = run.result

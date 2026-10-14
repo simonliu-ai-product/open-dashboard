@@ -1,7 +1,7 @@
 import { readFileSync } from 'node:fs'
 import type { ParamValue } from '../config.js'
 import { humanize } from '../runtime/shape.js'
-import { isTimePreset, TIME_PRESETS, timeRangeParams } from '../runtime/time-range.js'
+import { isTimePreset, isTimeValue, TIME_PRESETS, timeRangeParams } from '../runtime/time-range.js'
 import type { Workspace } from '../workspace.js'
 import { analyzeDashboard } from './analyze.js'
 import { chartImports } from './charts.js'
@@ -11,7 +11,7 @@ import { dashboardFile, runDashboardQuery } from './dashboards.js'
 export interface FilterChoice {
   /** The key in the URL (`time`, `region`). */
   key: string
-  kind: 'TimeRange' | 'Select'
+  kind: 'TimeRange' | 'Select' | 'SearchInput' | 'Toggle'
   label: string
   /** Every value on offer, as the page holds it — strings, `null` for All. */
   options: (string | null)[]
@@ -71,9 +71,16 @@ export async function dashboardFilters(
   for (const decl of filters) {
     if (decl.kind === 'TimeRange') {
       const key = decl.name ?? 'time'
-      const fallback = isTimePreset(set[key]) ? (set[key] as string) : (decl.default ?? '30d')
-      if (!isTimePreset(fallback)) continue
+      const fallback = isTimeValue(set[key]) ? (set[key] as string) : (decl.default ?? '30d')
+      if (!isTimeValue(fallback)) continue
       const presets = (decl.options ?? Object.keys(TIME_PRESETS)).filter(isTimePreset)
+      const produces = decl.name
+        ? [
+            `${decl.name}_from`,
+            `${decl.name}_to`,
+            ...(decl.compare ? [`${decl.name}_prev_from`, `${decl.name}_prev_to`] : []),
+          ]
+        : ['from', 'to', ...(decl.compare ? ['prev_from', 'prev_to'] : [])]
       choices.push({
         key,
         kind: 'TimeRange',
@@ -81,8 +88,35 @@ export async function dashboardFilters(
         options: presets,
         labels: Object.fromEntries(presets.map((preset) => [preset, TIME_PRESETS[preset]])),
         current: fallback,
-        produces: decl.name ? [`${decl.name}_from`, `${decl.name}_to`] : ['from', 'to'],
-        params: (value) => timeRangeParams(decl.name, isTimePreset(value) ? value : fallback, now),
+        produces,
+        params: (value) =>
+          timeRangeParams(decl.name, isTimeValue(value) ? value : fallback, now, decl.compare),
+      })
+    } else if (decl.kind === 'SearchInput' && decl.name) {
+      const name = decl.name
+      const fallback = decl.default && decl.default.trim() !== '' ? decl.default.trim() : null
+      choices.push({
+        key: name,
+        kind: 'SearchInput',
+        label: decl.label ?? humanize(name),
+        options: [fallback],
+        labels: {},
+        current: name in set ? (set[name] ?? null) : fallback,
+        produces: [name],
+        params: (value) => ({ [name]: value && value.trim() !== '' ? value.trim() : null }),
+      })
+    } else if (decl.kind === 'Toggle' && decl.name) {
+      const name = decl.name
+      const fallback = decl.default === '1' || decl.default === 'true' ? '1' : '0'
+      choices.push({
+        key: name,
+        kind: 'Toggle',
+        label: decl.label ?? humanize(name),
+        options: ['0', '1'],
+        labels: { '0': 'Off', '1': 'On' },
+        current: name in set ? (set[name] ?? fallback) : fallback,
+        produces: [name],
+        params: (value) => ({ [name]: value === '1' || value === 'true' ? 1 : 0 }),
       })
     } else if (decl.name) {
       const name = decl.name

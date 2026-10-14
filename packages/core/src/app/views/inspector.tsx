@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import type { ParamValue } from '../../config.js'
+import type { QueryPlan } from '../../ops/explain.js'
 import type { QueryHistory } from '../../ops/history.js'
 import { useEdit } from '../../runtime/edit.js'
 import { useLocale, useT } from '../../runtime/i18n.js'
@@ -8,15 +9,57 @@ import { ChartSettings } from '../components/chart-settings.js'
 import { CheckIcon } from '../components/icons.js'
 import { api } from '../lib/api.js'
 
-export type InspectorTab = 'chart' | 'data' | 'sql' | 'history' | 'params'
+export type InspectorTab = 'chart' | 'data' | 'sql' | 'plan' | 'history' | 'params'
 type Tab = InspectorTab
 
 const TAB_LABELS: Record<Tab, string> = {
   chart: 'Chart',
   data: 'Data',
   sql: 'SQL',
+  plan: 'Plan',
   history: 'History',
   params: 'Params',
+}
+
+function QueryPlanView({
+  id,
+  query,
+  params,
+}: {
+  id: string
+  query: string
+  params: Record<string, ParamValue>
+}) {
+  const t = useT()
+  const [plan, setPlan] = useState<QueryPlan>()
+  const [error, setError] = useState<string>()
+  const paramsKey = JSON.stringify(params)
+  // biome-ignore lint/correctness/useExhaustiveDependencies: paramsKey represents params
+  useEffect(() => {
+    let live = true
+    setPlan(undefined)
+    setError(undefined)
+    api.explain(id, query, params).then(
+      (found) => live && setPlan(found),
+      (e: Error) => live && setError(e.message),
+    )
+    return () => {
+      live = false
+    }
+  }, [id, query, paramsKey])
+  if (error) return <p className="odd-callout odd-callout-error">{error}</p>
+  if (!plan) return <p className="odd-muted">{t('Loading…')}</p>
+  return (
+    <div className="odd-plan">
+      <div className="odd-plan-badges">
+        <span className="odd-cell-badge" data-tone={plan.usesIndex ? 'good' : 'neutral'}>
+          {plan.usesIndex ? t('Index used') : t('Full scan')}
+        </span>
+        <span className="odd-muted">{plan.elapsedMs.toFixed(1)} ms</span>
+      </div>
+      <pre className="odd-code">{plan.steps.join('\n') || '—'}</pre>
+    </div>
+  )
 }
 
 /** Who changed this query's definition, when and how — from git, newest first. */
@@ -207,7 +250,7 @@ export function Inspector(props: {
       {run ? (
         <>
           <div className="odd-tabs odd-tabs-small" role="tablist">
-            {(['chart', 'data', 'sql', 'history', 'params'] as Tab[]).map((name) => (
+            {(['chart', 'data', 'sql', 'plan', 'history', 'params'] as Tab[]).map((name) => (
               <button
                 key={name}
                 type="button"
@@ -255,6 +298,8 @@ export function Inspector(props: {
               </div>
             ) : tab === 'sql' ? (
               <pre className="odd-code">{run.query.sql}</pre>
+            ) : tab === 'plan' ? (
+              <QueryPlanView id={id} query={run.query.name} params={run.params} />
             ) : tab === 'history' ? (
               <QueryHistoryView id={id} query={run.query.name} />
             ) : (

@@ -142,4 +142,13 @@ export const PANELS: Record<string, string> = {
   After: '前置任务',
   'Starts too early': '开始过早',
   'before {name} ends': '{name} 尚未完成',
+  'Custom range': '自定义期间',
+  'Start date': '开始日期',
+  'End date': '结束日期',
+  'Filter…': '筛选…',
+  Alert: '警报',
+  Previous: '上一页',
+  Next: '下一页',
+  Expand: '放大查看',
+  Collapse: '收起',
 }

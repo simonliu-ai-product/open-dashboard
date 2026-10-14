@@ -17,7 +17,18 @@ import { OpsError } from './errors.js'
 type Node = Parameters<typeof walk>[0]
 
 /** Elements that hold panels rather than being one. */
-const STRUCTURE = new Set(['Dashboard', 'Row', 'Section', 'Filters', 'TimeRange', 'Select'])
+const STRUCTURE = new Set([
+  'Dashboard',
+  'Row',
+  'Section',
+  'Tabs',
+  'Tab',
+  'Filters',
+  'TimeRange',
+  'Select',
+  'SearchInput',
+  'Toggle',
+])
 
 /**
  * A panel is any component element that is not structure — a built-in or a

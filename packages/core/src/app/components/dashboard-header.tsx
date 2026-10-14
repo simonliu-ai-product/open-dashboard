@@ -41,6 +41,33 @@ export function DashboardHeader(props: DashboardHeaderProps) {
   const t = useT()
   const [copied, setCopied] = useState(false)
   const [notesCopied, setNotesCopied] = useState(false)
+  const [kiosk, setKiosk] = useState(
+    () =>
+      typeof window !== 'undefined' &&
+      new URLSearchParams(window.location.search).get('kiosk') === '1',
+  )
+  useEffect(() => {
+    const sync = () => setKiosk(new URLSearchParams(window.location.search).get('kiosk') === '1')
+    window.addEventListener('odd:kiosk-changed', sync)
+    window.addEventListener('popstate', sync)
+    return () => {
+      window.removeEventListener('odd:kiosk-changed', sync)
+      window.removeEventListener('popstate', sync)
+    }
+  }, [])
+  useEffect(() => {
+    if (!kiosk) return
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        const url = new URL(window.location.href)
+        url.searchParams.delete('kiosk')
+        window.history.replaceState(window.history.state, '', url)
+        window.dispatchEvent(new CustomEvent('odd:kiosk-changed'))
+      }
+    }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [kiosk])
   useEffect(() => {
     if (!copied && !notesCopied) return
     const timer = window.setTimeout(() => {
@@ -49,6 +76,19 @@ export function DashboardHeader(props: DashboardHeaderProps) {
     }, 1600)
     return () => window.clearTimeout(timer)
   }, [copied, notesCopied])
+
+  const toggleKiosk = () => {
+    const url = new URL(window.location.href)
+    if (kiosk) url.searchParams.delete('kiosk')
+    else url.searchParams.set('kiosk', '1')
+    try {
+      window.history.replaceState(window.history.state, '', url)
+    } catch {
+      // ignore on file://
+    }
+    setKiosk(!kiosk)
+    window.dispatchEvent(new CustomEvent('odd:kiosk-changed'))
+  }
 
   return (
     <header className="odd-header" data-mode={props.mode}>
@@ -111,20 +151,41 @@ export function DashboardHeader(props: DashboardHeaderProps) {
           </>
         )}
         {props.standalone ? null : (
-          <button
-            type="button"
-            className="odd-icon-button odd-header-icon"
-            title={copied ? t('Link copied') : t('Copy link')}
-            aria-label={copied ? t('Link copied') : t('Copy link')}
-            onClick={() =>
-              navigator.clipboard?.writeText(window.location.href).then(
-                () => setCopied(true),
-                () => {},
-              )
-            }
-          >
-            {copied ? <CheckIcon /> : <LinkIcon />}
-          </button>
+          <>
+            <button
+              type="button"
+              className="odd-icon-button odd-header-icon"
+              title={kiosk ? t('Exit kiosk') : t('Kiosk mode')}
+              aria-label={kiosk ? t('Exit kiosk') : t('Kiosk mode')}
+              aria-pressed={kiosk}
+              onClick={toggleKiosk}
+            >
+              <svg viewBox="0 0 16 16" width="14" height="14" aria-hidden="true">
+                <path
+                  d="M2.5 5.5V2.5h3M10.5 2.5h3v3M13.5 10.5v3h-3M5.5 13.5h-3v-3"
+                  stroke="currentColor"
+                  strokeWidth="1.5"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  fill="none"
+                />
+              </svg>
+            </button>
+            <button
+              type="button"
+              className="odd-icon-button odd-header-icon"
+              title={copied ? t('Link copied') : t('Copy link')}
+              aria-label={copied ? t('Link copied') : t('Copy link')}
+              onClick={() =>
+                navigator.clipboard?.writeText(window.location.href).then(
+                  () => setCopied(true),
+                  () => {},
+                )
+              }
+            >
+              {copied ? <CheckIcon /> : <LinkIcon />}
+            </button>
+          </>
         )}
         {props.mode === 'edit' && props.themes && props.onTheme ? (
           <label className="odd-refresh">

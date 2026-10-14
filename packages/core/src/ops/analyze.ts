@@ -12,9 +12,11 @@ type Node = {
 }
 
 export interface FilterDecl {
-  kind: 'TimeRange' | 'Select'
+  kind: 'TimeRange' | 'Select' | 'SearchInput' | 'Toggle'
   name: string | undefined
   default: string | null | undefined
+  /** TimeRange only: whether it also binds `:prev_from` and `:prev_to`. */
+  compare?: boolean
   /** Select only: the query that lists its options. */
   query?: string
   /** The choices written as a literal `options` array: presets, or a Select's values. */
@@ -273,15 +275,25 @@ export function analyzeDashboard(
     const attrs = attributes(node)
     const read = (key: string) => (attrs.has(key) ? literal(attrs.get(key), constants) : undefined)
 
-    if (name === 'TimeRange' || name === 'Select') {
+    if (name === 'TimeRange' || name === 'Select' || name === 'SearchInput' || name === 'Toggle') {
       const raw = read('default')
       const query = read('query')
       const decl: FilterDecl = {
         kind: name,
         name: typeof read('name') === 'string' ? (read('name') as string) : undefined,
-        default: typeof raw === 'string' || raw === null ? raw : undefined,
+        default:
+          typeof raw === 'string' || raw === null
+            ? raw
+            : typeof raw === 'boolean'
+              ? raw
+                ? '1'
+                : '0'
+              : undefined,
         allowAll: read('allowAll') !== false,
         line: line(node),
+      }
+      if (name === 'TimeRange' && (read('compare') === true || attrs.get('compare') === null)) {
+        decl.compare = true
       }
       const options = read('options')
       if (Array.isArray(options)) {
@@ -328,6 +340,7 @@ export function analyzeDashboard(
       }
     }
     const drill = read('drill')
+    const drillTo = read('drillTo')
     const panel: PanelRef = {
       component: name,
       title: typeof read('title') === 'string' ? (read('title') as string) : undefined,
@@ -335,15 +348,32 @@ export function analyzeDashboard(
       columns,
       line: line(node),
     }
-    if (typeof drill === 'string') panel.drill = { filter: drill }
-    else if (
+    if (typeof drill === 'string') {
+      panel.drill = {
+        filter: drill,
+        ...(typeof drillTo === 'string' ? { dashboard: drillTo } : {}),
+      }
+    } else if (
       drill &&
       typeof drill === 'object' &&
       typeof (drill as { filter?: unknown }).filter === 'string'
     ) {
-      const spec = drill as { filter: string; column?: unknown; dashboard?: unknown }
+      const spec = drill as {
+        filter: string
+        column?: unknown
+        dashboard?: unknown
+        drillTo?: unknown
+      }
       panel.drill = { filter: spec.filter }
-      if (typeof spec.dashboard === 'string') panel.drill.dashboard = spec.dashboard
+      const targetDash =
+        typeof spec.dashboard === 'string'
+          ? spec.dashboard
+          : typeof spec.drillTo === 'string'
+            ? spec.drillTo
+            : typeof drillTo === 'string'
+              ? drillTo
+              : undefined
+      if (targetDash) panel.drill.dashboard = targetDash
       if (typeof spec.column === 'string') columns.push(spec.column)
     }
     result.panels.push(panel)

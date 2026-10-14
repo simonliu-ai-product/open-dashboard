@@ -2,8 +2,7 @@ import { existsSync, readdirSync, readFileSync } from 'node:fs'
 import { join, relative } from 'node:path'
 import { type NamedQuery, parseQueryFile, QueryFileError } from './parse.js'
 
-/** Every `*.sql` file in the dashboard's folder, merged into one namespace. */
-export function loadQueries(dir: string, root: string): Map<string, NamedQuery> {
+function readDirQueries(dir: string, root: string): Map<string, NamedQuery> {
   const queries = new Map<string, NamedQuery>()
   if (!existsSync(dir)) return queries
   for (const entry of readdirSync(dir).sort()) {
@@ -20,6 +19,29 @@ export function loadQueries(dir: string, root: string): Map<string, NamedQuery> 
     }
   }
   return queries
+}
+
+/** Workspace-wide shared queries defined under `<root>/queries/*.sql`. */
+export function loadSharedQueries(root: string): Map<string, NamedQuery> {
+  return readDirQueries(join(root, 'queries'), root)
+}
+
+/**
+ * Every `*.sql` file in the dashboard's folder, merged on top of workspace-wide
+ * shared queries from `<root>/queries/*.sql` (unless `includeShared: false`).
+ */
+export function loadQueries(
+  dir: string,
+  root: string,
+  options: { includeShared?: boolean } = {},
+): Map<string, NamedQuery> {
+  const merged =
+    options.includeShared === false ? new Map<string, NamedQuery>() : loadSharedQueries(root)
+  const local = readDirQueries(dir, root)
+  for (const [name, query] of local) {
+    merged.set(name, query)
+  }
+  return merged
 }
 
 export type { NamedQuery } from './parse.js'

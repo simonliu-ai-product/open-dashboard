@@ -150,4 +150,13 @@ export const PANELS: Record<string, string> = {
   After: '先行タスク',
   'Starts too early': '開始が早すぎます',
   'before {name} ends': '{name} の完了前',
+  'Custom range': 'カスタム期間',
+  'Start date': '開始日',
+  'End date': '終了日',
+  'Filter…': '絞り込み…',
+  Alert: 'アラート',
+  Previous: '前へ',
+  Next: '次へ',
+  Expand: '拡大表示',
+  Collapse: '元のサイズに戻す',
 }

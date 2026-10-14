@@ -32,12 +32,14 @@ Dashboard 是沒有人想手動拖拉拼出來的產出物。Agent 很會寫 SQL
 ### 🗂️ 一張 Dashboard 就是兩個檔案
 
 ```
+queries/
+  shared.sql      選用的全工作區共用 SQL，所有 Dashboard 自動繼承
 dashboards/sales-overview/
-  queries.sql     具名 SQL，任何 SQL 工具都能直接執行
+  queries.sql     具名 SQL，任何 SQL 工具都能直接執行（可覆寫同名的共用查詢）
   index.tsx       有哪些面板、順序，以及各自顯示哪些欄位
 ```
 
-「數字怎麼算」和「畫面怎麼排」分開存放。你可以把 `queries.sql` 貼到 DBeaver 驗算，Pull Request 也能清楚看出改的是哪一個指標的定義。面板只用名稱引用查詢，裡面不會有 SQL。詳見[檔案契約](#檔案契約)。
+「數字怎麼算」和「畫面怎麼排」分開存放。你可以把 `queries.sql` 貼到 DBeaver 驗算，Pull Request 也能清楚看出改的是哪一個指標的定義。放在工作區根目錄 `queries/*.sql` 的共用查詢會由所有 Dashboard 自動繼承。面板只用名稱引用查詢，裡面不會有 SQL。詳見[檔案契約](#檔案契約)。
 
 ### 🤖 為 Agent 設計的撰寫流程
 
@@ -112,7 +114,7 @@ SQL 錯誤、不存在的查詢、沒有綁定的參數、找不到的欄位都�
 | `http` | JSON HTTP API | 內建 | REST 與開放資料 API——只送 GET |
 | `mcp` | MCP server | 內建 | 遠端（streamable HTTP）或本機（stdio）；只呼叫唯讀工具 |
 | `json` | JSON 檔案 | 內建 | workspace 裡的 JSON 與 JSON Lines；萬用字元可以把整個資料夾的檔案疊成一張表 |
-| `csv` | CSV 檔案 | 內建 | workspace 裡的 CSV 與 TSV，第一列為欄位名稱 |
+| `csv` | CSV / TSV / Markdown 檔案 | 內建 | workspace 裡的 CSV、TSV，以及 GitHub 風格的 Markdown 表格（`.md`） |
 
 想設定幾個就設定幾個，每條查詢用 `-- source:` 指定來源。驅動程式是選用的 peer dependency，只有在開啟該類型的資料來源時才會載入。查詢結果在伺服器端統一正規化——整數、小數、時間在每種資料庫都以同樣的形式回傳——所以在 SQLite 上寫好的圖表，換到 Postgres 也會長得一模一樣。除了 BigQuery 與 Snowflake 之外，每種資料庫都經過跨資料庫一致性測試，在真實的伺服器上驗證過（[`conformance.test.ts`](packages/core/src/datasource/conformance.test.ts)）；這兩者則是以其 SDK 的替身進行測試。
 
@@ -157,9 +159,9 @@ FROM stocks ORDER BY CAST(TradeValue AS REAL) DESC LIMIT 10;
 - `open-dashboard check` 會沿用 10 分鐘內抓過的回應（包括 dev server 抓的），寫 Dashboard 時反覆執行也不會耗掉 API 額度；加上 `--fresh` 則重新抓取。
 
 
-### 📄 JSON 與 CSV 檔案，也能用 SQL 查
+### 📄 JSON、CSV 與 Markdown（`.md`）表格，也能用 SQL 查
 
-別人匯出的結果、存成 CSV 的試算表、一整個資料夾的評測紀錄：`json` 或 `csv` 資料來源會把 workspace 裡的檔案當成資料表，SQL、篩選、`check` 和 `-- uses:` 跨來源查詢都和資料庫一樣。一張表可以指向一個檔案，也可以指向**萬用字元**——符合的檔案會全部疊成一張表，並多一欄 `_file` 記錄檔案路徑；新檔案丟進資料夾，資料就會自動出現。
+別人匯出的結果、存成 CSV 的試算表、寫在 Markdown 裡的季度目標表，或一整個資料夾的評測紀錄：`json` 或 `csv` 資料來源會把 workspace 裡的檔案當成資料表，SQL、篩選、`check` 和 `-- uses:` 跨來源查詢都和資料庫一樣。一張表可以指向一個檔案，也可以指向**萬用字元**——符合的檔案會全部疊成一張表，並多一欄 `_file` 記錄檔案路徑；新檔案丟進資料夾，資料就會自動出現。
 
 ```ts
 evals: {
@@ -169,11 +171,17 @@ evals: {
     models: { file: 'data/models.json', rows: 'official' },  // 取某個路徑下的陣列
   },
 },
-sheets: { type: 'csv', tables: { budget: { file: 'data/budget.csv' } } },
+sheets: {
+  type: 'csv',
+  tables: {
+    budget: { file: 'data/budget.csv' },
+    targets: { file: 'data/targets.md' },                  // GitHub 風格的 Markdown 管線表格
+  },
+},
 ```
 
 - JSON Lines（`.jsonl`、`.ndjson`）一行一筆；巢狀的值會以 JSON 文字傳入，用 `json_extract`／`json_each` 讀取。
-- CSV 的欄位只有在每個值都是純數字時才轉成數字，所以 `0050` 這種代號會保留為文字。`.tsv` 以 Tab 分隔，也可以用 `delimiter` 指定。
+- CSV 或 `.md` 的欄位只有在每個值都是純數字時才轉成數字，所以 `0050` 這種代號會保留為文字。`.tsv` 以 Tab 分隔；`.md` 會自動解析 GitHub 風格的 Markdown 表格（`| col | col |`）；也可以用 `delimiter` 指定分隔符號。
 - 全是整數的欄位會存成 INTEGER，和資料庫的型別一致：`home || ':' || away` 會得到 `2:6`，而 `wins / games` 會做整數除法，算比率請寫 `wins * 1.0 / games`。`http` 與 `mcp` 的表也一樣。
 - 空檔案（或 `[]`）是沒有資料列的表，不是錯誤：讀它的面板會顯示沒有資料；原本有欄位的表會保留欄位。
 - 只讀取 workspace 裡的檔案，絕不寫入，也不會讓網頁直接下載原始檔。檔案一改，讀它的面板就會重新整理。
@@ -224,15 +232,15 @@ ORDER BY roas DESC;
 | 類型 | 面板 |
 | --- | --- |
 | 重點數字 | `Stat`（附與上一期的比較與迷你走勢圖）、`Gauge`、`Text` |
-| 趨勢 | `LineChart`、`AreaChart`、`BandChart`、`HorizonChart`、`ControlChart`、`Candlestick`、`CalendarHeatmap`、`SmallMultiples` |
-| 比較與排名 | `BarChart`（分組、堆疊、橫向）、`DotPlot`、`Dumbbell`、`SlopeChart`、`BumpChart`、`BulletChart`、`DivergingBar`、`ParetoChart`、`Waterfall` |
+| 趨勢 | `LineChart`（支援 `target` 目標線、`targetLabel`、`brush` 拖曳縮放）、`AreaChart`（`target`、`brush`）、`BandChart`、`HorizonChart`、`ControlChart`、`Candlestick`、`CalendarHeatmap`、`SmallMultiples` |
+| 比較與排名 | `BarChart`（分組、堆疊、橫向、`target` 目標線）、`DotPlot`、`Dumbbell`、`SlopeChart`、`BumpChart`、`BulletChart`、`DivergingBar`、`ParetoChart`、`Waterfall` |
 | 部分與整體 | `PieChart`（甜甜圈）、`Treemap`、`Marimekko`、`FunnelChart`、`UpSetChart` |
 | 分佈 | `Histogram`、`BoxPlot`、`StripPlot`、`EcdfChart`、`ScatterChart`、`Heatmap` |
 | 流向與狀態 | `Sankey`、`Timeline`、`Gantt`、`StateTimeline` |
 | 地圖 | `ChoroplethMap`、`SymbolMap`、`TileMap` |
-| 表格 | `Table`（可排序、內嵌長條）、`PivotTable`、`CohortTable` |
+| 表格 | `Table`（可排序、`searchable` 搜尋、`pageSize` 分頁、`summary` 彙總列、內嵌 `bar`、`colorScale` 熱度底色、`delta` ▲/▼ 漲跌、`badge` 標籤、`sparkline` 走勢、`href` 連結）、`PivotTable`、`CohortTable` |
 
-不用任何圖表套件：core 會裝進每一個 workspace，而視覺規則寫死在框架裡，而不是交給每一次的 prompt——只有一條 Y 軸（沒有雙軸選項）、零一定在範圍內、每條軸只有一種刻度格式、經過驗證的八色色票並有獨立的深色版本，第九個類別一律收進「其他」。
+不用任何圖表套件：core 會裝進每一個 workspace，而視覺規則寫死在框架裡，而不是交給每一次的 prompt——只有一條 Y 軸（沒有雙軸選項）、零一定在範圍內、每條軸只有一種刻度格式、經過驗證的八色色票並有獨立的深色版本，第九個類別一律收進「其他」。每個面板右上角也內建**放大檢視（Expand）**按鈕（按 `Escape` 關閉），方便全螢幕檢視單一圖表或表格。
 
 ### 🧩 自訂圖表：41 種都不合用的時候
 
@@ -271,11 +279,11 @@ import Radar from '../../charts/radar'
 
 一套主題就是 `themes/<id>.json`——圖表色票、強調色、上漲／下跌色（若你的市場習慣紅漲綠跌也沒問題）、頁面與面板背景、格線、字型與圓角，淺色與深色各一組。沒設定的項目沿用內建值，畫在色塊上的文字也會依對比自動選擇黑或白。Dashboard 用 `meta.theme` 指定主題（也可以在編輯模式的主題選單中選，會寫回 `index.tsx`）；設定檔中的 `theme` 是整個 workspace 的預設值。每張圖表都透過 `--odd-*` 變數繪製，所以一套主題能同時改變 41 種面板與所有自訂圖表的外觀，不必改動它們。
 
-### 🖼️ 面板或整張 Dashboard 都能下載成 PNG、SVG、PDF 或 HTML
+### 🖼️ 面板或整張 Dashboard 都能下載成 PNG、SVG、CSV、JSON、PDF 或 HTML
 
 <img src=".github/assets/download.png" alt="面板的下載選單，可選 PNG 或 SVG。" width="100%">
 
-每個面板都有**下載**選單。匯出內容包含標題與圖例，套用 Dashboard 的主題，並排除按鈕、提示框與編輯控制項。SVG 是真正的向量檔——文字是 `<text>`、顏色已解析、沒有 `<foreignObject>`——所以在瀏覽器以外也能正確顯示（例如 macOS 的預覽程式）；PNG 則以兩倍解析度從它繪製。頁首「預覽／編輯」旁的**下載按鈕**則把整張 Dashboard——標題、目前的篩選條件與所有面板——輸出成一張圖。字型是以名稱引用而非內嵌：在沒有該字型的電腦上開啟 SVG，會換成其他字型，PNG 則一定和螢幕上看到的一樣。
+每個面板都有**下載**選單，支援匯出 **PNG**、**SVG**、**CSV**（RFC 4180）與 **JSON**。視覺匯出內容包含標題與圖例，套用 Dashboard 的主題，並排除按鈕、提示框與編輯控制項。SVG 是真正的向量檔——文字是 `<text>`、顏色已解析、沒有 `<foreignObject>`——所以在瀏覽器以外也能正確顯示（例如 macOS 的預覽程式）；PNG 則以兩倍解析度從它繪製。頁首「預覽／編輯」旁的**下載按鈕**則把整張 Dashboard——標題、目前的篩選條件與所有面板——輸出成一張圖。字型是以名稱引用而非內嵌：在沒有該字型的電腦上開啟 SVG，會換成其他字型，PNG 則一定和螢幕上看到的一樣。
 
 **PDF** 是同一張圖，放在剛好符合大小的一頁裡，方便直接附在信件中；文字是圖片的一部分，無法選取。**HTML**（整張 Dashboard）是一個檔案，裡面有檢視器和這張 Dashboard 的查詢結果，打開時停在你當下設定的篩選條件：可以直接寄出、不用伺服器從硬碟開啟，篩選、提示框和下載都照樣能用——內容規則和 `open-dashboard build` 相同，只有查詢結果。
 
@@ -335,26 +343,43 @@ assistant: {
 
 金鑰只留在 `.env` 與伺服器；頁面上沒有任何輸入金鑰的欄位，API 也只會回報助理是否開啟。回覆會逐字串流顯示；模型思考時，對話框會即時顯示它正在做的步驟，回答後可以點開看完整的思考內容。`.env` 的 `ASSISTANT_REASONING_EFFORT`（`low`、`medium` 或 `high`）決定思考多久——Gemini 預設 `medium`，會顯示思考過程，大約 10–20 秒開始回答；`low` 幾秒內就會回答，但不會送回可顯示的思考內容。`openai` 只在有設定時才送出。每次提問都會把這張 Dashboard 的資料（每條查詢最多 `maxRows` 筆，預設 200 筆）送到你設定的供應商——處理敏感資料時請留意這一點。
 
-### 🎛️ 篩選、下鑽，以及可以分享的連結
+### 🎛️ 互動篩選器、分頁（Tabs）、預設檢視、跨頁下鑽、電視輪播模式與 `⌘K`
 
 ```tsx
+export const meta: DashboardMeta = {
+  title: 'Sales overview',
+  views: [
+    { name: 'All Regions', filters: { region: null, paid_only: '0' } },
+    { name: 'North America', filters: { region: 'North America' } },
+  ],
+}
+
 <Filters>
-  <TimeRange default="90d" />
-  <Select name="region" query="regions" />
+  <TimeRange default="90d" allowCustom compare />
+  <Select name="region" query="shared_regions" />
+  <SearchInput name="q" label="Customer" placeholder="Search customer…" />
+  <Toggle name="paid_only" label="Paid only" />
 </Filters>
+
+<Tabs default="trends">
+  <Tab value="trends" label="Revenue Trends">…</Tab>
+  <Tab value="orders" label="Orders & Targets">…</Tab>
+</Tabs>
 ```
 
-`TimeRange` 綁定 `:from`／`:to`（`today`、`7d`、`30d`、`90d`、`6m`、`12m`、`ytd`）；`Select` 用一條選項查詢綁定 `:region`。篩選值存在網址裡，所以篩選後的畫面就是一個連結。在面板加上 `drill="region"`，點擊長條就會設定該篩選條件——或開啟另一張 Dashboard。自動更新預設採用 `meta.refresh`，讀者可以從工具列調整，間隔也會保存在網址中，方便掛在牆上的螢幕。
+- **`TimeRange`**：綁定 `:from`／`:to`（`today`、`7d`、`30d`、`90d`、`6m`、`12m`、`ytd`、`all`），支援 `allowCustom`（自訂起訖日期 `YYYY-MM-DD..YYYY-MM-DD`）與 `compare`（自動計算並綁定等長的前一期 `:prev_from`／`:prev_to` 供環比分析），也能透過 `<LineChart brush />`／`<AreaChart brush />` 直接在圖表上拖曳框選時間區間。
+- **`Select`、`SearchInput`、`Toggle`**：由查詢提供選項的下拉選單、防抖關鍵字搜尋框（`:q`），以及布林切換按鈕（`0`／`1`）。
+- **預設檢視（`meta.views`）與分頁（`<Tabs>`／`<Tab>`）**：一鍵切換常用的篩選組合，並支援與網址同步（`?tab=`）的多分頁版面配置。
+- **跨 Dashboard 下鑽（`drill` + `drillTo`）**：在面板上設定 `drill="category" drillTo="product-analysis"`，點擊圖表或表格時會直接跳轉至 `/d/product-analysis?category=…` 並保留當前的時間範圍與篩選參數。
+- **Kiosk 全螢幕模式與命令面板（`⌘K`）**：加上 `?kiosk=1`（或點標題列按鈕，按 `Escape` 退出）可隱藏側欄與工具列供電視牆展示；隨時按 **`⌘K`／`Ctrl+K`** 即可模糊搜尋並跳轉至任何 Dashboard、定位並高亮當前頁面的任一圖表面板、套用預設檢視或切換主題。
 
-### 🖱️ 檢視任何面板，留備註給 Agent
+### 🖱️ 檢視任何面板、SQL 執行計畫（Explain）、閾值警報，並留備註給 Agent
 
 <img src=".github/assets/inspect.png" alt="檢視器：面板的查詢、資料來源、筆數、耗時與 SQL，底部可以留備註給 Agent。" width="100%">
 
 <sub>檢視器：面板的查詢、資料來源、筆數、耗時、定義所在的檔案與行號，以及給 Agent 的備註。</sub>
 
-滑過面板、打開檢視器，就能看到它的 SQL、參數、資料列與耗時。輸入一則備註——「改成依通路拆開」——它會以 `@dashboard-comment` 標記寫進 `index.tsx`，就放在那個面板旁邊。請 Agent 執行 `/apply-comments`，它會逐一完成修改並清掉標記。備註錨定在原始碼上，而不是一張截圖。
-
-檢視器裡還有**變更紀錄**分頁：這條查詢的定義是誰、在什麼時候、怎麼改的，資料來自 git（只追蹤這條查詢的那幾行；只顯示作者名稱，不含 email）。數字突然變了的時候，可以分辨是資料變了，還是指標的算法被改了。
+滑過面板、打開檢視器，就能看到它的 SQL、參數、資料列與耗時，以及 **Explain** 執行計畫分頁（執行 `EXPLAIN QUERY PLAN`／`EXPLAIN` 並在偵測到全表掃描時自動提示警告）與**變更紀錄**分頁（從 git 追蹤這條查詢的修改歷史）。此外，SQL 查詢可加上 `-- alert: refund_rate > 0.02 Refund rate above 2% SLA` 宣告閾值規則，觸發時會在面板標題旁即時顯示醒目的警報徽章。輸入一則備註——「改成依通路拆開」——它會以 `@dashboard-comment` 標記寫進 `index.tsx`，請 Agent 執行 `/apply-comments` 就會完成修改並清掉標記。
 
 ### ✏️ 編輯模式改的是原始碼，不是狀態
 
@@ -402,6 +427,8 @@ pnpm dev                     # http://localhost:5473
 | `open-dashboard query "<sql>" [--source s] [--param k=v]` | 在資料來源上執行唯讀 SQL |
 | `open-dashboard query --dashboard <id> --name <query>` | 執行某張 Dashboard 的具名查詢 |
 | `open-dashboard check [id] [--json] [--fresh]` | 執行每條查詢、驗證每個面板；有錯誤時以非零狀態結束 |
+| `open-dashboard diff [dir] [--dashboard id] [--json]` | 比對即時查詢結果與已建置快照（預設 `site/`）的筆數與數值總和差異 |
+| `open-dashboard report [id] [--format md\|json] [--webhook url]` | 產生包含各查詢摘要指標與觸發 `-- alert:` 警報的 Markdown 或 JSON 巡檢報告（可選擇透過 `--webhook` 推播至 Slack/Discord） |
 | `open-dashboard charts [--json]` | 這個 workspace 能用的所有圖表——41 種內建與 `charts/`——以及使用它們的 Dashboard |
 | `open-dashboard build [id...] [--out site] [--max-runs 100]` | 把 Dashboard 連同此刻的結果輸出成靜態網站 |
 | `open-dashboard serve [--port n] [--host h] [--build-only]` | 把 Dashboard 以唯讀方式提供給讀者，結果即時查詢 |
@@ -459,7 +486,7 @@ export default function SalesOverview() {
 }
 ```
 
-查詢註解：`-- name:`（必填）、`-- source:`（預設為 `defaultSource`）、`-- uses:`、`-- cache:`、`-- description:`（顯示在檢視器中——指標定義應該寫在這裡）。
+查詢註解：`-- name:`（必填）、`-- source:`（預設為 `defaultSource`）、`-- uses:`、`-- cache:`、`-- description:`（顯示在檢視器中——指標定義應該寫在這裡），以及 `-- alert: <欄位> <運算子> <閾值> [訊息]`（自動評估指標閾值並在觸發時顯示警報徽章）。
 
 ```ts
 // open-dashboard.config.ts

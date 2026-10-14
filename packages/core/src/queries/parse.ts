@@ -10,6 +10,8 @@ export interface NamedQuery {
   uses?: string[]
   /** How long its result is reused: '5m', '30s', 'off'. Default: the config's `cache`. */
   cache?: string
+  /** Threshold alert rules: `-- alert: <column> <op> <threshold> [message]`. */
+  alerts?: string[]
   file: string
   /** 1-based line of the `-- name:` header. */
   line: number
@@ -19,7 +21,7 @@ export class QueryFileError extends Error {
   status = 500
 }
 
-const HEADER = /^\s*--\s*(name|source|description|uses|cache)\s*:\s*(.*?)\s*$/i
+const HEADER = /^\s*--\s*(name|source|description|uses|cache|alert)\s*:\s*(.*?)\s*$/i
 const VALID_NAME = /^[A-Za-z_][A-Za-z0-9_-]*$/
 
 /**
@@ -78,6 +80,11 @@ export function parseQueryFile(text: string, file: string): NamedQuery[] {
         .split(',')
         .map((name) => name.trim())
         .filter(Boolean)
+      return
+    }
+    if (header && inHeader && current && key === 'alert') {
+      const rule = (header[2] ?? '').trim()
+      if (rule) current.alerts = [...(current.alerts ?? []), rule]
       return
     }
     inHeader = false

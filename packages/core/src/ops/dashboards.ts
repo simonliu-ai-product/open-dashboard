@@ -4,7 +4,9 @@ import type { ParamValue, QueryResult } from '../config.js'
 import { tableParams } from '../datasource/json-tables.js'
 import { referencedParams } from '../datasource/params.js'
 import { loadQueries, type NamedQuery } from '../queries/load.js'
+import type { QueryAlertResult } from '../runtime/types.js'
 import type { ResolvedConfig, Workspace } from '../workspace.js'
+import { evaluateAlerts } from './alerts.js'
 import { analyzeDashboard } from './analyze.js'
 import { chartImports } from './charts.js'
 import { combineResults } from './combine.js'
@@ -114,6 +116,7 @@ export interface QueryRun {
   }
   params: Record<string, ParamValue>
   result: QueryResult
+  alerts?: QueryAlertResult[]
   /** When the result was produced: earlier than now when it came from the cache. */
   ranAt: string
   cached: boolean
@@ -239,10 +242,12 @@ async function execute(
     )
     for (const [i, used] of query.uses.entries()) inputs.set(used, (runs[i] as QueryRun).result)
     const result = await combineResults(query.sql, inputs, params, workspace.config.maxRows)
+    const alerts = evaluateAlerts(result, query.alerts)
     return {
       query: { ...base, source: 'combined', uses: query.uses },
       params,
       result,
+      ...(alerts.length > 0 ? { alerts } : {}),
       ranAt,
       cached: false,
     }
@@ -253,7 +258,15 @@ async function execute(
     maxRows: workspace.config.maxRows,
     timeoutMs: workspace.config.timeoutMs,
   })
-  return { query: { ...base, source }, params, result, ranAt, cached: false }
+  const alerts = evaluateAlerts(result, query.alerts)
+  return {
+    query: { ...base, source },
+    params,
+    result,
+    ...(alerts.length > 0 ? { alerts } : {}),
+    ranAt,
+    cached: false,
+  }
 }
 
 export async function runSql(

@@ -8,6 +8,8 @@ import {
   type CollectorRun,
   chartCatalog,
   checkWorkspace,
+  diffWorkspace,
+  generateReport,
   listSources,
   readDatabaseDoc,
   readSchema,
@@ -43,6 +45,8 @@ Commands:
   query --dashboard <id> --name <query>
                             Run one of a dashboard's named queries
   check [id]                Run every query of every dashboard, verify panels
+  diff [dir]                Compare live query results against a built snapshot (default dir: site/)
+  report [id]               Generate a Markdown/JSON summary report (and optionally POST to --webhook)
   charts                    Every chart you can use — built-in and charts/ — and where each is used
   collect [id...]           Run the collectors in the config (all, or those named) and report each
   render <id>               A dashboard, or one panel (--panel), as a PNG — for an agent to look at (needs Playwright)
@@ -101,6 +105,8 @@ const VALUE_FLAGS = new Set([
   '--filter',
   '--theme',
   '--width',
+  '--webhook',
+  '--format',
 ])
 
 function positional(argv: string[]): string[] {
@@ -241,7 +247,17 @@ export async function run(argv: string[]): Promise<number> {
     return 0
   }
 
-  const known = ['sources', 'schema', 'query', 'check', 'charts', 'collect', 'render']
+  const known = [
+    'sources',
+    'schema',
+    'query',
+    'check',
+    'diff',
+    'report',
+    'charts',
+    'collect',
+    'render',
+  ]
   if (!known.includes(command)) {
     process.stderr.write(`unknown command: ${command}\n\n${USAGE}`)
     return 1
@@ -251,6 +267,39 @@ export async function run(argv: string[]): Promise<number> {
   // Rerunning check while writing a dashboard should not spend an API's hourly quota.
   if (command === 'check' && !argv.includes('--fresh')) workspace.reuseResponsesMs = CHECK_REUSE_MS
   try {
+    if (command === 'report') {
+      const only = positional(argv)[0] ?? flag(argv, 'dashboard')
+      const webhook = flag(argv, 'webhook')
+      const format = flag(argv, 'format')
+      const result = await generateReport(workspace, only, webhook ? { webhook } : {})
+      if (json || format === 'json') {
+        out(`${JSON.stringify(result, null, 2)}\n`)
+      } else {
+        out(`${result.markdown}\n`)
+      }
+      return 0
+    }
+    if (command === 'diff') {
+      const snapDir = resolve(root, positional(argv)[0] ?? flag(argv, 'out') ?? 'site')
+      const entries = await diffWorkspace(workspace, snapDir, flag(argv, 'dashboard'))
+      if (json) {
+        out(`${JSON.stringify(entries, null, 2)}\n`)
+        return 0
+      }
+      for (const e of entries) {
+        const mark = e.status === 'unchanged' ? '✓' : e.status === 'changed' ? 'Δ' : '+'
+        const rowInfo =
+          e.beforeRows === null
+            ? `${e.afterRows} rows (new)`
+            : `${e.beforeRows} → ${e.afterRows} rows (${e.rowDelta && e.rowDelta > 0 ? `+${e.rowDelta}` : (e.rowDelta ?? 0)})`
+        out(`${mark} ${e.dashboard}/${e.query}: ${rowInfo}\n`)
+        for (const m of e.metrics) {
+          const sign = m.delta > 0 ? '+' : ''
+          out(`    ${m.column}: ${m.before} → ${m.after} (${sign}${m.delta})\n`)
+        }
+      }
+      return 0
+    }
     if (command === 'render') {
       const id = positional(argv)[0]
       if (!id)

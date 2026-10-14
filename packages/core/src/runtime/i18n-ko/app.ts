@@ -310,4 +310,9 @@ export const APP: Record<string, string> = {
   'Not committed to git yet': '아직 git에 커밋되지 않음',
   'Changed since the last commit': '마지막 커밋 이후 변경됨',
   'Switched to {names}': '{names}(으)로 전환함',
+  'Kiosk mode': '키오스크 모드',
+  'Exit kiosk': '키오스크 종료',
+  Plan: '실행 계획',
+  'Index used': '인덱스 사용',
+  'Full scan': '전체 스캔',
 }

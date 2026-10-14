@@ -148,4 +148,13 @@ export const PANELS: Record<string, string> = {
   After: '선행 작업',
   'Starts too early': '너무 일찍 시작',
   'before {name} ends': '{name} 완료 전',
+  'Custom range': '사용자 지정 기간',
+  'Start date': '시작일',
+  'End date': '종료일',
+  'Filter…': '필터…',
+  Alert: '경고',
+  Previous: '이전',
+  Next: '다음',
+  Expand: '확대 보기',
+  Collapse: '축소',
 }

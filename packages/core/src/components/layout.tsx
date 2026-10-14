@@ -188,10 +188,12 @@ function arrange(body: ReactNode[], edit: EditState): ReactNode[] {
 }
 
 export interface DashboardProps {
+  /** Named filter presets readers can switch between with one click. */
+  views?: { name: string; filters: Record<string, string | null> }[]
   children?: ReactNode
 }
 
-export function Dashboard({ children }: DashboardProps) {
+export function Dashboard({ views, children }: DashboardProps) {
   const host = useHost()
   const edit = useEdit()
   const nodes = flatten(children)
@@ -251,6 +253,8 @@ export function Dashboard({ children }: DashboardProps) {
     [values, params],
   )
 
+  const savedViews = views ?? host.meta.views ?? []
+
   return (
     <FilterContext.Provider value={state}>
       <div className="odd-dashboard">
@@ -258,6 +262,33 @@ export function Dashboard({ children }: DashboardProps) {
           <div className="odd-dash-titles">
             <h1>{host.meta.title}</h1>
             {host.meta.description ? <p>{host.meta.description}</p> : null}
+            {savedViews.length > 0 ? (
+              <nav className="odd-saved-views" aria-label="Saved views" data-export-skip="">
+                {savedViews.map((view) => {
+                  const active = Object.entries(view.filters).every(
+                    ([k, v]) => (values[k] ?? null) === (v ?? null),
+                  )
+                  return (
+                    <button
+                      key={view.name}
+                      type="button"
+                      className="odd-saved-view"
+                      aria-pressed={active}
+                      data-active={active || undefined}
+                      onClick={() =>
+                        setValues((prev) => {
+                          const next = { ...prev }
+                          for (const [k, v] of Object.entries(view.filters)) next[k] = v ?? null
+                          return next
+                        })
+                      }
+                    >
+                      {view.name}
+                    </button>
+                  )
+                })}
+              </nav>
+            ) : null}
           </div>
           {filterNodes.length > 0 ? <div className="odd-dash-filters">{filterNodes}</div> : null}
         </header>
@@ -318,6 +349,82 @@ export function Section({ title, description, children }: SectionProps): ReactEl
       <div className="odd-grid">
         <RowContext.Provider value={{ span: 12, height: undefined }}>
           {children}
+        </RowContext.Provider>
+      </div>
+    </section>
+  )
+}
+
+export interface TabProps {
+  label: string
+  value?: string
+  children?: ReactNode
+}
+
+export function Tab({ children }: TabProps): ReactElement {
+  return <>{children}</>
+}
+
+export interface TabsProps {
+  /** Optional URL parameter name (`?tab=…`) so the selected tab is linkable. */
+  id?: string
+  default?: string
+  children?: ReactNode
+}
+
+/** A tabbed container across the grid: only the active `<Tab>` mounts its panels. */
+export function Tabs({ id, default: fallback, children }: TabsProps): ReactElement {
+  const tabs = flatten(children).filter(
+    (node): node is ReactElement<TabProps> => isValidElement(node) && node.type === Tab,
+  )
+  const keyOf = (tab: ReactElement<TabProps>) => tab.props.value ?? tab.props.label
+  const firstKey = tabs[0] ? keyOf(tabs[0]) : ''
+  const paramKey = id ?? 'tab'
+
+  const [active, setActive] = useState<string>(() => {
+    if (typeof window !== 'undefined') {
+      const fromUrl = new URLSearchParams(window.location.search).get(paramKey)
+      if (fromUrl && tabs.some((t) => keyOf(t) === fromUrl)) return fromUrl
+    }
+    return fallback ?? firstKey
+  })
+
+  const selectTab = (next: string) => {
+    setActive(next)
+    if (typeof window !== 'undefined' && id) {
+      const url = new URL(window.location.href)
+      if (next === (fallback ?? firstKey)) url.searchParams.delete(paramKey)
+      else url.searchParams.set(paramKey, next)
+      try {
+        window.history.replaceState(window.history.state, '', url)
+      } catch {
+        // ignore on file://
+      }
+    }
+  }
+
+  const current = tabs.find((t) => keyOf(t) === active) ?? tabs[0]
+  return (
+    <section className="odd-section odd-tabs-section">
+      <div className="odd-tabs" role="tablist" data-export-skip="">
+        {tabs.map((tab) => {
+          const k = keyOf(tab)
+          return (
+            <button
+              key={k}
+              type="button"
+              role="tab"
+              aria-selected={current ? keyOf(current) === k : false}
+              onClick={() => selectTab(k)}
+            >
+              {tab.props.label}
+            </button>
+          )
+        })}
+      </div>
+      <div className="odd-grid" role="tabpanel">
+        <RowContext.Provider value={{ span: 12, height: undefined }}>
+          {current?.props.children}
         </RowContext.Provider>
       </div>
     </section>

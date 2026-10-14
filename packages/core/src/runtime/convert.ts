@@ -30,7 +30,7 @@ interface PanelSpec {
 }
 
 const COMMON = ['title', 'description', 'span', 'height', 'query', 'drill']
-const XY = ['x', 'y', 'series', 'format', 'stacked', 'labels']
+const XY = ['x', 'y', 'series', 'format', 'stacked', 'labels', 'target', 'targetLabel', 'brush']
 const XY_ROLES: Roles = { category: 'x', measure: 'y', group: 'series' }
 const PARTS: Roles = { category: 'label', measure: 'value' }
 
@@ -48,7 +48,11 @@ export const PANEL_SPECS = {
     roles: PARTS,
     columns: ['label', 'value'],
   },
-  Table: { props: ['columns', 'sort'], roles: {}, columns: [] },
+  Table: {
+    props: ['columns', 'sort', 'searchable', 'pageSize', 'summary'],
+    roles: {},
+    columns: [],
+  },
   Stat: {
     props: ['column', 'format', 'compare', 'compareLabel', 'invert', 'spark'],
     roles: { measure: 'column' },

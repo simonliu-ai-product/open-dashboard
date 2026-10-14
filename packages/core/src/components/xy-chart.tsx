@@ -1,4 +1,6 @@
-import { type MouseEvent, type ReactNode, useState } from 'react'
+import { type MouseEvent, type PointerEvent, type ReactNode, useState } from 'react'
+import { useFilters } from '../runtime/context.js'
+import { useEdit } from '../runtime/edit.js'
 import {
   type FormatContext,
   formatCategory,
@@ -15,6 +17,15 @@ import { useDrill } from './drill.js'
 import { editable } from './editable.js'
 import { PanelFrame, type PanelProps, useFormatContext, useSize } from './panel.js'
 
+export interface ReferenceLine {
+  /** Value on the numeric axis. */
+  y?: number
+  /** Category or date value on the category axis. */
+  x?: string
+  label?: string
+  tone?: 'good' | 'bad' | 'ink'
+}
+
 export interface XYProps extends PanelProps {
   query: string
   /** The category or time column. Default: the first non-numeric column. */
@@ -27,6 +38,14 @@ export interface XYProps extends PanelProps {
   stacked?: boolean
   /** Rename series in the legend and tooltip: `{ revenue_twd: 'Revenue' }`. */
   labels?: Record<string, string>
+  /** Draw a dashed reference/goal line on the numeric axis. */
+  target?: number
+  /** Label for `target`. */
+  targetLabel?: string
+  /** Additional horizontal (`y`) or vertical (`x`) reference lines / event annotations. */
+  referenceLines?: ReferenceLine[]
+  /** Drag across a time axis to set a custom range on `<TimeRange>` (default key `'time'`). */
+  brush?: boolean | string
 }
 
 export interface LineChartProps extends XYProps {
@@ -177,6 +196,18 @@ function estimateWidth(text: string): number {
   return width
 }
 
+function toDateBound(raw: unknown, endOfMonth = false): string | undefined {
+  const s = String(raw ?? '').trim()
+  if (/^\d{4}-\d{2}-\d{2}/.test(s)) return s.slice(0, 10)
+  if (/^\d{4}-\d{2}$/.test(s)) {
+    if (!endOfMonth) return `${s}-01`
+    const [y, m] = s.split('-').map(Number)
+    const last = new Date(y ?? 2026, m ?? 1, 0)
+    return `${s}-${String(last.getDate()).padStart(2, '0')}`
+  }
+  return undefined
+}
+
 function Plot({
   run,
   props,
@@ -188,17 +219,33 @@ function Plot({
 }) {
   const ctx = useFormatContext()
   const t = useT()
+  const filters = useFilters()
+  const edit = useEdit()
   const [ref, size] = useSize<HTMLDivElement>()
   const [hover, setHover] = useState<TooltipState | null>(null)
+  const [brush, setBrush] = useState<{ start: number; end: number } | null>(null)
   const prepared = prepare(run, props, t)
-  const drill = useDrill(props.drill)
+  const drill = useDrill(props.drill, props.drillTo)
   if (typeof prepared === 'string') return <div className="odd-panel-message">{prepared}</div>
 
   const { categories, series } = prepared
   const n = categories.length
   const stacked = Boolean(props.stacked) && series.length > 1
   const horizontal = kind === 'bar' && Boolean(props.horizontal)
-  const domain = niceDomain(stackedExtent(series, n, stacked), horizontal ? 4 : 5, true)
+  const refLines: ReferenceLine[] = [
+    ...(typeof props.target === 'number' && Number.isFinite(props.target)
+      ? [{ y: props.target, label: props.targetLabel }]
+      : []),
+    ...(props.referenceLines ?? []),
+  ]
+  const refValues = refLines
+    .map((r) => r.y)
+    .filter((v): v is number => typeof v === 'number' && Number.isFinite(v))
+  const domain = niceDomain(
+    [...stackedExtent(series, n, stacked), ...refValues],
+    horizontal ? 4 : 5,
+    true,
+  )
   const tickLabels = domain.ticks.map(tickFormatter(domain.ticks, props.format, ctx))
   const room = size.width * 0.38 - 12
   const categoryLabels = categories.map((c) => {
@@ -515,6 +562,104 @@ function Plot({
               )
             ) : null}
             {marks}
+            {refLines.map((rl) => {
+              const refKey = `ref-${rl.y ?? ''}-${rl.x ?? ''}-${rl.label ?? ''}`
+              const stroke =
+                rl.tone === 'good'
+                  ? 'var(--odd-good)'
+                  : rl.tone === 'bad'
+                    ? 'var(--odd-bad)'
+                    : 'var(--odd-ink-2)'
+              if (typeof rl.y === 'number' && Number.isFinite(rl.y)) {
+                const pos = value(rl.y)
+                const text = rl.label
+                  ? `${rl.label} (${formatShort(rl.y, props.format, ctx)})`
+                  : formatShort(rl.y, props.format, ctx)
+                return horizontal ? (
+                  <g key={refKey} className="odd-ref-line">
+                    <line
+                      x1={pos}
+                      x2={pos}
+                      y1={margin.top}
+                      y2={margin.top + innerH}
+                      stroke={stroke}
+                      strokeDasharray="4 3"
+                      strokeWidth={1.5}
+                    />
+                    <text
+                      x={pos - 4}
+                      y={margin.top + 10}
+                      textAnchor="end"
+                      fill={stroke}
+                      className="odd-ref-label"
+                    >
+                      {text}
+                    </text>
+                  </g>
+                ) : (
+                  <g key={refKey} className="odd-ref-line">
+                    <line
+                      x1={margin.left}
+                      x2={margin.left + innerW}
+                      y1={pos}
+                      y2={pos}
+                      stroke={stroke}
+                      strokeDasharray="4 3"
+                      strokeWidth={1.5}
+                    />
+                    <text
+                      x={margin.left + innerW - 4}
+                      y={Math.max(margin.top + 10, pos - 5)}
+                      textAnchor="end"
+                      fill={stroke}
+                      className="odd-ref-label"
+                    >
+                      {text}
+                    </text>
+                  </g>
+                )
+              }
+              if (rl.x !== undefined && !horizontal) {
+                const catIdx = categories.findIndex((c) => String(c).startsWith(String(rl.x)))
+                if (catIdx === -1) return null
+                const cx = center(catIdx)
+                return (
+                  <g key={refKey} className="odd-ref-line">
+                    <line
+                      x1={cx}
+                      x2={cx}
+                      y1={margin.top}
+                      y2={margin.top + innerH}
+                      stroke={stroke}
+                      strokeDasharray="3 3"
+                      strokeWidth={1.5}
+                    />
+                    {rl.label ? (
+                      <text
+                        x={cx + 4}
+                        y={margin.top + 11}
+                        textAnchor="start"
+                        fill={stroke}
+                        className="odd-ref-label"
+                      >
+                        {rl.label}
+                      </text>
+                    ) : null}
+                  </g>
+                )
+              }
+              return null
+            })}
+            {brush && !horizontal ? (
+              <rect
+                x={Math.min(center(brush.start), center(brush.end))}
+                y={margin.top}
+                width={Math.max(4, Math.abs(center(brush.end) - center(brush.start)))}
+                height={innerH}
+                className="odd-brush-rect"
+                data-export-skip=""
+              />
+            ) : null}
             {shownLabels.map((i) =>
               horizontal ? (
                 <text
@@ -552,10 +697,24 @@ function Plot({
               width={innerW}
               height={innerH}
               fill="transparent"
-              className={drill ? 'odd-drillable' : undefined}
-              onClick={drill ? (event) => drill.pick(categories[indexAt(event)]) : undefined}
+              className={drill || props.brush ? 'odd-drillable' : undefined}
+              onClick={
+                drill && !brush ? (event) => drill.pick(categories[indexAt(event)]) : undefined
+              }
+              onPointerDown={
+                props.brush && !edit.editing && !horizontal
+                  ? (event: PointerEvent<SVGRectElement>) => {
+                      event.currentTarget.setPointerCapture?.(event.pointerId)
+                      const idx = indexAt(event)
+                      setBrush({ start: idx, end: idx })
+                    }
+                  : undefined
+              }
               onPointerMove={(event) => {
                 const index = indexAt(event)
+                if (brush) {
+                  setBrush((prev) => (prev ? { ...prev, end: index } : null))
+                }
                 const rect = event.currentTarget.ownerSVGElement?.getBoundingClientRect()
                 const top = rect ? Math.min(event.clientY - rect.top, height - 40) : 0
                 setHover({
@@ -564,7 +723,21 @@ function Plot({
                   top: Math.max(0, top - 10),
                 })
               }}
-              onPointerLeave={() => setHover(null)}
+              onPointerUp={() => {
+                if (!brush) return
+                const lo = Math.min(brush.start, brush.end)
+                const hi = Math.max(brush.start, brush.end)
+                setBrush(null)
+                if (lo === hi) return
+                const from = toDateBound(categories[lo], false)
+                const to = toDateBound(categories[hi], true)
+                const filterKey = typeof props.brush === 'string' ? props.brush : 'time'
+                if (from && to) filters.set(filterKey, `${from}..${to}`)
+              }}
+              onPointerLeave={() => {
+                setHover(null)
+                setBrush(null)
+              }}
             />
           </svg>
         ) : null}

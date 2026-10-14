@@ -18,11 +18,26 @@ export function isTimePreset(value: unknown): value is TimePreset {
   return typeof value === 'string' && value in TIME_PRESETS
 }
 
+const CUSTOM_RANGE = /^(\d{4}-\d{2}-\d{2})\.\.(\d{4}-\d{2}-\d{2})$/
+
+export function isCustomTimeRange(value: unknown): value is string {
+  return typeof value === 'string' && CUSTOM_RANGE.test(value)
+}
+
+export function isTimeValue(value: unknown): value is string {
+  return isTimePreset(value) || isCustomTimeRange(value)
+}
+
 function day(date: Date): string {
   const y = date.getFullYear()
   const m = String(date.getMonth() + 1).padStart(2, '0')
   const d = String(date.getDate()).padStart(2, '0')
   return `${y}-${m}-${d}`
+}
+
+function parseDay(text: string): Date {
+  const [y, m, d] = text.split('-').map(Number)
+  return new Date(y ?? 2026, (m ?? 1) - 1, d ?? 1)
 }
 
 /**
@@ -31,9 +46,15 @@ function day(date: Date): string {
  * in SQLite alike — and "today" includes all of today.
  */
 export function resolveTimeRange(
-  preset: TimePreset,
+  preset: TimePreset | string,
   now = referenceNow(),
 ): { from: string; to: string } {
+  const custom = CUSTOM_RANGE.exec(preset)
+  if (custom) {
+    const a = custom[1] as string
+    const b = custom[2] as string
+    return a <= b ? { from: a, to: b } : { from: b, to: a }
+  }
   const start = new Date(now.getFullYear(), now.getMonth(), now.getDate())
   const tomorrow = new Date(start)
   tomorrow.setDate(start.getDate() + 1)
@@ -47,6 +68,7 @@ export function resolveTimeRange(
     d.setMonth(d.getMonth() - months)
     return d
   }
+  const key: TimePreset = isTimePreset(preset) ? preset : '30d'
   const from = {
     today: start,
     '7d': back(7),
@@ -57,12 +79,38 @@ export function resolveTimeRange(
     mtd: new Date(now.getFullYear(), now.getMonth(), 1),
     ytd: new Date(now.getFullYear(), 0, 1),
     all: null,
-  }[preset]
+  }[key]
   if (!from) return { from: '0001-01-01', to: '9999-12-31' }
   return { from: day(from), to: day(tomorrow) }
 }
 
-export function timeRangeParams(name: string | undefined, preset: TimePreset, now?: Date) {
+/** Equal-length period immediately before `[from, to)`. */
+export function resolvePreviousRange(
+  from: string,
+  to: string,
+): { prevFrom: string; prevTo: string } {
+  if (from === '0001-01-01') return { prevFrom: '0001-01-01', prevTo: '0001-01-01' }
+  const start = parseDay(from)
+  const end = parseDay(to)
+  const days = Math.max(1, Math.round((end.getTime() - start.getTime()) / 86_400_000))
+  const prevStart = new Date(start)
+  prevStart.setDate(prevStart.getDate() - days)
+  return { prevFrom: day(prevStart), prevTo: from }
+}
+
+export function timeRangeParams(
+  name: string | undefined,
+  preset: TimePreset | string,
+  now?: Date,
+  compare?: boolean,
+): Record<string, string> {
   const { from, to } = resolveTimeRange(preset, now)
-  return name ? { [`${name}_from`]: from, [`${name}_to`]: to } : { from, to }
+  const base: Record<string, string> = name
+    ? { [`${name}_from`]: from, [`${name}_to`]: to }
+    : { from, to }
+  if (!compare) return base
+  const { prevFrom, prevTo } = resolvePreviousRange(from, to)
+  return name
+    ? { ...base, [`${name}_prev_from`]: prevFrom, [`${name}_prev_to`]: prevTo }
+    : { ...base, prev_from: prevFrom, prev_to: prevTo }
 }

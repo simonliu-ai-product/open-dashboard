@@ -1,5 +1,10 @@
 import type { ColumnInfo, ParamValue, Row } from '../config.js'
 
+export interface SavedView {
+  name: string
+  filters: Record<string, string | null>
+}
+
 export interface DashboardMeta {
   title: string
   description?: string
@@ -11,7 +16,19 @@ export interface DashboardMeta {
   currency?: string
   /** A theme in `themes/<id>.json`. Default: the workspace's `theme`, else the built-in look. */
   theme?: string
+  /** Named filter presets readers can switch between with one click. */
+  views?: SavedView[]
   createdAt?: string
+}
+
+export interface QueryAlertResult {
+  rule: string
+  column: string
+  op: '>' | '>=' | '<' | '<=' | '==' | '!='
+  threshold: number
+  actual: number | null
+  triggered: boolean
+  message?: string
 }
 
 export interface QueryRun {
@@ -25,6 +42,7 @@ export interface QueryRun {
   }
   params: Record<string, ParamValue>
   result: { columns: ColumnInfo[]; rows: Row[]; truncated: boolean; elapsedMs: number }
+  alerts?: QueryAlertResult[]
   ranAt?: string
   cached?: boolean
 }

@@ -4,6 +4,7 @@ import type { DashboardSummary } from '../ops/dashboards.js'
 import type { SourceStatus } from '../ops/sources.js'
 import { LocaleProvider, useT } from '../runtime/i18n.js'
 import { readOnly, snapshot } from '../runtime/snapshot.js'
+import { CommandPalette } from './components/command-palette.js'
 import { ChevronIcon } from './components/icons.js'
 import { SettingsMenu } from './components/settings-menu.js'
 import { api } from './lib/api.js'
@@ -82,14 +83,45 @@ function Shell() {
   // /data without a name shows the default source, as the page itself does.
   const shownSource = sources?.find((s) => s.default)?.name ?? sources?.[0]?.name
   const [menuOpen, setMenuOpen] = useState(false)
+  const [cmdkOpen, setCmdkOpen] = useState(false)
+  const [kiosk, setKiosk] = useState(
+    () =>
+      typeof window !== 'undefined' &&
+      new URLSearchParams(window.location.search).get('kiosk') === '1',
+  )
   // A built snapshot has dashboards and nothing that needs the database or writes a file.
   const live = !readOnly()
 
   // biome-ignore lint/correctness/useExhaustiveDependencies: close the menu whenever the route changes
-  useEffect(() => setMenuOpen(false), [route])
+  useEffect(() => {
+    setMenuOpen(false)
+    setKiosk(new URLSearchParams(window.location.search).get('kiosk') === '1')
+  }, [route])
+
+  useEffect(() => {
+    const sync = () => setKiosk(new URLSearchParams(window.location.search).get('kiosk') === '1')
+    const onKey = (event: KeyboardEvent) => {
+      if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === 'k') {
+        event.preventDefault()
+        setCmdkOpen((v) => !v)
+      }
+    }
+    window.addEventListener('odd:kiosk-changed', sync)
+    window.addEventListener('popstate', sync)
+    window.addEventListener('keydown', onKey)
+    return () => {
+      window.removeEventListener('odd:kiosk-changed', sync)
+      window.removeEventListener('popstate', sync)
+      window.removeEventListener('keydown', onKey)
+    }
+  }, [])
 
   return (
-    <div className="odd-shell" data-menu={menuOpen || undefined}>
+    <div
+      className="odd-shell"
+      data-menu={menuOpen || undefined}
+      data-kiosk={(route.name === 'dashboard' && kiosk) || undefined}
+    >
       <aside className="odd-sidebar">
         <div className="odd-brand">
           <a {...linkProps('/')} className="odd-brand-link">
@@ -100,6 +132,15 @@ function Shell() {
             </svg>
             open-dashboard
           </a>
+          <button
+            type="button"
+            className="odd-cmdk-trigger"
+            title={`${t('Search')} (⌘K)`}
+            aria-label={t('Search')}
+            onClick={() => setCmdkOpen(true)}
+          >
+            <kbd>⌘K</kbd>
+          </button>
           <button
             type="button"
             className="odd-menu-toggle"
@@ -215,6 +256,17 @@ function Shell() {
           <HomeView dashboards={dashboards.list} sources={sources} error={dashboards.error} />
         )}
       </main>
+      <CommandPalette
+        open={cmdkOpen}
+        onClose={() => setCmdkOpen(false)}
+        dashboards={dashboards.list}
+        sources={sources}
+        live={live}
+        isDashboard={route.name === 'dashboard'}
+        kiosk={kiosk}
+        theme={theme}
+        onTheme={setTheme}
+      />
     </div>
   )
 }
