@@ -368,12 +368,13 @@ export const meta: DashboardMeta = {
 ```
 
 - **`TimeRange`**：綁定 `:from`／`:to`（`today`、`7d`、`30d`、`90d`、`6m`、`12m`、`ytd`、`all`），支援 `allowCustom`（自訂起訖日期 `YYYY-MM-DD..YYYY-MM-DD`）與 `compare`（自動計算並綁定等長的前一期 `:prev_from`／`:prev_to` 供環比分析），也能透過 `<LineChart brush />`／`<AreaChart brush />` 直接在圖表上拖曳框選時間區間。
-- **`Select`、`MultiSelect`、`SearchInput`、`Toggle`**：單選下拉選單、多選膠囊篩選器（`:region` 綁定逗號分隔字串或 `NULL`）、防抖關鍵字搜尋框（`:q`），以及布林切換按鈕（`0`／`1`）。
-- **資料列詳情抽屜（`<Table detail />`）**：在 `<Table>` 加上 `detail` 屬性，點擊任一列即可滑出側邊詳情面板，檢視該筆紀錄的所有欄位與可複製的 Raw JSON。
-- **預設檢視（`meta.views`）與分頁（`<Tabs>`／`<Tab>`）**：一鍵切換常用的篩選組合，並支援與網址同步（`?tab=`）的多分頁版面配置。
+- **`Select`、`MultiSelect`、`SearchInput`、`Toggle`、`NumberRange`**：單選下拉選單、多選膠囊篩選器（`:region` 綁定逗號分隔字串或 `NULL`）、防抖關鍵字搜尋框（`:q`）、布林切換按鈕（`0`／`1`）、數值區間篩選器（`:<name>_min`／`:<name>_max`），以及當篩選異動時自動顯示的 **`↺ Reset`** 一鍵重置按鈕。
+- **KPI 目標達成進度條（`<Stat goal />`）、事件標註線與自動異常偵測**：`<Stat goal={500000} />` 即時繪製目標達成率進度條（`68% · Goal $500K`）；`<LineChart annotations={[…]} anomalies />` 支援垂直事件標註線，並自動以 Z-score 統計標記異常尖峰與低谷。
+- **資料列詳情抽屜（`<Table detail />`）、折疊分組（`groupBy`）與一鍵複製儲存格**：加上 `detail` 點擊任一列滑出側邊詳情與 Raw JSON、`groupBy="region"` 依欄位折疊分組並顯示筆數徽章、`copyable: true` 單擊複製儲存格（`✓`），且所有面板皆支援匯出 **CSV**、**JSON** 或 **Markdown 表格（`.md`）**。
+- **預設檢視（`meta.views`）、可折疊區段（`<Section collapsible />`）與分頁（`<Tabs>`／`<Tab>`）**：一鍵切換常用的篩選組合、可收合網格區段，並支援與網址同步（`?tab=`）的多分頁版面配置。
 - **跨 Dashboard 下鑽（`drill` + `drillTo`）**：在面板上設定 `drill="category" drillTo="product-analysis"`，點擊圖表或表格時會直接跳轉至 `/d/product-analysis?category=…` 並保留當前的時間範圍與篩選參數。
 - **Git 變更檢視與一鍵還原（`/changes`）**：在瀏覽器內直接檢視你或 AI Agent 對 `dashboards/`、`queries/`、`charts/`、`themes/`、`databases/` 所做的未提交修改（Unified Diff），並支援單檔一鍵還原。
-- **Kiosk 全螢幕模式與命令面板（`⌘K`）**：加上 `?kiosk=1`（或點標題列按鈕，按 `Escape` 退出）可隱藏側欄與工具列供電視牆展示；隨時按 **`⌘K`／`Ctrl+K`** 即可模糊搜尋並跳轉至任何 Dashboard、定位並高亮當前頁面的任一圖表面板、套用預設檢視或切換主題。
+- **星號釘選看板（`★`）、Kiosk 全螢幕模式與命令面板（`⌘K`）**：在側欄與 `⌘K` 釘選常用 Dashboard；加上 `?kiosk=1`（按 `Escape` 退出）隱藏側欄與工具列供電視牆展示；隨時按 **`⌘K`／`Ctrl+K`** 即可模糊搜尋並跳轉至任何 Dashboard、定位並高亮當前頁面的任一圖表面板、套用預設檢視或切換主題。
 
 ### ☁️ 一鍵部署至 Google Cloud Run + GCS FUSE + 遠端 MCP
 
@@ -443,6 +444,7 @@ pnpm dev                     # http://localhost:5473
 | `open-dashboard query "<sql>" [--source s] [--param k=v]` | 在資料來源上執行唯讀 SQL |
 | `open-dashboard query --dashboard <id> --name <query>` | 執行某張 Dashboard 的具名查詢 |
 | `open-dashboard check [id] [--json] [--fresh]` | 執行每條查詢、驗證每個面板；有錯誤時以非零狀態結束 |
+| `open-dashboard lint [id] [--json]` | 靜態檢測 Dashboard 與 SQL 最佳實踐（未使用的查詢、缺少說明、未加 LIMIT 的表格查詢、面板過多等） |
 | `open-dashboard diff [dir] [--dashboard id] [--json]` | 比對即時查詢結果與已建置快照（預設 `site/`）的筆數與數值總和差異 |
 | `open-dashboard report [id] [--format md\|json] [--webhook url]` | 產生包含各查詢摘要指標與觸發 `-- alert:` 警報的 Markdown 或 JSON 巡檢報告（可選擇透過 `--webhook` 推播至 Slack/Discord） |
 | `open-dashboard charts [--json]` | 這個 workspace 能用的所有圖表——41 種內建與 `charts/`——以及使用它們的 Dashboard |

@@ -50,6 +50,10 @@ export interface StatProps extends PanelProps {
   invert?: boolean
   /** A small trend under the value: a query (default: this one) and its x / y columns. */
   spark?: { query?: string; x?: string; y: string }
+  /** A numeric target or a column name holding the target — renders a goal progress bar. */
+  goal?: number | string
+  /** Optional label shown beside the goal percentage. */
+  goalLabel?: string
 }
 
 function Sparkline({ query, x, y }: { query: string; x?: string; y: string }) {
@@ -90,9 +94,12 @@ function StatPanel(props: StatProps) {
     <PanelFrame {...props} component="Stat" state={state} defaultHeight="auto">
       {(run) => {
         const row = run.result.rows[0] ?? {}
+        const excludeCols = [
+          ...(props.compare ? [props.compare] : []),
+          ...(typeof props.goal === 'string' ? [props.goal] : []),
+        ]
         const column =
-          props.column ??
-          pickY(run.result.columns, undefined, undefined, props.compare ? [props.compare] : [])[0]
+          props.column ?? pickY(run.result.columns, undefined, undefined, excludeCols)[0]
         const value = column ? row[column] : undefined
         const previous = props.compare ? row[props.compare] : undefined
         let delta: number | undefined
@@ -101,6 +108,18 @@ function StatPanel(props: StatProps) {
         }
         const good =
           delta === undefined || delta === 0 ? undefined : delta > 0 !== Boolean(props.invert)
+        const goalRaw =
+          typeof props.goal === 'number'
+            ? props.goal
+            : typeof props.goal === 'string'
+              ? Number(row[props.goal])
+              : undefined
+        const goalValue =
+          typeof goalRaw === 'number' && Number.isFinite(goalRaw) && goalRaw > 0
+            ? goalRaw
+            : undefined
+        const goalRatio =
+          typeof value === 'number' && goalValue !== undefined ? value / goalValue : undefined
         return (
           <div className="odd-stat">
             <FitValue>{formatValue(value, props.format, ctx)}</FitValue>
@@ -118,6 +137,22 @@ function StatPanel(props: StatProps) {
             ) : props.compare ? (
               <div className="odd-stat-delta" data-good="flat">
                 <span className="odd-muted">{t('no comparison value')}</span>
+              </div>
+            ) : null}
+            {goalRatio !== undefined && goalValue !== undefined ? (
+              <div className="odd-stat-goal">
+                <div className="odd-stat-goal-bar" aria-hidden="true">
+                  <span
+                    style={{ width: `${Math.max(0, Math.min(100, goalRatio * 100)).toFixed(1)}%` }}
+                  />
+                </div>
+                <div className="odd-stat-goal-meta">
+                  <strong>{Math.round(goalRatio * 100)}%</strong>
+                  <span className="odd-muted">
+                    {props.goalLabel ??
+                      `${t('Goal')}: ${formatValue(goalValue, props.format, ctx)}`}
+                  </span>
+                </div>
               </div>
             ) : null}
             {props.spark ? (

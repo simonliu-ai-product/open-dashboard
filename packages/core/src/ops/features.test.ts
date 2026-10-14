@@ -10,10 +10,11 @@ import {
   generateEntrypointScript,
   sanitizeKebab,
 } from '../cli/deploy-gcp.js'
+import { parseNumberRangeValue } from '../components/filters.js'
 import { openFiles, parseMarkdownTable } from '../datasource/files.js'
 import { loadQueries, loadSharedQueries } from '../queries/load.js'
 import { parseQueryFile } from '../queries/parse.js'
-import { resultToCsv } from '../runtime/export-panel.js'
+import { resultToCsv, resultToMarkdown } from '../runtime/export-panel.js'
 import {
   isCustomTimeRange,
   isTimeValue,
@@ -28,6 +29,7 @@ import { readWorkspaceChanges, revertWorkspaceFile } from './changes.js'
 import { readSharedQueryFiles, writeSharedQueryFile } from './dashboard-files.js'
 import { diffWorkspace } from './diff.js'
 import { explainDashboardQuery } from './explain.js'
+import { lintWorkspace } from './lint.js'
 import { generateReport } from './report.js'
 
 describe('Feature 1: Interactive Filters & Custom/Compare Time Ranges', () => {
@@ -360,5 +362,73 @@ describe('Phase 3: Shared Queries API, Git Changes & GCP Deploy Helpers', () => 
       serverUrl: 'https://demo-board.run.app/mcp',
       headers: { Authorization: 'Bearer odd_mcp_secret' },
     })
+  })
+})
+
+describe('Phase 4: NumberRange, Markdown Export & Workspace Linter', () => {
+  it('parses NumberRange URL values and normalizes swapped min/max bounds', () => {
+    expect(parseNumberRangeValue('100..500')).toEqual({ min: 100, max: 500 })
+    expect(parseNumberRangeValue('800..200')).toEqual({ min: 200, max: 800 })
+    expect(parseNumberRangeValue(undefined)).toEqual({ min: null, max: null })
+  })
+
+  it('exports QueryResult to GFM Markdown table with escaped pipes', () => {
+    const md = resultToMarkdown({
+      columns: [{ name: 'region' }, { name: 'revenue' }],
+      rows: [
+        { region: 'North | East', revenue: 1200 },
+        { region: 'South', revenue: 850 },
+      ],
+    })
+    expect(md).toContain('| region | revenue |')
+    expect(md).toContain('| --- | --- |')
+    expect(md).toContain('| North \\| East | 1200 |')
+  })
+
+  it('audits dashboards with lintWorkspace for unused queries, missing descriptions, and unbounded tables', async () => {
+    const root = await mkdtemp(join(tmpdir(), 'odd-lint-'))
+    try {
+      await mkdir(join(root, 'dashboards', 'audit-board'), { recursive: true })
+      await writeFile(
+        join(root, 'dashboards', 'audit-board', 'queries.sql'),
+        [
+          '-- name: rows_q',
+          'SELECT 1 AS a, 2 AS b;',
+          '',
+          '-- name: orphan_q',
+          '-- description: Unused query',
+          'SELECT 1 AS x;',
+        ].join('\n'),
+      )
+      await writeFile(
+        join(root, 'dashboards', 'audit-board', 'index.tsx'),
+        [
+          `import { Dashboard, NumberRange, Table } from '@open-dashboard/core'`,
+          `export const meta = { title: 'Audit Board' }`,
+          `export default function AuditBoard() {`,
+          `  return (`,
+          `    <Dashboard>`,
+          `      <NumberRange name="amount" label="Amount" defaultMin={0} defaultMax={500} />`,
+          `      <Table title="Rows" query="rows_q" />`,
+          `    </Dashboard>`,
+          `  )`,
+          `}`,
+        ].join('\n'),
+      )
+      const config = await loadConfig(root)
+      const workspace = new Workspace(config)
+      try {
+        const result = lintWorkspace(workspace)
+        const rules = result.flatMap((r) => r.findings.map((f) => f.rule))
+        expect(rules).toContain('missing-meta-description')
+        expect(rules).toContain('missing-query-description')
+        expect(rules).toContain('unbounded-table-query')
+        expect(rules).toContain('unused-query')
+      } finally {
+        await workspace.close()
+      }
+    } finally {
+      await rm(root, { recursive: true, force: true })
+    }
   })
 })

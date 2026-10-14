@@ -91,11 +91,38 @@ function useSourcesOpen(): [boolean, (open: boolean) => void] {
   return [open, update]
 }
 
+const STARRED_KEY = 'odd:starred-dashboards'
+
+function useStarredDashboards(): [string[], (id: string) => void] {
+  const [starred, setStarred] = useState<string[]>(() => {
+    try {
+      const raw = localStorage.getItem(STARRED_KEY)
+      const parsed = raw ? (JSON.parse(raw) as unknown) : []
+      return Array.isArray(parsed) ? parsed.filter((x): x is string => typeof x === 'string') : []
+    } catch {
+      return []
+    }
+  })
+  const toggle = (id: string) => {
+    setStarred((prev) => {
+      const next = prev.includes(id) ? prev.filter((item) => item !== id) : [...prev, id]
+      try {
+        localStorage.setItem(STARRED_KEY, JSON.stringify(next))
+      } catch {
+        // ignore storage errors
+      }
+      return next
+    })
+  }
+  return [starred, toggle]
+}
+
 function Shell() {
   const t = useT()
   const route = useRoute()
   const [theme, setTheme] = useTheme()
   const dashboards = useDashboards()
+  const [starred, toggleStar] = useStarredDashboards()
   const sources = useSources()
   const [sourcesOpen, setSourcesOpen] = useSourcesOpen()
   // /data without a name shows the default source, as the page itself does.
@@ -251,15 +278,34 @@ function Shell() {
             {t('Dashboards')}
             {dashboards.list ? <span className="odd-count">{dashboards.list.length}</span> : null}
           </h2>
-          {dashboards.list?.map((d) => (
-            <a
-              key={d.id}
-              {...linkProps(`/d/${encodeURIComponent(d.id)}`)}
-              aria-current={route.name === 'dashboard' && route.id === d.id ? 'page' : undefined}
-            >
-              {d.title}
-            </a>
-          ))}
+          {dashboards.list
+            ?.slice()
+            .sort((a, b) => Number(starred.includes(b.id)) - Number(starred.includes(a.id)))
+            .map((d) => {
+              const isStarred = starred.includes(d.id)
+              return (
+                <div key={d.id} className="odd-nav-dash">
+                  <a
+                    {...linkProps(`/d/${encodeURIComponent(d.id)}`)}
+                    aria-current={
+                      route.name === 'dashboard' && route.id === d.id ? 'page' : undefined
+                    }
+                  >
+                    {d.title}
+                  </a>
+                  <button
+                    type="button"
+                    className="odd-nav-star"
+                    data-starred={isStarred || undefined}
+                    title={isStarred ? t('Unpin') : t('Pin')}
+                    aria-label={isStarred ? t('Unpin') : t('Pin')}
+                    onClick={() => toggleStar(d.id)}
+                  >
+                    {isStarred ? '★' : '☆'}
+                  </button>
+                </div>
+              )
+            })}
         </nav>
         <SettingsMenu theme={theme} onTheme={setTheme} />
       </aside>
@@ -288,6 +334,7 @@ function Shell() {
         open={cmdkOpen}
         onClose={() => setCmdkOpen(false)}
         dashboards={dashboards.list}
+        starred={starred}
         sources={sources}
         live={live}
         isDashboard={route.name === 'dashboard'}

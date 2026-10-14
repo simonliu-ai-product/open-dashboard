@@ -324,4 +324,6 @@ export const APP: Record<string, string> = {
     '未コミットの変更はありません。',
   'Revert file': '元に戻す',
   'Reverting…': '復元中…',
+  Pin: 'ピン留め',
+  Unpin: 'ピン留め解除',
 }

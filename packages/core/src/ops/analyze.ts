@@ -12,7 +12,7 @@ type Node = {
 }
 
 export interface FilterDecl {
-  kind: 'TimeRange' | 'Select' | 'MultiSelect' | 'SearchInput' | 'Toggle'
+  kind: 'TimeRange' | 'Select' | 'MultiSelect' | 'SearchInput' | 'Toggle' | 'NumberRange'
   name: string | undefined
   default: string | null | undefined
   /** TimeRange only: whether it also binds `:prev_from` and `:prev_to`. */
@@ -280,23 +280,32 @@ export function analyzeDashboard(
       name === 'Select' ||
       name === 'MultiSelect' ||
       name === 'SearchInput' ||
-      name === 'Toggle'
+      name === 'Toggle' ||
+      name === 'NumberRange'
     ) {
       const raw = read('default')
       const query = read('query')
+      let defaultVal: string | null | undefined =
+        typeof raw === 'string' || raw === null
+          ? raw
+          : Array.isArray(raw)
+            ? raw.map(String).join(',')
+            : typeof raw === 'boolean'
+              ? raw
+                ? '1'
+                : '0'
+              : undefined
+      if (name === 'NumberRange') {
+        const dMin = read('defaultMin')
+        const dMax = read('defaultMax')
+        const hasMin = typeof dMin === 'number' && Number.isFinite(dMin)
+        const hasMax = typeof dMax === 'number' && Number.isFinite(dMax)
+        defaultVal = hasMin || hasMax ? `${hasMin ? dMin : ''}..${hasMax ? dMax : ''}` : null
+      }
       const decl: FilterDecl = {
         kind: name,
         name: typeof read('name') === 'string' ? (read('name') as string) : undefined,
-        default:
-          typeof raw === 'string' || raw === null
-            ? raw
-            : Array.isArray(raw)
-              ? raw.map(String).join(',')
-              : typeof raw === 'boolean'
-                ? raw
-                  ? '1'
-                  : '0'
-                : undefined,
+        default: defaultVal,
         allowAll: read('allowAll') !== false,
         line: line(node),
       }

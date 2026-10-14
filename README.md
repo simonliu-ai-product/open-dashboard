@@ -368,12 +368,13 @@ export const meta: DashboardMeta = {
 ```
 
 - **`TimeRange`**: binds `:from` / `:to` (`today`, `7d`, `30d`, `90d`, `6m`, `12m`, `ytd`, `all`), supports `allowCustom` (`YYYY-MM-DD..YYYY-MM-DD` date pickers), and `compare` (automatically binds equal-length `:prev_from` / `:prev_to` for period-over-period comparisons). Also integrates with `<LineChart brush />` / `<AreaChart brush />` drag-to-zoom.
-- **`Select`, `MultiSelect`, `SearchInput`, `Toggle`**: single-value dropdowns, multi-value chip selectors (`:region` as comma-separated values or `NULL`), debounced keyword search (`:q`), and boolean `0`/`1` pill toggles.
-- **Row-Detail Drawer (`<Table detail />`)**: add `detail` to any `<Table>` so clicking a row opens a slide-over drawer showing every column and a collapsible Raw JSON inspector with one-click copy.
-- **Saved Views (`meta.views`) & Tabs (`<Tabs>` / `<Tab>`)**: one-click filter presets in the subbar and URL-synced (`?tab=`) multi-tab dashboard sections.
+- **`Select`, `MultiSelect`, `SearchInput`, `Toggle`, `NumberRange`**: single-value dropdowns, multi-value chip selectors (`:region` as comma-separated values or `NULL`), debounced keyword search (`:q`), boolean `0`/`1` pill toggles, numeric min/max bound filters (`:<name>_min` / `:<name>_max`), and an automatic **`↺ Reset`** button whenever filters diverge from defaults.
+- **Goal Progress (`<Stat goal />`), Event Annotations & Anomaly Detection**: `<Stat goal={500000} />` renders a live goal progress bar (`68% · Goal $500K`); `<LineChart annotations={[…]} anomalies />` draws vertical event markers and automatically highlights statistical z-score outliers with dashed alert rings.
+- **Row-Detail Drawer (`<Table detail />`), Row Grouping (`groupBy`) & Copyable Cells**: add `detail` to open a slide-over drawer with all columns + raw JSON, `groupBy="region"` for collapsible row groups with count pills, `copyable: true` on columns for one-click cell copy (`✓`), and export any panel as **CSV**, **JSON**, or **GitHub-Flavored Markdown (`.md`)**.
+- **Saved Views (`meta.views`), Collapsible `<Section collapsible />` & Tabs (`<Tabs>` / `<Tab>`)**: one-click filter presets in the subbar, collapsible grid sections, and URL-synced (`?tab=`) multi-tab dashboard sections.
 - **Cross-dashboard drill-through (`drill` + `drillTo`)**: `drill="category" drillTo="product-analysis"` on a chart or table makes clicking a mark navigate straight to `/d/product-analysis?category=…` while carrying over active time ranges and filters.
 - **In-Browser Git Changes (`/changes`)**: review uncommitted edits made by you or your AI agent across `dashboards/`, `queries/`, `charts/`, `themes/`, and `databases/` with unified diffs and one-click file revert.
-- **Kiosk / TV Mode & Command Palette (`⌘K`)**: toggle `?kiosk=1` (`Escape` to exit) to hide the sidebar and chrome for wall displays; press **`⌘K` / `Ctrl+K`** anywhere to fuzzy-search dashboards, jump to and highlight any panel on the current page, apply saved views, or switch themes.
+- **Starred Dashboards (`★`), Kiosk / TV Mode & Command Palette (`⌘K`)**: pin favorite dashboards to the top of the sidebar and `⌘K` palette; toggle `?kiosk=1` (`Escape` to exit) to hide the sidebar and chrome for wall displays; press **`⌘K` / `Ctrl+K`** anywhere to fuzzy-search dashboards, jump to and highlight any panel on the current page, apply saved views, or switch themes.
 
 ### ☁️ One-Command Cloud Run + GCS FUSE + Remote MCP Deployment
 
@@ -443,6 +444,7 @@ No database to hand? `init my-dashboards --sample` adds a small generated SQLite
 | `open-dashboard query "<sql>" [--source s] [--param k=v]` | Run read-only SQL against a datasource |
 | `open-dashboard query --dashboard <id> --name <query>` | Run one of a dashboard's named queries |
 | `open-dashboard check [id] [--json] [--fresh]` | Run every query, verify every panel; non-zero exit on errors |
+| `open-dashboard lint [id] [--json]` | Audit dashboards and SQL queries for best practices (unused queries, missing descriptions, unbounded table queries, high panel counts) |
 | `open-dashboard diff [dir] [--dashboard id] [--json]` | Compare live query row counts and numeric sums against a built snapshot (`site/` by default) |
 | `open-dashboard report [id] [--format md\|json] [--webhook url]` | Generate a Markdown or JSON inspection report of headline metrics and active `-- alert:` rules (and optionally POST to a Slack/Discord/generic webhook) |
 | `open-dashboard charts [--json]` | Every chart this workspace can use — the 41 built-ins and `charts/` — and the dashboards using each |

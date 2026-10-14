@@ -323,4 +323,6 @@ export const APP: Record<string, string> = {
     '工作目錄乾淨 — 目前沒有未提交的看板或查詢變更。',
   'Revert file': '還原檔案',
   'Reverting…': '還原中…',
+  Pin: '釘選',
+  Unpin: '取消釘選',
 }

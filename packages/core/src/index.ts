@@ -20,6 +20,8 @@ export { EcdfChart, type EcdfChartProps } from './components/ecdf-chart.js'
 export {
   MultiSelect,
   type MultiSelectProps,
+  NumberRange,
+  type NumberRangeProps,
   SearchInput,
   type SearchInputProps,
   Select,

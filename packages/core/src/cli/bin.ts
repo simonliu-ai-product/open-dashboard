@@ -10,6 +10,7 @@ import {
   checkWorkspace,
   diffWorkspace,
   generateReport,
+  lintWorkspace,
   listSources,
   readDatabaseDoc,
   readSchema,
@@ -58,6 +59,7 @@ Commands:
   query --dashboard <id> --name <query>
                             Run one of a dashboard's named queries
   check [id]                Run every query of every dashboard, verify panels
+  lint [id]                 Audit dashboards and SQL queries for best-practice and performance warnings
   diff [dir]                Compare live query results against a built snapshot (default dir: site/)
   report [id]               Generate a Markdown/JSON summary report (and optionally POST to --webhook)
   charts                    Every chart you can use — built-in and charts/ — and where each is used
@@ -345,6 +347,7 @@ export async function run(argv: string[]): Promise<number> {
     'schema',
     'query',
     'check',
+    'lint',
     'diff',
     'report',
     'charts',
@@ -360,6 +363,23 @@ export async function run(argv: string[]): Promise<number> {
   // Rerunning check while writing a dashboard should not spend an API's hourly quota.
   if (command === 'check' && !argv.includes('--fresh')) workspace.reuseResponsesMs = CHECK_REUSE_MS
   try {
+    if (command === 'lint') {
+      const only = positional(argv)[0] ?? flag(argv, 'dashboard')
+      const reports = lintWorkspace(workspace, only)
+      if (json) {
+        out(`${JSON.stringify(reports, null, 2)}\n`)
+        return 0
+      }
+      for (const r of reports) {
+        const warnCount = r.findings.filter((f) => f.severity === 'warning').length
+        const mark = warnCount > 0 ? '⚠' : '✓'
+        out(`${mark} ${r.title} (${r.id}) — ${r.findings.length} finding(s)\n`)
+        for (const f of r.findings) {
+          out(`  ${f.severity.padEnd(7)} [${f.rule}] ${f.message} (${f.where})\n`)
+        }
+      }
+      return 0
+    }
     if (command === 'report') {
       const only = positional(argv)[0] ?? flag(argv, 'dashboard')
       const webhook = flag(argv, 'webhook')

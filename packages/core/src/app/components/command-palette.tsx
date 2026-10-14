@@ -17,6 +17,7 @@ export function CommandPalette(props: {
   open: boolean
   onClose: () => void
   dashboards: DashboardSummary[] | undefined
+  starred?: string[]
   sources: SourceStatus[] | undefined
   live: boolean
   isDashboard: boolean
@@ -72,11 +73,16 @@ export function CommandPalette(props: {
       }
     }
 
-    for (const d of props.dashboards ?? []) {
+    const starredSet = new Set(props.starred ?? [])
+    const sortedDashboards = [...(props.dashboards ?? [])].sort(
+      (a, b) => Number(starredSet.has(b.id)) - Number(starredSet.has(a.id)),
+    )
+    for (const d of sortedDashboards) {
+      const isStarred = starredSet.has(d.id)
       list.push({
         id: `dash:${d.id}`,
         group: t('Dashboards'),
-        label: d.title,
+        label: isStarred ? `★ ${d.title}` : d.title,
         detail: d.description ?? d.id,
         run: () => navigate(`/d/${encodeURIComponent(d.id)}`),
       })
@@ -156,6 +162,7 @@ export function CommandPalette(props: {
   }, [
     props.open,
     props.dashboards,
+    props.starred,
     props.sources,
     props.live,
     props.isDashboard,

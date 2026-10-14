@@ -162,4 +162,5 @@ export const PANELS: Record<string, string> = {
   'Row details': '行の詳細',
   'Copy JSON': 'JSONをコピー',
   'Raw JSON': '生JSON',
+  Goal: '目標',
 }

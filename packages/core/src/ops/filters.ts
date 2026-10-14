@@ -11,7 +11,7 @@ import { dashboardFile, runDashboardQuery } from './dashboards.js'
 export interface FilterChoice {
   /** The key in the URL (`time`, `region`). */
   key: string
-  kind: 'TimeRange' | 'Select' | 'MultiSelect' | 'SearchInput' | 'Toggle'
+  kind: 'TimeRange' | 'Select' | 'MultiSelect' | 'SearchInput' | 'Toggle' | 'NumberRange'
   label: string
   /** Every value on offer, as the page holds it — strings, `null` for All. */
   options: (string | null)[]
@@ -117,6 +117,30 @@ export async function dashboardFilters(
         current: name in set ? (set[name] ?? fallback) : fallback,
         produces: [name],
         params: (value) => ({ [name]: value === '1' || value === 'true' ? 1 : 0 }),
+      })
+    } else if (decl.kind === 'NumberRange' && decl.name) {
+      const name = decl.name
+      const fallback = decl.default ?? null
+      const parseBound = (raw: string | null | undefined) => {
+        if (!raw || !raw.includes('..')) return { min: null, max: null }
+        const [l = '', r = ''] = raw.split('..', 2)
+        return {
+          min: l.trim() !== '' && Number.isFinite(Number(l)) ? Number(l) : null,
+          max: r.trim() !== '' && Number.isFinite(Number(r)) ? Number(r) : null,
+        }
+      }
+      choices.push({
+        key: name,
+        kind: 'NumberRange',
+        label: decl.label ?? humanize(name),
+        options: [fallback],
+        labels: {},
+        current: name in set ? (set[name] ?? null) : fallback,
+        produces: [`${name}_min`, `${name}_max`],
+        params: (value) => {
+          const parsed = parseBound(value ?? fallback)
+          return { [`${name}_min`]: parsed.min, [`${name}_max`]: parsed.max }
+        },
       })
     } else if (decl.name) {
       const name = decl.name

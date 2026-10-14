@@ -323,4 +323,6 @@ export const APP: Record<string, string> = {
     '工作区干净 — 当前没有未提交的看板或查询变更。',
   'Revert file': '还原文件',
   'Reverting…': '还原中…',
+  Pin: '置顶',
+  Unpin: '取消置顶',
 }

@@ -44,6 +44,10 @@ export interface XYProps extends PanelProps {
   targetLabel?: string
   /** Additional horizontal (`y`) or vertical (`x`) reference lines / event annotations. */
   referenceLines?: ReferenceLine[]
+  /** Vertical event markers on the category/time axis (`[{ x: '2026-08', label: 'Launch' }]`). */
+  annotations?: { x: string; label?: string; tone?: 'good' | 'bad' | 'ink' }[]
+  /** Highlight statistical outliers (`|z-score| >= threshold`, default `1.8` when `true`). */
+  anomalies?: boolean | number
   /** Drag across a time axis to set a custom range on `<TimeRange>` (default key `'time'`). */
   brush?: boolean | string
 }
@@ -237,6 +241,7 @@ function Plot({
       ? [{ y: props.target, label: props.targetLabel }]
       : []),
     ...(props.referenceLines ?? []),
+    ...(props.annotations ?? []).map((a) => ({ x: a.x, label: a.label, tone: a.tone })),
   ]
   const refValues = refLines
     .map((r) => r.y)
@@ -454,6 +459,42 @@ function Plot({
           )
         }
       })
+      if (props.anomalies) {
+        const zThreshold =
+          typeof props.anomalies === 'number' && props.anomalies > 0 ? props.anomalies : 1.8
+        const finite = s.values.filter((v): v is number => v !== null && Number.isFinite(v))
+        if (finite.length >= 4) {
+          const mean = finite.reduce((a, b) => a + b, 0) / finite.length
+          const variance = finite.reduce((acc, v) => acc + (v - mean) ** 2, 0) / finite.length
+          const std = Math.sqrt(variance)
+          if (std > 0) {
+            s.values.forEach((v, i) => {
+              if (v === null || !Number.isFinite(v)) return
+              const z = Math.abs((v - mean) / std)
+              if (z < zThreshold) return
+              const topPoint = tops[i]
+              if (!topPoint) return
+              const cx = center(i)
+              const cy = value(topPoint[1])
+              const catKey = String(categories[i] ?? cx)
+              marks.push(
+                <g key={`anomaly-${s.key}-${catKey}`} className="odd-anomaly-point">
+                  <circle
+                    cx={cx}
+                    cy={cy}
+                    r={7}
+                    fill="none"
+                    stroke="var(--odd-bad)"
+                    strokeWidth={1.6}
+                    strokeDasharray="2 2"
+                  />
+                  <circle cx={cx} cy={cy} r={3.5} fill="var(--odd-bad)" />
+                </g>,
+              )
+            })
+          }
+        }
+      }
     })
     if (hover) {
       const cx = center(hover.index)

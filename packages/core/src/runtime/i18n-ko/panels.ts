@@ -160,4 +160,5 @@ export const PANELS: Record<string, string> = {
   'Row details': '행 상세 정보',
   'Copy JSON': 'JSON 복사',
   'Raw JSON': '원시 JSON',
+  Goal: '목표',
 }

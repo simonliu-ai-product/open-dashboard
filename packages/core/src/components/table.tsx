@@ -28,6 +28,8 @@ export interface TableColumn {
   delta?: boolean
   /** Render cell as a link by interpolating `{value}` and `{column}` placeholders from the row. */
   href?: string
+  /** Click the cell to copy its raw value to the clipboard. */
+  copyable?: boolean
   /** Aggregate shown in the footer row for this column. */
   summary?: TableSummaryKind
 }
@@ -48,6 +50,8 @@ export interface TableProps extends PanelProps {
   summary?: boolean | TableSummaryKind
   /** Open a slide-over detail drawer when a row is clicked to inspect all fields and copy JSON. */
   detail?: boolean
+  /** Group rows by a category column with collapsible group headers. */
+  groupBy?: string
 }
 
 const IDENTIFIER = /(^id$|_id$|^id_)/i
@@ -129,6 +133,8 @@ function DataTable({ run, props }: { run: QueryRun; props: TableProps }) {
   const [page, setPage] = useState(0)
   const [detailRow, setDetailRow] = useState<Record<string, unknown> | null>(null)
   const [copiedJson, setCopiedJson] = useState(false)
+  const [copiedCell, setCopiedCell] = useState<string | null>(null)
+  const [collapsedGroups, setCollapsedGroups] = useState<Record<string, boolean>>({})
   const types = new Map<string, ColumnInfo['type']>(run.result.columns.map((c) => [c.name, c.type]))
   const columns: TableColumn[] = (props.columns ?? run.result.columns.map((c) => c.name)).map(
     (column) => (typeof column === 'string' ? { key: column } : column),
@@ -249,108 +255,173 @@ function DataTable({ run, props }: { run: QueryRun; props: TableProps }) {
           </tr>
         </thead>
         <tbody>
-          {visibleRows.map((row, i) => {
-            const interactive = Boolean(drill || props.detail)
-            const handleRowActivate = () => {
-              if (drill) drill.pick(row[drill.column ?? drill.filter])
-              if (props.detail) {
-                setCopiedJson(false)
-                setDetailRow(row)
+          {(() => {
+            const renderRow = (row: Record<string, unknown>, keyStr: string) => {
+              const interactive = Boolean(drill || props.detail)
+              const handleRowActivate = () => {
+                if (drill) drill.pick(row[drill.column ?? drill.filter])
+                if (props.detail) {
+                  setCopiedJson(false)
+                  setDetailRow(row)
+                }
+              }
+              return (
+                <tr
+                  key={keyStr}
+                  data-active={
+                    drill?.isActive(row[drill.column ?? drill.filter]) ||
+                    detailRow === row ||
+                    undefined
+                  }
+                  tabIndex={interactive ? 0 : undefined}
+                  onClick={interactive ? handleRowActivate : undefined}
+                  onKeyDown={
+                    interactive
+                      ? (event) => {
+                          if (event.key === 'Enter' || event.key === ' ') {
+                            event.preventDefault()
+                            handleRowActivate()
+                          }
+                        }
+                      : undefined
+                  }
+                  className={interactive ? 'odd-drillable' : undefined}
+                >
+                  {columns.map((column) => {
+                    const numeric = types.get(column.key) === 'number'
+                    const value = row[column.key]
+                    const max = maxima.get(column.key)
+                    const scale = scales.get(column.key)
+                    const numVal = Number(value)
+                    const scalePct =
+                      scale && Number.isFinite(numVal)
+                        ? scale.max === scale.min
+                          ? 14
+                          : Math.round(4 + ((numVal - scale.min) / (scale.max - scale.min)) * 22)
+                        : 0
+                    const colFormat =
+                      column.format ??
+                      props.format?.[column.key] ??
+                      (IDENTIFIER.test(column.key) ? ID_FORMAT : undefined)
+                    const formatted = formatValue(value, colFormat, ctx)
+                    const cellId = `${keyStr}:${column.key}`
+                    const inner = column.sparkline ? (
+                      <CellSparkline value={value} />
+                    ) : column.badge && value !== null && value !== undefined ? (
+                      <span className="odd-cell-badge" data-tone={badgeTone(value)}>
+                        {formatted}
+                      </span>
+                    ) : column.delta && Number.isFinite(numVal) && value !== null ? (
+                      <span
+                        className="odd-cell-delta"
+                        data-tone={numVal > 0 ? 'good' : numVal < 0 ? 'bad' : 'neutral'}
+                      >
+                        {numVal > 0 ? '▲ ' : numVal < 0 ? '▼ ' : ''}
+                        {formatted}
+                      </span>
+                    ) : (
+                      formatted
+                    )
+                    return (
+                      <td
+                        key={column.key}
+                        style={{
+                          textAlign: column.align ?? (numeric ? 'right' : 'left'),
+                          background:
+                            scalePct > 0
+                              ? `color-mix(in srgb, var(--odd-accent) ${scalePct}%, transparent)`
+                              : undefined,
+                        }}
+                        data-numeric={numeric || undefined}
+                      >
+                        {max ? (
+                          <span className="odd-cell-bar">
+                            <span
+                              style={{ width: `${Math.max(0, (Number(value) / max) * 100)}%` }}
+                            />
+                          </span>
+                        ) : null}
+                        {column.href && value !== null && value !== undefined ? (
+                          <a
+                            href={interpolateHref(column.href, value, row)}
+                            className="odd-cell-link"
+                            target={column.href.startsWith('http') ? '_blank' : undefined}
+                            rel={column.href.startsWith('http') ? 'noopener noreferrer' : undefined}
+                            onClick={(e) => e.stopPropagation()}
+                          >
+                            {inner}
+                          </a>
+                        ) : column.copyable && value !== null && value !== undefined ? (
+                          <button
+                            type="button"
+                            className="odd-cell-copy"
+                            title={t('Copy')}
+                            onClick={(e) => {
+                              e.stopPropagation()
+                              navigator.clipboard?.writeText(String(value))
+                              setCopiedCell(cellId)
+                              window.setTimeout(
+                                () => setCopiedCell((cur) => (cur === cellId ? null : cur)),
+                                1200,
+                              )
+                            }}
+                          >
+                            <span>{inner}</span>
+                            <span className="odd-cell-copy-mark" aria-hidden="true">
+                              {copiedCell === cellId ? '✓' : '⧉'}
+                            </span>
+                          </button>
+                        ) : (
+                          inner
+                        )}
+                      </td>
+                    )
+                  })}
+                </tr>
+              )
+            }
+
+            if (!props.groupBy) {
+              return visibleRows.map((row, i) => renderRow(row, `r-${i}`))
+            }
+
+            const groups = new Map<string, Record<string, unknown>[]>()
+            for (const row of visibleRows) {
+              const gKey = String(row[props.groupBy] ?? '—')
+              const list = groups.get(gKey) ?? []
+              list.push(row)
+              groups.set(gKey, list)
+            }
+
+            const out: React.ReactNode[] = []
+            for (const [gKey, gRows] of groups) {
+              const isCollapsed = Boolean(collapsedGroups[gKey])
+              out.push(
+                <tr key={`group-${gKey}`} className="odd-table-group-row">
+                  <td colSpan={columns.length}>
+                    <button
+                      type="button"
+                      className="odd-table-group-toggle"
+                      aria-expanded={!isCollapsed}
+                      onClick={() =>
+                        setCollapsedGroups((prev) => ({ ...prev, [gKey]: !prev[gKey] }))
+                      }
+                    >
+                      <span aria-hidden="true">{isCollapsed ? '▸' : '▾'}</span>
+                      <strong>{gKey}</strong>
+                      <span className="odd-table-group-count">{gRows.length}</span>
+                    </button>
+                  </td>
+                </tr>,
+              )
+              if (!isCollapsed) {
+                gRows.forEach((row, idx) => {
+                  out.push(renderRow(row, `g-${gKey}-${idx}`))
+                })
               }
             }
-            return (
-              <tr
-                // biome-ignore lint/suspicious/noArrayIndexKey: rows have no identity of their own
-                key={i}
-                data-active={
-                  drill?.isActive(row[drill.column ?? drill.filter]) ||
-                  detailRow === row ||
-                  undefined
-                }
-                tabIndex={interactive ? 0 : undefined}
-                onClick={interactive ? handleRowActivate : undefined}
-                onKeyDown={
-                  interactive
-                    ? (event) => {
-                        if (event.key === 'Enter' || event.key === ' ') {
-                          event.preventDefault()
-                          handleRowActivate()
-                        }
-                      }
-                    : undefined
-                }
-                className={interactive ? 'odd-drillable' : undefined}
-              >
-                {columns.map((column) => {
-                  const numeric = types.get(column.key) === 'number'
-                  const value = row[column.key]
-                  const max = maxima.get(column.key)
-                  const scale = scales.get(column.key)
-                  const numVal = Number(value)
-                  const scalePct =
-                    scale && Number.isFinite(numVal)
-                      ? scale.max === scale.min
-                        ? 14
-                        : Math.round(4 + ((numVal - scale.min) / (scale.max - scale.min)) * 22)
-                      : 0
-                  const colFormat =
-                    column.format ??
-                    props.format?.[column.key] ??
-                    (IDENTIFIER.test(column.key) ? ID_FORMAT : undefined)
-                  const formatted = formatValue(value, colFormat, ctx)
-                  const inner = column.sparkline ? (
-                    <CellSparkline value={value} />
-                  ) : column.badge && value !== null && value !== undefined ? (
-                    <span className="odd-cell-badge" data-tone={badgeTone(value)}>
-                      {formatted}
-                    </span>
-                  ) : column.delta && Number.isFinite(numVal) && value !== null ? (
-                    <span
-                      className="odd-cell-delta"
-                      data-tone={numVal > 0 ? 'good' : numVal < 0 ? 'bad' : 'neutral'}
-                    >
-                      {numVal > 0 ? '▲ ' : numVal < 0 ? '▼ ' : ''}
-                      {formatted}
-                    </span>
-                  ) : (
-                    formatted
-                  )
-                  return (
-                    <td
-                      key={column.key}
-                      style={{
-                        textAlign: column.align ?? (numeric ? 'right' : 'left'),
-                        background:
-                          scalePct > 0
-                            ? `color-mix(in srgb, var(--odd-accent) ${scalePct}%, transparent)`
-                            : undefined,
-                      }}
-                      data-numeric={numeric || undefined}
-                    >
-                      {max ? (
-                        <span className="odd-cell-bar">
-                          <span style={{ width: `${Math.max(0, (Number(value) / max) * 100)}%` }} />
-                        </span>
-                      ) : null}
-                      {column.href && value !== null && value !== undefined ? (
-                        <a
-                          href={interpolateHref(column.href, value, row)}
-                          className="odd-cell-link"
-                          target={column.href.startsWith('http') ? '_blank' : undefined}
-                          rel={column.href.startsWith('http') ? 'noopener noreferrer' : undefined}
-                          onClick={(e) => e.stopPropagation()}
-                        >
-                          {inner}
-                        </a>
-                      ) : (
-                        inner
-                      )}
-                    </td>
-                  )
-                })}
-              </tr>
-            )
-          })}
+            return out
+          })()}
         </tbody>
         {hasSummary && rows.length > 0 ? (
           <tfoot>

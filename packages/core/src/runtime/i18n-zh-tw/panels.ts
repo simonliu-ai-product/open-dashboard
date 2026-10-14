@@ -154,4 +154,5 @@ export const PANELS: Record<string, string> = {
   'Row details': '資料列明細',
   'Copy JSON': '複製 JSON',
   'Raw JSON': '原始 JSON',
+  Goal: '目標',
 }

@@ -49,8 +49,8 @@ const SVG_PROPS = [
 
 const COLOR_PROPS = new Set(['fill', 'stroke'])
 
-/** 'html' is the whole dashboard as one interactive file, built by the server; 'csv' and 'json' export a panel's rows. */
-export type ImageFormat = 'png' | 'svg' | 'pdf' | 'html' | 'csv' | 'json'
+/** 'html' is the whole dashboard as one interactive file, built by the server; 'csv', 'json' and 'md' export a panel's rows. */
+export type ImageFormat = 'png' | 'svg' | 'pdf' | 'html' | 'csv' | 'json' | 'md'
 export type PictureFormat = 'png' | 'svg' | 'pdf'
 
 async function encode(
@@ -111,14 +111,35 @@ export function resultToCsv(result: {
   return [header, ...body].join('\r\n')
 }
 
+export function resultToMarkdown(result: {
+  columns: { name: string }[]
+  rows: Record<string, unknown>[]
+}): string {
+  const names = result.columns.map((c) => c.name)
+  const esc = (v: unknown) => {
+    if (v === null || v === undefined) return ''
+    const s = typeof v === 'object' ? JSON.stringify(v) : String(v)
+    return s.replace(/\|/g, '\\|').replace(/\r?\n/g, ' ')
+  }
+  const head = `| ${names.map(esc).join(' | ')} |`
+  const sep = `| ${names.map(() => '---').join(' | ')} |`
+  const body = result.rows.map((row) => `| ${names.map((n) => esc(row[n])).join(' | ')} |`)
+  return [head, sep, ...body].join('\n')
+}
+
 export function downloadData(
   result: { columns: { name: string }[]; rows: Record<string, unknown>[] },
-  format: 'csv' | 'json',
+  format: 'csv' | 'json' | 'md',
   name: string,
 ): void {
   if (format === 'csv') {
     const blob = new Blob([resultToCsv(result)], { type: 'text/csv;charset=utf-8' })
     downloadBlob(blob, `${name}.csv`)
+    return
+  }
+  if (format === 'md') {
+    const blob = new Blob([resultToMarkdown(result)], { type: 'text/markdown;charset=utf-8' })
+    downloadBlob(blob, `${name}.md`)
     return
   }
   const blob = new Blob([JSON.stringify(result.rows, null, 2)], {

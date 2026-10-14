@@ -111,6 +111,7 @@ Postgres `::casts`, a colon is left alone.
 | `<MultiSelect name="region" />` | `:region` — comma-separated string (`'North,South'`), or **NULL when "All"** is chosen |
 | `<SearchInput name="q" />` | `:q` — trimmed search string, or **NULL when empty** |
 | `<Toggle name="paid_only" />` | `:paid_only` — `1` or `0` |
+| `<NumberRange name="amount" />` | `:amount_min` and `:amount_max` — numeric bounds |
 
 So always write:
 
@@ -119,6 +120,7 @@ So always write:
 - multi-select: `(:region IS NULL OR ',' || :region || ',' LIKE '%,' || region || ',%')`.
 - search: `(:q IS NULL OR name LIKE '%' || :q || '%')`.
 - toggle: `(:paid_only = 0 OR status = 'paid')`.
+- number range: `amount >= :amount_min AND amount <= :amount_max`.
 
 A query that uses a placeholder no filter provides fails with
 `missing parameter :x — no filter on the dashboard provides it`.

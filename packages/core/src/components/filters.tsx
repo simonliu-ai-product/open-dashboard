@@ -354,3 +354,101 @@ export function MultiSelect(props: MultiSelectProps) {
 MultiSelect.filterSpec = multiSelectSpec as unknown as (
   props: Record<string, unknown>,
 ) => FilterSpec
+
+export interface NumberRangeProps {
+  /** Binds `:<name>_min` and `:<name>_max` as numbers (or `NULL` when blank). */
+  name: string
+  label?: string
+  min?: number
+  max?: number
+  step?: number
+  defaultMin?: number | null
+  defaultMax?: number | null
+}
+
+function formatNumberRangeBound(min?: number | null, max?: number | null): string | null {
+  const hasMin = typeof min === 'number' && Number.isFinite(min)
+  const hasMax = typeof max === 'number' && Number.isFinite(max)
+  if (!hasMin && !hasMax) return null
+  return `${hasMin ? min : ''}..${hasMax ? max : ''}`
+}
+
+export function parseNumberRangeValue(raw: string | null | undefined): {
+  min: number | null
+  max: number | null
+} {
+  if (!raw || !raw.includes('..')) return { min: null, max: null }
+  const [left = '', right = ''] = raw.split('..', 2)
+  const min = left.trim() !== '' && Number.isFinite(Number(left)) ? Number(left) : null
+  const max = right.trim() !== '' && Number.isFinite(Number(right)) ? Number(right) : null
+  if (min !== null && max !== null && min > max) return { min: max, max: min }
+  return { min, max }
+}
+
+function numberRangeSpec(props: NumberRangeProps): FilterSpec {
+  const fallback = formatNumberRangeBound(props.defaultMin, props.defaultMax)
+  return {
+    key: props.name,
+    default: fallback,
+    params: (value) => {
+      const parsed = parseNumberRangeValue(value ?? fallback)
+      return {
+        [`${props.name}_min`]: parsed.min,
+        [`${props.name}_max`]: parsed.max,
+      }
+    },
+  }
+}
+
+export function NumberRange(props: NumberRangeProps) {
+  const minId = useId()
+  const maxId = useId()
+  const { values, set } = useFilters()
+  const fallback = formatNumberRangeBound(props.defaultMin, props.defaultMax)
+  const raw = props.name in values ? values[props.name] : fallback
+  const parsed = parseNumberRangeValue(raw)
+
+  const update = (nextMin: string, nextMax: string) => {
+    const cleanMin = nextMin.trim()
+    const cleanMax = nextMax.trim()
+    if (!cleanMin && !cleanMax) {
+      set(props.name, null)
+      return
+    }
+    set(props.name, `${cleanMin}..${cleanMax}`)
+  }
+
+  return (
+    <div className="odd-filter odd-filter-number-range">
+      <span>{props.label ?? humanize(props.name)}</span>
+      <div className="odd-number-range-inputs">
+        <input
+          id={minId}
+          type="number"
+          aria-label={`${props.label ?? humanize(props.name)} min`}
+          placeholder={props.min !== undefined ? String(props.min) : 'Min'}
+          min={props.min}
+          max={props.max}
+          step={props.step ?? 'any'}
+          value={parsed.min ?? ''}
+          onChange={(e) => update(e.target.value, parsed.max !== null ? String(parsed.max) : '')}
+        />
+        <span aria-hidden="true">–</span>
+        <input
+          id={maxId}
+          type="number"
+          aria-label={`${props.label ?? humanize(props.name)} max`}
+          placeholder={props.max !== undefined ? String(props.max) : 'Max'}
+          min={props.min}
+          max={props.max}
+          step={props.step ?? 'any'}
+          value={parsed.max ?? ''}
+          onChange={(e) => update(parsed.min !== null ? String(parsed.min) : '', e.target.value)}
+        />
+      </div>
+    </div>
+  )
+}
+NumberRange.filterSpec = numberRangeSpec as unknown as (
+  props: Record<string, unknown>,
+) => FilterSpec

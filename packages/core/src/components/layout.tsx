@@ -14,6 +14,7 @@ import {
 import type { ParamValue } from '../config.js'
 import { FilterContext, type FilterState, useHost } from '../runtime/context.js'
 import { type EditState, useEdit } from '../runtime/edit.js'
+import { useT } from '../runtime/i18n.js'
 import { snapshot } from '../runtime/snapshot.js'
 import type { RowShape } from '../runtime/structure.js'
 import { useRowDrag } from './edit-chrome.js'
@@ -196,6 +197,7 @@ export interface DashboardProps {
 export function Dashboard({ views, children }: DashboardProps) {
   const host = useHost()
   const edit = useEdit()
+  const t = useT()
   const nodes = flatten(children)
   const filterNodes = nodes.filter((node) => isValidElement(node) && node.type === Filters)
   const body = nodes.filter((node) => !(isValidElement(node) && node.type === Filters))
@@ -290,7 +292,25 @@ export function Dashboard({ views, children }: DashboardProps) {
               </nav>
             ) : null}
           </div>
-          {filterNodes.length > 0 ? <div className="odd-dash-filters">{filterNodes}</div> : null}
+          {filterNodes.length > 0 ? (
+            <div className="odd-dash-filters">
+              {filterNodes}
+              {specs.some((s) => (values[s.key] ?? null) !== (s.default ?? null)) ? (
+                <button
+                  type="button"
+                  className="odd-filter-reset"
+                  data-export-skip=""
+                  onClick={() => {
+                    const reset: Record<string, string | null> = {}
+                    for (const spec of specs) reset[spec.key] = spec.default
+                    setValues(reset)
+                  }}
+                >
+                  ↺ {t('Reset')}
+                </button>
+              ) : null}
+            </div>
+          ) : null}
         </header>
         <div className="odd-grid">
           <RowContext.Provider value={{ span: 12, height: undefined }}>
@@ -335,22 +355,53 @@ export function Row({ children, height, ...rest }: RowProps) {
 export interface SectionProps {
   title: string
   description?: string
+  /** Allow collapsing and expanding the section's rows. */
+  collapsible?: boolean
+  /** Start collapsed when `collapsible` is enabled. */
+  defaultCollapsed?: boolean
   children?: ReactNode
 }
 
 /** A heading across the grid, for grouping rows on a long dashboard. */
-export function Section({ title, description, children }: SectionProps): ReactElement {
+export function Section({
+  title,
+  description,
+  collapsible,
+  defaultCollapsed,
+  children,
+}: SectionProps): ReactElement {
+  const [collapsed, setCollapsed] = useState(Boolean(collapsible && defaultCollapsed))
   return (
-    <section className="odd-section">
+    <section
+      className="odd-section"
+      data-collapsible={collapsible || undefined}
+      data-collapsed={collapsed || undefined}
+    >
       <div className="odd-section-head">
-        <h2>{title}</h2>
+        {collapsible ? (
+          <button
+            type="button"
+            className="odd-section-toggle"
+            aria-expanded={!collapsed}
+            onClick={() => setCollapsed((v) => !v)}
+          >
+            <span className="odd-section-chevron" aria-hidden="true">
+              {collapsed ? '▸' : '▾'}
+            </span>
+            <h2>{title}</h2>
+          </button>
+        ) : (
+          <h2>{title}</h2>
+        )}
         {description ? <p>{description}</p> : null}
       </div>
-      <div className="odd-grid">
-        <RowContext.Provider value={{ span: 12, height: undefined }}>
-          {children}
-        </RowContext.Provider>
-      </div>
+      {collapsed ? null : (
+        <div className="odd-grid">
+          <RowContext.Provider value={{ span: 12, height: undefined }}>
+            {children}
+          </RowContext.Provider>
+        </div>
+      )}
     </section>
   )
 }

@@ -7,6 +7,7 @@ import {
   explainDashboardQuery,
   generateReport,
   getCurrent,
+  lintWorkspace,
   listCollectors,
   listComments,
   listDashboards,
@@ -490,6 +491,20 @@ export function registerTools(server: McpServer, workspace: Workspace, options: 
       annotations: { readOnlyHint: false, destructiveHint: true },
     },
     ({ path }) => run(() => revertWorkspaceFile(config(), path)),
+  )
+
+  server.registerTool(
+    'lint_workspace',
+    {
+      title: 'Audit workspace best practices',
+      description:
+        'Audit dashboards and SQL files for unused queries, missing descriptions, unbounded table queries, and layout density warnings.',
+      inputSchema: z.object({
+        id: z.string().optional().describe('optional dashboard id; omit for all dashboards'),
+      }),
+      annotations: { readOnlyHint: true },
+    },
+    ({ id }) => run(() => lintWorkspace(workspace, id)),
   )
 
   if (options.allowSql) {

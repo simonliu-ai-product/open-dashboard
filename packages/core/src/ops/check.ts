@@ -83,6 +83,20 @@ export async function defaultParams(
         filter.default && filter.default.trim() !== '' ? filter.default.trim() : null
       continue
     }
+    if (filter.kind === 'NumberRange') {
+      const raw = filter.default
+      if (raw && raw.includes('..')) {
+        const [l = '', r = ''] = raw.split('..', 2)
+        params[`${filter.name}_min`] =
+          l.trim() !== '' && Number.isFinite(Number(l)) ? Number(l) : null
+        params[`${filter.name}_max`] =
+          r.trim() !== '' && Number.isFinite(Number(r)) ? Number(r) : null
+      } else {
+        params[`${filter.name}_min`] = null
+        params[`${filter.name}_max`] = null
+      }
+      continue
+    }
     if (filter.default !== undefined) {
       params[filter.name] = filter.default
     } else if (filter.allowAll) {
@@ -168,7 +182,9 @@ export async function checkDashboard(
   }
 
   const selects = new Set(
-    analysis.filters.filter((f) => f.kind === 'Select' && f.name).map((f) => f.name),
+    analysis.filters
+      .filter((f) => (f.kind === 'Select' || f.kind === 'MultiSelect') && f.name)
+      .map((f) => f.name),
   )
   for (const panel of analysis.panels) {
     if (!panel.drill || panel.drill.dashboard || selects.has(panel.drill.filter)) continue

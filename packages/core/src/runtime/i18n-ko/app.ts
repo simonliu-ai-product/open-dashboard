@@ -323,4 +323,6 @@ export const APP: Record<string, string> = {
     '커밋되지 않은 변경 사항이 없습니다.',
   'Revert file': '파일 되돌리기',
   'Reverting…': '되돌리는 중…',
+  Pin: '고정',
+  Unpin: '고정 해제',
 }

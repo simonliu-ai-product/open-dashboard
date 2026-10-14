@@ -38,13 +38,13 @@ The root. Renders `meta.title` / `meta.description`, the filter bar, `meta.views
 grid. Children: `<Filters>`, `<Row>`, `<Section>`, `<Tabs>`, or bare panels (full width).
 
 ### `<Filters>`
-Direct child of `<Dashboard>`. Holds `<TimeRange>`, `<Select>`, `<MultiSelect>`, `<SearchInput>`, and `<Toggle>`.
+Direct child of `<Dashboard>`. Holds `<TimeRange>`, `<Select>`, `<MultiSelect>`, `<SearchInput>`, `<Toggle>`, and `<NumberRange>`. When any filter diverges from its default value, an automatic `↺ Reset` button appears at the end of the filter bar.
 
 ### `<Row height?>`
 A 12-column band.
 
-### `<Section title description?>`
-A heading spanning the grid, with rows inside.
+### `<Section title description? collapsible? defaultCollapsed?>`
+A heading spanning the grid, with rows inside. Set `collapsible` (and optionally `defaultCollapsed`) to let readers expand or collapse the section.
 
 ### `<Tabs defaultValue? param?>` and `<Tab value label>`
 Tabbed layout container synced with the URL (`?tab=<value>` or `?<param>=<value>`).
@@ -77,17 +77,22 @@ Tabbed layout container synced with the URL (`?tab=<value>` or `?<param>=<value>
 ### `<Toggle name label default?>`
 - boolean pill toggle; binds `:<name>` as `1` (true) or `0` (false)
 
+### `<NumberRange name label? min? max? step? defaultMin? defaultMax?>`
+- numeric min/max bound inputs synced with URL (`?name=100..500`); binds `:<name>_min` and `:<name>_max` as numbers
+
 ## Panels
 
-### `<Stat query column? format? compare? compareLabel? invert? spark?>`
+### `<Stat query column? format? compare? compareLabel? invert? spark? goal? goalLabel?>`
 Reads the **first row**.
 - `column`: value column (default: first numeric)
 - `compare`: column in the same row with the comparison value → shows ▲/▼ %
 - `compareLabel`: default "vs previous period"
 - `invert`: down is good
 - `spark={{ query?, y, x? }}`: small trend line under the value; `query` defaults to the Stat's
+- `goal`: numeric target or column name in the first row → renders a goal progress bar (`68% · Goal $500K`)
+- `goalLabel`: custom label for the goal target
 
-### `<LineChart query x? y? series? format? stacked? area? labels? target? targetLabel? brush?>`
+### `<LineChart query x? y? series? format? stacked? area? labels? target? targetLabel? brush? annotations? anomalies?>`
 - `x`: category/time column (default: first non-numeric)
 - `y`: column or array of columns (default: every numeric column)
 - `series`: long-form pivot column (then `y` is one column)
@@ -95,23 +100,26 @@ Reads the **first row**.
 - `labels={{ col: 'Nice name' }}`: rename series
 - `target`: number or column name to draw a horizontal reference line (`targetLabel` labels it)
 - `brush`: drag across the x-axis to zoom into a slice of points (with Reset zoom button)
+- `annotations`: `Array<{ x: string | number; label: string; tone?: 'neutral' | 'good' | 'warning' | 'critical' }>` vertical event marker lines with pill badges
+- `anomalies`: `true` (default z-score threshold `2.0`) or custom number threshold to highlight statistical outliers with dashed alert rings
 - Hover: crosshair + tooltip with every series
 
 ### `<AreaChart …>`
 Same props as LineChart, filled. `stacked` for parts of a whole over time.
 
-### `<BarChart query x? y? series? format? stacked? horizontal? labels? target? targetLabel?>`
+### `<BarChart query x? y? series? format? stacked? horizontal? labels? target? targetLabel? annotations?>`
 - vertical columns by default; `horizontal` for rankings / long labels (also
   prints each bar's value at its tip when there is one series and ≤ 16 bars)
 - several `y` (or a `series`) → grouped bars; add `stacked` to stack
 - `target` / `targetLabel`: reference line across the measure axis
+- `annotations`: vertical event marker lines on vertical bar charts
 
 ### `<PieChart query label? value? format? maxSlices?>`
 Donut with total in the middle and a legend with value and share. Slices
 sorted by size; beyond `maxSlices` (default 6) folded into "Other".
 Negative/zero values are dropped.
 
-### `<Table query columns? format? sort? searchable? pageSize? summary? detail?>`
+### `<Table query columns? format? sort? searchable? pageSize? summary? detail? groupBy?>`
 - `columns`: `['name', { key: 'revenue', label: 'Revenue', format: 'currency', align: 'right', bar: true }]`
   — `bar` draws an inline bar against the column's max
   — `badge`: `true` or `{ paid: 'good', pending: 'warning', failed: 'critical' }` status pill
@@ -119,11 +127,13 @@ Negative/zero values are dropped.
   — `colorScale`: `true | 'blue' | 'green' | 'amber' | 'red' | 'diverging'` heatmap cell background
   — `delta`: `true` or `{ invert?: boolean }` signed ▲/▼ badge
   — `href`: URL template with `{col}` placeholders, e.g. `"/orders/{id}"`
+  — `copyable`: `true` to click-to-copy cell value to clipboard with `✓` visual confirmation
   — `summary`: `'sum' | 'avg' | 'min' | 'max' | 'count' | false` footer aggregation
 - `searchable`: client-side search filter input in the table header
 - `pageSize`: paginate rows with page size selector (`10 / 25 / 50 / 100`)
 - `summary`: `true` to show a footer totals row (auto-sums numeric columns)
 - `detail`: `true` to open a slide-over drawer with all columns + raw JSON when clicking any row
+- `groupBy`: column name to group rows into collapsible sections with group count badges
 - `format={{ revenue: 'currency' }}`: formats when `columns` is not given
 - `sort`: initial sort, `'revenue'` or `'-revenue'`; headers are click-to-sort
 - numbers right-aligned with tabular figures; `id` / `*_id` columns are not grouped

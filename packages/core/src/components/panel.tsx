@@ -209,12 +209,12 @@ export function PanelFrame(props: FrameProps) {
             <DownloadMenu
               formats={
                 run && run.result.rows.length > 0
-                  ? ['png', 'svg', 'pdf', 'csv', 'json']
+                  ? ['png', 'svg', 'pdf', 'csv', 'json', 'md']
                   : ['png', 'svg', 'pdf']
               }
               save={async (format) => {
                 const name = exportName(host.id, props.title)
-                if (format === 'csv' || format === 'json') {
+                if (format === 'csv' || format === 'json' || format === 'md') {
                   if (run) downloadData(run.result, format, name)
                   return
                 }
