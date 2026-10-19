@@ -1,4 +1,4 @@
-import { useEffect, useId } from 'react'
+import { useEffect, useId, useRef, useState } from 'react'
 import { useFilters } from '../runtime/context.js'
 import { useT } from '../runtime/i18n.js'
 import { humanize } from '../runtime/shape.js'
@@ -263,6 +263,10 @@ export interface MultiSelectProps {
   options?: (string | { value: string; label: string })[]
   default?: string[] | string | null
   allLabel?: string
+  /** Display mode: `'dropdown'` (compact menu with checkboxes, default) or `'chips'` (inline pill bar). */
+  variant?: 'dropdown' | 'chips'
+  /** Show a search input inside the dropdown popover. Defaults to true when there are more than 5 options. */
+  searchable?: boolean
 }
 
 function normalizeMultiDefault(raw: MultiSelectProps['default']): string | null {
@@ -287,6 +291,9 @@ export function MultiSelect(props: MultiSelectProps) {
   const t = useT()
   const { values, set } = useFilters()
   const state = useQuery(props.query)
+  const [open, setOpen] = useState(false)
+  const [search, setSearch] = useState('')
+  const rootRef = useRef<HTMLDivElement>(null)
   const fallback = normalizeMultiDefault(props.default)
   const raw = props.name in values ? values[props.name] : fallback
   const selected = raw
@@ -309,6 +316,24 @@ export function MultiSelect(props: MultiSelectProps) {
     }))
   }
 
+  useEffect(() => {
+    if (!open) return
+    const onPointerDown = (event: MouseEvent) => {
+      if (rootRef.current && !rootRef.current.contains(event.target as Node)) {
+        setOpen(false)
+      }
+    }
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') setOpen(false)
+    }
+    document.addEventListener('mousedown', onPointerDown)
+    document.addEventListener('keydown', onKeyDown)
+    return () => {
+      document.removeEventListener('mousedown', onPointerDown)
+      document.removeEventListener('keydown', onKeyDown)
+    }
+  }, [open])
+
   function toggleValue(optionValue: string) {
     const next = selected.includes(optionValue)
       ? selected.filter((item) => item !== optionValue)
@@ -316,32 +341,148 @@ export function MultiSelect(props: MultiSelectProps) {
     set(props.name, next.length > 0 ? next.join(',') : null)
   }
 
+  const variant = props.variant ?? 'dropdown'
+  if (variant === 'chips') {
+    return (
+      <div className="odd-filter odd-filter-multiselect">
+        <span>{props.label ?? humanize(props.name)}</span>
+        <div className="odd-multiselect-chips">
+          <button
+            type="button"
+            className="odd-multiselect-chip"
+            data-active={selected.length === 0 || undefined}
+            onClick={() => set(props.name, null)}
+          >
+            {props.allLabel ?? t('All')}
+          </button>
+          {options.map((option) => {
+            const active = selected.includes(option.value)
+            return (
+              <button
+                key={option.value}
+                type="button"
+                className="odd-multiselect-chip"
+                data-active={active || undefined}
+                onClick={() => toggleValue(option.value)}
+              >
+                {option.label}
+              </button>
+            )
+          })}
+        </div>
+        {state.status === 'error' ? (
+          <em className="odd-filter-error" title={state.error}>
+            !
+          </em>
+        ) : null}
+      </div>
+    )
+  }
+
+  const labelByValue = new Map(options.map((o) => [o.value, o.label]))
+  const selectedLabels = selected.map((v) => labelByValue.get(v) ?? v)
+  const allText = props.allLabel ?? t('All')
+  const summaryText =
+    selectedLabels.length === 0
+      ? allText
+      : selectedLabels.length <= 2
+        ? selectedLabels.join(', ')
+        : `${selectedLabels.slice(0, 2).join(', ')} +${selectedLabels.length - 2}`
+
+  const showSearch = props.searchable ?? options.length > 5
+  const needle = search.trim().toLowerCase()
+  const filteredOptions = needle
+    ? options.filter(
+        (o) => o.label.toLowerCase().includes(needle) || o.value.toLowerCase().includes(needle),
+      )
+    : options
+
   return (
-    <div className="odd-filter odd-filter-multiselect">
+    <div className="odd-filter odd-filter-multiselect" ref={rootRef}>
       <span>{props.label ?? humanize(props.name)}</span>
-      <div className="odd-multiselect-chips">
+      <div className="odd-multiselect-dropdown">
         <button
           type="button"
-          className="odd-multiselect-chip"
-          data-active={selected.length === 0 || undefined}
-          onClick={() => set(props.name, null)}
+          className="odd-multiselect-trigger"
+          aria-haspopup="listbox"
+          aria-expanded={open}
+          data-active={selected.length > 0 || undefined}
+          title={selectedLabels.length > 0 ? selectedLabels.join('、') : allText}
+          onClick={() => {
+            setOpen((prev) => {
+              if (prev) setSearch('')
+              return !prev
+            })
+          }}
         >
-          {props.allLabel ?? t('All')}
+          <span className="odd-multiselect-summary">{summaryText}</span>
+          {selected.length > 0 ? (
+            <span className="odd-multiselect-badge">{selected.length}</span>
+          ) : null}
         </button>
-        {options.map((option) => {
-          const active = selected.includes(option.value)
-          return (
-            <button
-              key={option.value}
-              type="button"
-              className="odd-multiselect-chip"
-              data-active={active || undefined}
-              onClick={() => toggleValue(option.value)}
-            >
-              {option.label}
-            </button>
-          )
-        })}
+        {open ? (
+          <div
+            className="odd-multiselect-popover"
+            role="listbox"
+            aria-multiselectable="true"
+            data-export-skip=""
+          >
+            {showSearch ? (
+              <div className="odd-multiselect-search-wrap">
+                <input
+                  type="search"
+                  className="odd-multiselect-search"
+                  value={search}
+                  placeholder={t('Filter…')}
+                  onChange={(event) => setSearch(event.target.value)}
+                />
+              </div>
+            ) : null}
+            <div className="odd-multiselect-list">
+              <button
+                type="button"
+                role="option"
+                aria-selected={selected.length === 0}
+                className="odd-multiselect-option odd-multiselect-option-all"
+                data-active={selected.length === 0 || undefined}
+                onClick={() => set(props.name, null)}
+              >
+                <span
+                  className="odd-multiselect-check"
+                  data-checked={selected.length === 0 || undefined}
+                >
+                  {selected.length === 0 ? '✓' : ''}
+                </span>
+                <span className="odd-multiselect-option-label">{allText}</span>
+                {selected.length > 0 ? (
+                  <span className="odd-multiselect-clear-hint">↺ {t('Reset')}</span>
+                ) : null}
+              </button>
+              {filteredOptions.map((option) => {
+                const active = selected.includes(option.value)
+                return (
+                  <button
+                    key={option.value}
+                    type="button"
+                    role="option"
+                    aria-selected={active}
+                    className="odd-multiselect-option"
+                    data-active={active || undefined}
+                    onClick={() => toggleValue(option.value)}
+                  >
+                    <span className="odd-multiselect-check" data-checked={active || undefined}>
+                      {active ? '✓' : ''}
+                    </span>
+                    <span className="odd-multiselect-option-label">{option.label}</span>
+                  </button>
+                )
+              })}
+              {filteredOptions.length === 0 ? (
+                <div className="odd-multiselect-empty">{t('No data')}</div>
+              ) : null}
+            </div>
+          </div>
+        ) : null}
       </div>
       {state.status === 'error' ? (
         <em className="odd-filter-error" title={state.error}>

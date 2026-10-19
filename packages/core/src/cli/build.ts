@@ -1,7 +1,8 @@
-import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
+import { cpSync, existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { dirname, join, relative, resolve, sep } from 'node:path'
 import { build as viteBuild } from 'vite'
-import { discoverDashboards, listDashboards } from '../ops/dashboards.js'
+import { compileParams } from '../datasource/params.js'
+import { dashboardQueries, discoverDashboards, listDashboards } from '../ops/dashboards.js'
 import { OpsError } from '../ops/errors.js'
 import { type DashboardSnapshot, snapshotDashboard } from '../ops/snapshot.js'
 import { listThemes, readTheme } from '../ops/themes.js'
@@ -48,6 +49,54 @@ function escapeHtml(text: string): string {
   )
 }
 
+function inlineUsesSql(
+  name: string,
+  queries: ReturnType<typeof dashboardQueries>,
+): { sql: string; source?: string } {
+  const target = queries.get(name)
+  if (!target) return { sql: '' }
+  const order: string[] = []
+  const visited = new Set<string>()
+  const collect = (n: string) => {
+    const q = queries.get(n)
+    if (!q) return
+    for (const u of q.uses ?? []) {
+      if (!visited.has(u)) {
+        visited.add(u)
+        collect(u)
+        order.push(u)
+      }
+    }
+  }
+  collect(name)
+  let resolvedSource = target.source
+  for (const u of order) {
+    const uq = queries.get(u)
+    if (!resolvedSource && uq?.source) resolvedSource = uq.source
+  }
+  const cleanSql = (raw: string) => raw.trim().replace(/;+\s*$/, '')
+  if (order.length === 0) {
+    return { sql: cleanSql(target.sql), source: resolvedSource }
+  }
+  const ctes = order.map((u) => {
+    const uq = queries.get(u)
+    return `${u} AS (\n${cleanSql(uq?.sql ?? '')}\n)`
+  })
+  const body = cleanSql(target.sql)
+    .replace(/^(?:\s*--[^\n]*\n|\s*\/\*[\s\S]*?\*\/)+/, '')
+    .trimStart()
+  if (/^WITH\s+/i.test(body) && !/^WITH\s+RECURSIVE\b/i.test(body)) {
+    return {
+      sql: `WITH ${ctes.join(',\n')},\n${body.replace(/^WITH\s+/i, '')}`,
+      source: resolvedSource,
+    }
+  }
+  return {
+    sql: `WITH ${ctes.join(',\n')}\n${body}`,
+    source: resolvedSource,
+  }
+}
+
 /** What the page reads, by path under `data/`: the dashboard list, every stored query, the themes it uses. */
 export async function snapshotFiles(
   workspace: Workspace,
@@ -71,6 +120,15 @@ export async function snapshotFiles(
     snapshots.push(snap)
     for (const [name, stored] of Object.entries(snap.queries))
       files.set(`d/${snap.id}/${encodeURIComponent(name)}.json`, stored)
+    const rawQueries = dashboardQueries(config, id)
+    const compiledQueries: Record<string, { sql: string; names: string[]; source: string }> = {}
+    for (const qName of rawQueries.keys()) {
+      const inlined = inlineUsesSql(qName, rawQueries)
+      const compiled = compileParams(inlined.sql, 'question')
+      const srcName = workspace.sourceName(inlined.source)
+      compiledQueries[qName] = { sql: compiled.text, names: compiled.names, source: srcName }
+    }
+    files.set(`d/${snap.id}/_queries.json`, compiledQueries)
     const failed = Object.values(snap.queries).filter((q) =>
       Object.values(q.results).some((r) => 'error' in r),
     ).length
@@ -108,6 +166,7 @@ export async function bundleViewer(
   ids: string[],
   outDir: string,
   single: boolean,
+  base = './',
 ): Promise<{ file: string; css: string[] }> {
   const inline = viteConfigFor(workspace)
   inline.plugins = [
@@ -126,7 +185,7 @@ export async function bundleViewer(
   ]
   await viteBuild({
     ...inline,
-    base: './',
+    base,
     mode: 'production',
     logLevel: 'error',
     build: {
@@ -195,7 +254,11 @@ export async function buildSite(options: BuildOptions = {}): Promise<BuildResult
     await workspace.close()
   }
 
-  const entry = await bundleViewer(workspace, ids, out, false)
+  const rawEnvBase = process.env.COSTAFF_BASE?.trim()
+  const envBase = rawEnvBase
+    ? `${rawEnvBase.startsWith('/') ? '' : '/'}${rawEnvBase.replace(/\/+$/, '')}/`
+    : undefined
+  const entry = await bundleViewer(workspace, ids, out, false, envBase ?? './')
   // Runs before any module (they are deferred): when the snapshot was taken,
   // and where the site is served — wherever the entry script is
   // (`<base>/assets/…`), so the same files work at a domain root or under a path.
@@ -210,14 +273,24 @@ export async function buildSite(options: BuildOptions = {}): Promise<BuildResult
       title,
     )
 
-  writeFileSync(join(out, 'index.html'), page('./', 'open-dashboard'))
+  writeFileSync(join(out, 'index.html'), page(envBase ?? './', 'open-dashboard'))
   for (const summary of listDashboards(config).filter((d) => ids.includes(d.id))) {
     // One page per dashboard, so a link to it works on any static host.
     const html = join(out, 'd', summary.id, 'index.html')
     mkdirSync(dirname(html), { recursive: true })
-    writeFileSync(html, page('../../', `${summary.title} · open-dashboard`))
+    writeFileSync(html, page(envBase ?? '../../', `${summary.title} · open-dashboard`))
   }
   for (const [path, value] of taken.files) writeJson(join(out, 'data', path), value)
+  for (const [sourceName, ds] of Object.entries(config.datasources)) {
+    if (ds.type === 'sqlite' && ds.file) {
+      const dbSrc = resolve(config.root, ds.file)
+      if (existsSync(dbSrc)) {
+        const dbDest = join(out, 'data', '_sqlite', `${sourceName}.db`)
+        mkdirSync(dirname(dbDest), { recursive: true })
+        cpSync(dbSrc, dbDest)
+      }
+    }
+  }
   if (!existsSync(join(out, 'index.html'))) throw new Error('nothing was written')
   const shown = relative(process.cwd(), out)
   log(`  wrote ${shown.startsWith('..') ? out : shown || '.'}/`)
@@ -240,7 +313,17 @@ export async function exportHtml(
   const summary = listDashboards(config).find((d) => d.id === id)
   if (!summary) throw new OpsError(`no dashboard "${id}" under ${config.dashboardsDir}/`, 404)
   const now = new Date()
-  const { files } = await snapshotFiles(workspace, [id], { now, ...options })
+  const searchParams = new URLSearchParams(search.startsWith('?') ? search.slice(1) : search)
+  const searchValues: Record<string, string | null> = {}
+  for (const [k, v] of searchParams.entries()) {
+    searchValues[k] = v === '' ? null : v
+  }
+  const mergedValues = { ...searchValues, ...options.values }
+  const { files } = await snapshotFiles(workspace, [id], {
+    now,
+    ...options,
+    ...(Object.keys(mergedValues).length > 0 ? { values: mergedValues } : {}),
+  })
   const dir = join(
     config.root,
     'node_modules',

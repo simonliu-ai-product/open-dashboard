@@ -117,6 +117,15 @@ function useStarredDashboards(): [string[], (id: string) => void] {
   return [starred, toggle]
 }
 
+const locSearch = () =>
+  ((window as { __cwLocation?: () => URL }).__cwLocation?.() ?? window.location).search
+
+const isEmbedded = () =>
+  typeof window !== 'undefined' &&
+  (new URLSearchParams(locSearch()).get('kiosk') === '1' ||
+    Boolean((window as { __COSTAFF_HOST__?: { embed?: boolean } }).__COSTAFF_HOST__?.embed) ||
+    document.documentElement.hasAttribute('data-costaff-embed'))
+
 function Shell() {
   const t = useT()
   const route = useRoute()
@@ -129,11 +138,7 @@ function Shell() {
   const shownSource = sources?.find((s) => s.default)?.name ?? sources?.[0]?.name
   const [menuOpen, setMenuOpen] = useState(false)
   const [cmdkOpen, setCmdkOpen] = useState(false)
-  const [kiosk, setKiosk] = useState(
-    () =>
-      typeof window !== 'undefined' &&
-      new URLSearchParams(window.location.search).get('kiosk') === '1',
-  )
+  const [kiosk, setKiosk] = useState(isEmbedded)
   // A built snapshot has dashboards and nothing that needs the database or writes a file.
   const live = !readOnly()
   const changesCount = useChangesCount(live)
@@ -141,11 +146,11 @@ function Shell() {
   // biome-ignore lint/correctness/useExhaustiveDependencies: close the menu whenever the route changes
   useEffect(() => {
     setMenuOpen(false)
-    setKiosk(new URLSearchParams(window.location.search).get('kiosk') === '1')
+    setKiosk(isEmbedded())
   }, [route])
 
   useEffect(() => {
-    const sync = () => setKiosk(new URLSearchParams(window.location.search).get('kiosk') === '1')
+    const sync = () => setKiosk(isEmbedded())
     const onKey = (event: KeyboardEvent) => {
       if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === 'k') {
         event.preventDefault()

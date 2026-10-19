@@ -31,7 +31,7 @@ export function staticApi(): Api {
         : Promise.reject(new Error(NOT_IN_SNAPSHOT))
     let pending = loaded.get(path)
     if (!pending) {
-      const base = new URL(snapshot()?.base ?? '/', window.location.origin)
+      const base = new URL(snapshot()?.base ?? '/', window.location.href)
       pending = fetch(new URL(`data/${path}`, base)).then((response) => {
         if (!response.ok) throw new Error(NOT_IN_SNAPSHOT)
         return response.json()
@@ -50,7 +50,21 @@ export function staticApi(): Api {
     const file = await load<SnapshotQueryFile>(
       `${folder}/${encodeURIComponent(id)}/${encodeURIComponent(name)}.json`,
     )
-    const hit = file.results[snapshotKey(params, file.reads)]
+    const key = snapshotKey(params, file.reads)
+    let hit = file.results[key]
+    if (!hit && !inline) {
+      const base = new URL(snapshot()?.base ?? '/', window.location.href)
+      const qUrl = new URL(
+        `data/__odd_query.json?id=${encodeURIComponent(id)}&name=${encodeURIComponent(name)}&params=${encodeURIComponent(JSON.stringify(params))}`,
+        base,
+      )
+      const res = await fetch(qUrl)
+      if (res.ok) {
+        const dynamicRun = (await res.json()) as QueryRun
+        file.results[key] = dynamicRun
+        hit = dynamicRun
+      }
+    }
     if (!hit) throw new Error(NOT_IN_SNAPSHOT)
     if ('error' in hit) throw new Error(hit.error)
     return { ...hit, params }

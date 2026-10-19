@@ -48,6 +48,7 @@ export interface QueryRef {
 
 export interface DashboardAnalysis {
   meta: Record<string, string | number | boolean>
+  views?: { name: string; filters: Record<string, string | null> }[]
   filters: FilterDecl[]
   panels: PanelRef[]
   queryRefs: QueryRef[]
@@ -258,14 +259,32 @@ export function analyzeDashboard(
   const constants = constantsOf(ast, file)
   const result: DashboardAnalysis = { meta: {}, filters: [], panels: [], queryRefs: [] }
 
+  const parseViews = (raw: unknown) => {
+    if (!Array.isArray(raw)) return undefined
+    const out: { name: string; filters: Record<string, string | null> }[] = []
+    for (const item of raw) {
+      if (!item || typeof item !== 'object') continue
+      const v = item as { name?: unknown; filters?: unknown }
+      if (typeof v.name !== 'string' || !v.filters || typeof v.filters !== 'object') continue
+      const filters: Record<string, string | null> = {}
+      for (const [fk, fv] of Object.entries(v.filters as Record<string, unknown>)) {
+        if (typeof fv === 'string' || fv === null) filters[fk] = fv
+      }
+      out.push({ name: v.name, filters })
+    }
+    return out.length > 0 ? out : undefined
+  }
+
   walk(ast, (node) => {
     if (node.type === 'VariableDeclarator' && (node.id as Node).name === 'meta') {
-      const value = literal(node.init as Node)
+      const value = literal(node.init as Node, constants)
       if (value && typeof value === 'object' && !Array.isArray(value)) {
         for (const [key, v] of Object.entries(value)) {
           if (typeof v === 'string' || typeof v === 'number' || typeof v === 'boolean')
             result.meta[key] = v
         }
+        const views = parseViews((value as { views?: unknown }).views)
+        if (views) result.views = views
       }
       return
     }
@@ -274,6 +293,11 @@ export function analyzeDashboard(
     if (!name) return
     const attrs = attributes(node)
     const read = (key: string) => (attrs.has(key) ? literal(attrs.get(key), constants) : undefined)
+    if (name === 'Dashboard') {
+      const views = parseViews(read('views'))
+      if (views) result.views = views
+      return
+    }
 
     if (
       name === 'TimeRange' ||

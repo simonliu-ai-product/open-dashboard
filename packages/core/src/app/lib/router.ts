@@ -23,11 +23,15 @@ export function parseRoute(pathname: string): Route {
   return { name: 'home' }
 }
 
+function loc(): Pick<Location, 'pathname' | 'search' | 'href'> {
+  return (window as { __cwLocation?: () => URL }).__cwLocation?.() ?? window.location
+}
+
 let guard: (() => boolean) | undefined
-let shown = typeof window === 'undefined' ? '' : window.location.pathname + window.location.search
+let shown = typeof window === 'undefined' ? '' : loc().pathname + loc().search
 
 function current(): string {
-  return window.location.pathname + window.location.search
+  return loc().pathname + loc().search
 }
 
 /**
@@ -54,7 +58,7 @@ export function navigate(path: string, options: { replace?: boolean } = {}): voi
 
 export function useRoute(): Route {
   const [route, setRoute] = useState(() =>
-    parseRoute(snapshot()?.route ?? stripBase(window.location.pathname)),
+    parseRoute(snapshot()?.route ?? stripBase(loc().pathname)),
   )
   useEffect(() => {
     const update = () => {
@@ -65,7 +69,7 @@ export function useRoute(): Route {
         return
       }
       shown = now
-      setRoute(parseRoute(snapshot()?.route ?? stripBase(window.location.pathname)))
+      setRoute(parseRoute(snapshot()?.route ?? stripBase(loc().pathname)))
     }
     window.addEventListener('popstate', update)
     return () => window.removeEventListener('popstate', update)

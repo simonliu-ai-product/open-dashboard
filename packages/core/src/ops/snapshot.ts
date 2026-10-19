@@ -1,9 +1,12 @@
+import { readFileSync } from 'node:fs'
 import type { ParamValue } from '../config.js'
 import { errorMessage } from '../datasource/types.js'
 import { snapshotKey } from '../runtime/snapshot.js'
 import type { QueryRun } from '../runtime/types.js'
 import type { Workspace } from '../workspace.js'
-import { dashboardQueries, readsOf, runDashboardQuery } from './dashboards.js'
+import { analyzeDashboard } from './analyze.js'
+import { chartImports } from './charts.js'
+import { dashboardFile, dashboardQueries, readsOf, runDashboardQuery } from './dashboards.js'
 import { dashboardFilters, filterParams } from './filters.js'
 
 /** What `open-dashboard build` stores for one query: every run, by the parameters it reads. */
@@ -54,31 +57,62 @@ export async function snapshotDashboard(
   const maxRuns = options.maxRuns ?? 100
   const maxOptions = options.maxOptions ?? 50
   const config = workspace.config
+  const file = dashboardFile(config, id)
+  const code = readFileSync(file, 'utf8')
+  const custom = new Map(
+    [...chartImports(config, file, code)].map(([name, chart]) => [name, chart.spec.columns]),
+  )
+  const analysis = analyzeDashboard(code, custom, file)
+  const referenced = new Set(analysis.queryRefs.map((r) => r.name))
+
   const queries = dashboardQueries(config, id)
-  const filters = await dashboardFilters(workspace, id, {
+  const usedAsInput = new Set([...queries.values()].flatMap((q) => q.uses ?? []))
+
+  const initialFilters = await dashboardFilters(workspace, id, {
     now,
     maxOptions,
-    ...(options.values ? { values: options.values } : {}),
   })
+  const filters =
+    options.values && Object.keys(options.values).length > 0
+      ? await dashboardFilters(workspace, id, {
+          now,
+          maxOptions,
+          values: options.values,
+        })
+      : initialFilters
+
   // The values each filter is snapshotted at: its current one first, null too
   // for a Select — one with no default opens empty before it picks.
   const choices = filters.map((filter) => ({
     filter,
     values: [
-      ...new Set([filter.current, ...(filter.kind === 'Select' ? [null] : []), ...filter.options]),
+      ...new Set([
+        filter.current,
+        ...(filter.kind === 'Select' || filter.kind === 'MultiSelect' ? [null] : []),
+        ...filter.options,
+      ]),
     ],
   }))
   const defaults = (): Record<string, ParamValue> => filterParams(filters)
 
+  const priorityParamSets: Record<string, ParamValue>[] = [defaults(), filterParams(initialFilters)]
+  for (const view of analysis.views ?? []) {
+    priorityParamSets.push(filterParams(initialFilters, view.filters))
+  }
+
   const snapshot: DashboardSnapshot = { id, queries: {}, runs: 0, trimmed: [] }
   for (const name of queries.keys()) {
+    // Pure intermediate `-- uses:` queries that no panel or filter reads directly are only needed server-side.
+    if (usedAsInput.has(name) && !referenced.has(name)) continue
+
     const reads = [...new Set(readsOf(config, queries, name))].sort()
     const relevant = choices.filter(({ filter }) =>
       filter.produces.some((param) => reads.includes(param)),
     )
-    const lists = relevant.map((choice) => choice.values)
+    const lists = relevant.map((choice) => [...choice.values])
     const size = () => lists.reduce((n, values) => n * values.length, 1)
-    if (size() > maxRuns) snapshot.trimmed.push(name)
+    const wasTrimmed = size() > maxRuns
+    if (wasTrimmed) snapshot.trimmed.push(name)
     while (size() > maxRuns) {
       const widest = lists.reduce(
         (best, values, i) => (values.length > (lists[best]?.length ?? 0) ? i : best),
@@ -88,11 +122,24 @@ export async function snapshotDashboard(
     }
 
     const stored: SnapshotQuery = { reads, results: {} }
+    const candidates: Record<string, ParamValue>[] = [...priorityParamSets]
+    if (wasTrimmed) {
+      for (const { filter, values } of relevant) {
+        for (const value of values) {
+          candidates.push({ ...defaults(), ...filter.params(value) })
+        }
+      }
+    }
     for (const combo of product(lists)) {
       const params = defaults()
       combo.forEach((value, i) => {
         Object.assign(params, relevant[i]?.filter.params(value))
       })
+      candidates.push(params)
+    }
+
+    for (const params of candidates) {
+      if (Object.keys(stored.results).length >= maxRuns) break
       const key = snapshotKey(params, reads)
       if (key in stored.results) continue
       try {

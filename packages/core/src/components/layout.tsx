@@ -77,11 +77,15 @@ function collectSpecs(nodes: ReactNode[]): FilterSpec[] {
   return specs
 }
 
+function loc(): Pick<Location, 'pathname' | 'search' | 'href'> {
+  return (window as { __cwLocation?: () => URL }).__cwLocation?.() ?? window.location
+}
+
 function readUrl(specs: FilterSpec[]): Record<string, string | null> {
   const search =
     typeof window === 'undefined'
       ? new URLSearchParams()
-      : new URLSearchParams(window.location.search || snapshot()?.search || '')
+      : new URLSearchParams(loc().search || snapshot()?.search || '')
   const values: Record<string, string | null> = {}
   for (const spec of specs) {
     const raw = search.get(spec.key)
@@ -91,13 +95,14 @@ function readUrl(specs: FilterSpec[]): Record<string, string | null> {
 }
 
 function writeUrl(specs: FilterSpec[], values: Record<string, string | null>): void {
-  const url = new URL(window.location.href)
+  const currentHref = loc().href
+  const url = new URL(currentHref)
   for (const spec of specs) {
     const value = values[spec.key] ?? null
     if (value === spec.default) url.searchParams.delete(spec.key)
     else url.searchParams.set(spec.key, value ?? '')
   }
-  if (url.href === window.location.href) return
+  if (url.href === currentHref) return
   try {
     window.history.replaceState(window.history.state, '', url)
   } catch {
@@ -265,7 +270,7 @@ export function Dashboard({ views, children }: DashboardProps) {
             <h1>{host.meta.title}</h1>
             {host.meta.description ? <p>{host.meta.description}</p> : null}
             {savedViews.length > 0 ? (
-              <nav className="odd-saved-views" aria-label="Saved views" data-export-skip="">
+              <nav className="odd-saved-views" aria-label="Saved views">
                 {savedViews.map((view) => {
                   const active = Object.entries(view.filters).every(
                     ([k, v]) => (values[k] ?? null) === (v ?? null),
@@ -434,7 +439,7 @@ export function Tabs({ id, default: fallback, children }: TabsProps): ReactEleme
 
   const [active, setActive] = useState<string>(() => {
     if (typeof window !== 'undefined') {
-      const fromUrl = new URLSearchParams(window.location.search).get(paramKey)
+      const fromUrl = new URLSearchParams(loc().search || snapshot()?.search || '').get(paramKey)
       if (fromUrl && tabs.some((t) => keyOf(t) === fromUrl)) return fromUrl
     }
     return fallback ?? firstKey
@@ -442,8 +447,8 @@ export function Tabs({ id, default: fallback, children }: TabsProps): ReactEleme
 
   const selectTab = (next: string) => {
     setActive(next)
-    if (typeof window !== 'undefined' && id) {
-      const url = new URL(window.location.href)
+    if (typeof window !== 'undefined') {
+      const url = new URL(loc().href)
       if (next === (fallback ?? firstKey)) url.searchParams.delete(paramKey)
       else url.searchParams.set(paramKey, next)
       try {
@@ -457,7 +462,7 @@ export function Tabs({ id, default: fallback, children }: TabsProps): ReactEleme
   const current = tabs.find((t) => keyOf(t) === active) ?? tabs[0]
   return (
     <section className="odd-section odd-tabs-section">
-      <div className="odd-tabs" role="tablist" data-export-skip="">
+      <div className="odd-tabs" role="tablist">
         {tabs.map((tab) => {
           const k = keyOf(tab)
           return (

@@ -242,6 +242,16 @@ class Builder {
       // A closed <select> draws its choice itself; its options have no boxes to copy.
       this.box(style, rect)
       this.label(element.selectedOptions[0]?.textContent ?? '', style, rect)
+      this.chevron(rect)
+      return
+    }
+    if (element instanceof HTMLInputElement) {
+      if (element.type === 'checkbox' || element.type === 'radio') {
+        this.checkbox(element, style, rect)
+        return
+      }
+      this.box(style, rect)
+      this.inputValue(element, style, rect)
       return
     }
 
@@ -265,6 +275,9 @@ class Builder {
       wrapped++
     }
     for (const child of Array.from(element.childNodes)) this.node(child)
+    if (element.classList.contains('odd-multiselect-trigger')) {
+      this.chevron(rect)
+    }
     for (let i = 0; i < wrapped; i++) this.close('</g>')
   }
 
@@ -285,6 +298,12 @@ class Builder {
       )
     }
     this.borders(style, x, y, rect.width, rect.height)
+    const ring = ringColor(style.boxShadow)
+    if (ring && rect.width > 1 && rect.height > 1) {
+      this.parts.push(
+        `<rect x="${n(x + 0.5)}" y="${n(y + 0.5)}" width="${n(rect.width - 1)}" height="${n(rect.height - 1)}" rx="${n(r)}" fill="none" stroke="${ring}"/>`,
+      )
+    }
   }
 
   ring(style: CSSStyleDeclaration, width: number, height: number) {
@@ -292,6 +311,62 @@ class Builder {
     if (!color) return
     this.parts.push(
       `<rect x="0.5" y="0.5" width="${n(width - 1)}" height="${n(height - 1)}" rx="${n(radius(style))}" fill="none" stroke="${color}"/>`,
+    )
+  }
+
+  chevron(rect: DOMRect) {
+    const cx = rect.right - this.x0 - 15
+    const cy = rect.top - this.y0 + rect.height / 2 - 2
+    this.parts.push(
+      `<path d="M${n(cx)} ${n(cy)}l4 4 4-4" stroke="#898781" stroke-width="1.5" fill="none" stroke-linecap="round"/>`,
+    )
+  }
+
+  checkbox(element: HTMLInputElement, style: CSSStyleDeclaration, rect: DOMRect) {
+    if (rect.width <= 0 || rect.height <= 0) return
+    const x = rect.left - this.x0
+    const y = rect.top - this.y0
+    const w = rect.width
+    const h = rect.height
+    const accent = paint(style.accentColor) ?? '#2563eb'
+    if (element.checked) {
+      this.parts.push(
+        `<rect x="${n(x)}" y="${n(y)}" width="${n(w)}" height="${n(h)}" rx="3" fill="${accent}"/>`,
+      )
+      const x1 = x + w * 0.22
+      const y1 = y + h * 0.52
+      const x2 = x + w * 0.44
+      const y2 = y + h * 0.74
+      const x3 = x + w * 0.78
+      const y3 = y + h * 0.28
+      this.parts.push(
+        `<path d="M${n(x1)} ${n(y1)}L${n(x2)} ${n(y2)}L${n(x3)} ${n(y3)}" stroke="#ffffff" stroke-width="1.75" fill="none" stroke-linecap="round" stroke-linejoin="round"/>`,
+      )
+    } else {
+      this.parts.push(
+        `<rect x="${n(x + 0.5)}" y="${n(y + 0.5)}" width="${n(w - 1)}" height="${n(h - 1)}" rx="3" fill="#ffffff" stroke="#898781"/>`,
+      )
+    }
+  }
+
+  inputValue(element: HTMLInputElement, style: CSSStyleDeclaration, rect: DOMRect) {
+    const hasValue = element.value.trim() !== ''
+    const raw = hasValue ? element.value : element.placeholder
+    const value = (raw ?? '').replace(/\s+/g, ' ').trim()
+    if (!value) return
+    const padLeft = Number.parseFloat(style.paddingLeft) || 8
+    const padRight = Number.parseFloat(style.paddingRight) || 8
+    const x = rect.left - this.x0 + padLeft
+    const y = rect.top - this.y0 + rect.height / 2
+    const fill = hasValue ? (paint(style.color) ?? '#000') : '#898781'
+    const clipId = this.clip(
+      rect.left - this.x0 + padLeft,
+      rect.top - this.y0,
+      Math.max(0, rect.width - padLeft - padRight),
+      rect.height,
+    )
+    this.parts.push(
+      `<g clip-path="url(#${clipId})"><text x="${n(x)}" y="${n(y)}" dominant-baseline="central" fill="${fill}" font-family="${attr(style.fontFamily)}" font-size="${style.fontSize}" font-weight="${style.fontWeight}">${escapeXml(value)}</text></g>`,
     )
   }
 
@@ -365,10 +440,18 @@ class Builder {
   label(content: string, style: CSSStyleDeclaration, rect: DOMRect) {
     const value = content.replace(/\s+/g, ' ').trim()
     if (!value) return
-    const x = rect.left - this.x0 + (Number.parseFloat(style.paddingLeft) || 0)
+    const padLeft = Number.parseFloat(style.paddingLeft) || 10
+    const padRight = Number.parseFloat(style.paddingRight) || 28
+    const x = rect.left - this.x0 + padLeft
     const y = rect.top - this.y0 + rect.height / 2
+    const clipId = this.clip(
+      rect.left - this.x0 + padLeft,
+      rect.top - this.y0,
+      Math.max(0, rect.width - padLeft - padRight),
+      rect.height,
+    )
     this.parts.push(
-      `<text x="${n(x)}" y="${n(y)}" dominant-baseline="central" fill="${paint(style.color) ?? '#000'}" font-family="${attr(style.fontFamily)}" font-size="${style.fontSize}" font-weight="${style.fontWeight}">${escapeXml(value)}</text>`,
+      `<g clip-path="url(#${clipId})"><text x="${n(x)}" y="${n(y)}" dominant-baseline="central" fill="${paint(style.color) ?? '#000'}" font-family="${attr(style.fontFamily)}" font-size="${style.fontSize}" font-weight="${style.fontWeight}">${escapeXml(value)}</text></g>`,
     )
   }
 
@@ -395,6 +478,9 @@ interface Line {
   height: number
 }
 
+const TOKEN_RE =
+  /\s+|[\u2E80-\u9FFF\uF900-\uFAFF\uFE30-\uFE4F\uFF00-\uFFEF]|[^\s\u2E80-\u9FFF\uF900-\uFAFF\uFE30-\uFE4F\uFF00-\uFFEF]+/gu
+
 /** A text node as the lines the browser broke it into, each where it was drawn. */
 function layoutLines(node: Text): Line[] {
   const range = document.createRange()
@@ -402,23 +488,89 @@ function layoutLines(node: Text): Line[] {
   const rects = Array.from(range.getClientRects()).filter((r) => r.width > 0)
   const first = rects[0]
   if (!first) return []
-  if (rects.length === 1) {
+
+  const parent = node.parentElement
+  let clipBox: DOMRect | undefined
+  let lineClamp = 0
+  let ellipsis = false
+  for (let el: HTMLElement | null = parent; el; el = el.parentElement) {
+    const st = getComputedStyle(el)
+    if (st.overflowX === 'hidden' || st.overflowY === 'hidden') {
+      clipBox = el.getBoundingClientRect()
+      const clamp = Number.parseInt(st.webkitLineClamp || '0', 10)
+      if (clamp > 0) lineClamp = clamp
+      if (st.textOverflow === 'ellipsis' && st.whiteSpace === 'nowrap') ellipsis = true
+      break
+    }
+  }
+
+  if (rects.length === 1 && !ellipsis) {
     return [
       { text: node.textContent ?? '', left: first.left, top: first.top, height: first.height },
     ]
   }
+
   const lines: Line[] = []
   const content = node.textContent ?? ''
-  for (const match of content.matchAll(/\S+\s*/g)) {
-    const start = match.index ?? 0
-    range.setStart(node, start)
-    range.setEnd(node, start + match[0].length)
-    const box = Array.from(range.getClientRects()).find((r) => r.width > 0)
-    if (!box) continue
+  let truncatedByEllipsis = false
+
+  const pushPiece = (piece: string, box: DOMRect) => {
+    if (ellipsis && clipBox && box.right > clipBox.right - 6) {
+      truncatedByEllipsis = true
+      return false
+    }
     const last = lines.at(-1)
-    if (last && Math.abs(last.top - box.top) < box.height / 2) last.text += match[0]
-    else lines.push({ text: match[0], left: box.left, top: box.top, height: box.height })
+    if (last && Math.abs(last.top - box.top) < box.height / 2) {
+      last.text += piece
+    } else {
+      lines.push({ text: piece, left: box.left, top: box.top, height: box.height })
+    }
+    return true
   }
+
+  for (const match of content.matchAll(TOKEN_RE)) {
+    const start = match.index ?? 0
+    const token = match[0]
+    range.setStart(node, start)
+    range.setEnd(node, start + token.length)
+    const tokenRects = Array.from(range.getClientRects()).filter((r) => r.width > 0)
+    if (tokenRects.length === 0) continue
+    if (tokenRects.length === 1 && !(ellipsis && clipBox && tokenRects[0]!.right > clipBox.right)) {
+      if (!pushPiece(token, tokenRects[0]!)) break
+    } else {
+      let stopped = false
+      let offset = start
+      for (const ch of token) {
+        range.setStart(node, offset)
+        range.setEnd(node, offset + ch.length)
+        offset += ch.length
+        const chBox = Array.from(range.getClientRects()).find((r) => r.width > 0)
+        if (!chBox) continue
+        if (!pushPiece(ch, chBox)) {
+          stopped = true
+          break
+        }
+      }
+      if (stopped) break
+    }
+  }
+
+  if (truncatedByEllipsis && lines.length > 0) {
+    const last = lines.at(-1)!
+    last.text = `${last.text.trimEnd()}…`
+  }
+
+  if (lineClamp > 0 && lines.length > lineClamp) {
+    const clamped = lines.slice(0, lineClamp)
+    const last = clamped.at(-1)
+    if (last) last.text = `${last.text.replace(/[、，,.\s]+$/, '')}…`
+    return clamped
+  }
+
+  if (clipBox) {
+    return lines.filter((line) => line.top + line.height * 0.6 <= clipBox.bottom + 2)
+  }
+
   return lines
 }
 
@@ -477,7 +629,8 @@ function paint(value: string): string | undefined {
 /** The first `0 0 0 1px <color>` ring of a box-shadow — the panel's hairline border. */
 function ringColor(shadow: string): string | undefined {
   if (!shadow || shadow === 'none') return undefined
-  const match = /^(rgba?\([^)]*\)|color\([^)]*\)|#[0-9a-f]+)\s+0px\s+0px\s+0px\s+1px/i.exec(shadow)
+  const match =
+    /(rgba?\([^)]*\)|color\([^)]*\)|#[0-9a-f]+)\s+0px\s+0px\s+0px\s+1px(?:\s+inset)?/i.exec(shadow)
   return match?.[1] ? paint(match[1]) : undefined
 }
 
@@ -544,5 +697,7 @@ export function downloadBlob(blob: Blob, filename: string): void {
   document.body.appendChild(a)
   a.click()
   a.remove()
-  setTimeout(() => URL.revokeObjectURL(url), 0)
+  // Chrome reads the blob after the click returns, and later still when it asks where to save or an extension
+  // handles the download; revoked by then, the file arrives named by the blob's UUID with no extension.
+  setTimeout(() => URL.revokeObjectURL(url), 60_000)
 }
