@@ -12,6 +12,11 @@ export interface NamedQuery {
   cache?: string
   /** Threshold alert rules: `-- alert: <column> <op> <threshold> [message]`. */
   alerts?: string[]
+  /**
+   * What must hold of every result, checked by `open-dashboard check`, never shown to
+   * readers: `-- expect: rows > 0`, `not_null a, b`, `unique a, b`, `col between 0 and 1`.
+   */
+  expects?: string[]
   file: string
   /** 1-based line of the `-- name:` header. */
   line: number
@@ -21,7 +26,7 @@ export class QueryFileError extends Error {
   status = 500
 }
 
-const HEADER = /^\s*--\s*(name|source|description|uses|cache|alert)\s*:\s*(.*?)\s*$/i
+const HEADER = /^\s*--\s*(name|source|description|uses|cache|alert|expect)\s*:\s*(.*?)\s*$/i
 const VALID_NAME = /^[A-Za-z_][A-Za-z0-9_-]*$/
 
 /**
@@ -85,6 +90,11 @@ export function parseQueryFile(text: string, file: string): NamedQuery[] {
     if (header && inHeader && current && key === 'alert') {
       const rule = (header[2] ?? '').trim()
       if (rule) current.alerts = [...(current.alerts ?? []), rule]
+      return
+    }
+    if (header && inHeader && current && key === 'expect') {
+      const rule = (header[2] ?? '').trim()
+      if (rule) current.expects = [...(current.expects ?? []), rule]
       return
     }
     inHeader = false

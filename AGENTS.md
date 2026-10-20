@@ -26,9 +26,10 @@ When implementing new features and shipping a release for `open-dashboard`, foll
   2. **Functional Correctness (功能是否正常)**: Verify URL query param sync, SQL parameter binding, live KPI recalculation, interactive drawers/modals, and confirm `0` Console/Page errors.
   3. **User Experience (是否能夠有好的體驗)**: Verify end-to-end flow smoothness, keyboard shortcuts (`⌘K`, `ESC`), and visual feedback.
 
-### 4. Version Bump & GitHub Release
-- Bump version numbers in `packages/core/package.json`, `packages/cli/package.json`, `packages/mcp/package.json` (including `peerDependencies`), and `SECURITY.md`.
-- Run `pnpm build` (which also syncs skills into `packages/cli/template/skills`), commit `Release <version>`, tag `v<version>`, push to `origin main` + `--tags`, and create the GitHub Release via `gh release create v<version>`.
+### 4. Version Bump, GitHub Release & npm
+- Bump version numbers in `packages/core/package.json`, `packages/cli/package.json`, `packages/mcp/package.json` (including `peerDependencies`), `SECURITY.md`, and add the version's section to `CHANGELOG.md`. A change to the public surface in `docs/compatibility.md` ships with a migration in `src/ops/upgrade.ts`.
+- Run `pnpm build` (which also syncs skills into `packages/cli/template/skills`), commit `Release <version>`, run `node scripts/release-check.mjs` until it reports ready, tag `v<version>`, push to `origin main` + `--tags`, and create the GitHub Release via `gh release create v<version>`.
+- The maintainer publishes from the tag with `pnpm -r publish --access public` (npm login + 2FA) and confirms `npm view @open-dashboard/core version`. Without it the release does not exist for users.
 
 ### 5. Live Interaction Promo Video (with Bottom Bilingual Subtitles) & Multi-Platform Social Copy
 - **Live Browser Promo Video (`open-dashboard-v<ver>-live-subtitled.mp4`)**:

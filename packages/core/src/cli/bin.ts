@@ -11,6 +11,7 @@ import {
   diffWorkspace,
   generateReport,
   lintWorkspace,
+  listDashboards,
   listSources,
   readDatabaseDoc,
   readSchema,
@@ -20,6 +21,7 @@ import {
   SKILL_DIRS,
   schemaToText,
   syncSkills,
+  upgradeWorkspace,
 } from '../ops/index.js'
 import { exportName } from '../runtime/export-panel.js'
 import { coreVersion, importMcp, MCP_INSTALL } from '../vite/mcp-plugin.js'
@@ -58,7 +60,7 @@ Commands:
   query "<sql>"             Run read-only SQL against a datasource
   query --dashboard <id> --name <query>
                             Run one of a dashboard's named queries
-  check [id]                Run every query of every dashboard, verify panels
+  check [id]                Run every query of every dashboard, verify panels, -- expect: rules and speed
   lint [id]                 Audit dashboards and SQL queries for best-practice and performance warnings
   diff [dir]                Compare live query results against a built snapshot (default dir: site/)
   report [id]               Generate a Markdown/JSON summary report (and optionally POST to --webhook)
@@ -67,6 +69,7 @@ Commands:
   render <id>               A dashboard, or one panel (--panel), as a PNG — for an agent to look at (needs Playwright)
   mcp                       Serve the MCP tools over stdio, for a client that starts it (needs @open-dashboard/mcp)
   sync-skills               Update the agent skills in this workspace to the installed version
+  upgrade                   After installing a newer @open-dashboard/core: what this workspace needs (--write does it)
 
 Options:
   --help                 Show this, from any command
@@ -80,13 +83,18 @@ Options:
   --filter <key=value>   A filter value for render, as the URL has it; repeatable
   --theme <light|dark>   Colour scheme for render (default light)
   --max-runs <n>         Runs per query for build: filter combinations beyond it keep defaults (default 100)
+  --queryable            With build, also write each query's SQL and every SQLite file, for a host behind
+                         access control to run combinations the build did not store (docs/host-integration.md)
   --mcp                  Serve an MCP endpoint at /mcp for agents (dev; needs @open-dashboard/mcp)
   --allow-sql            With --mcp or mcp, also offer run_sql: read-only SQL of the agent's own
   --source <name>        Datasource for query/schema (default: defaultSource)
   --param <key=value>    Bind :key in the SQL; repeatable. "null" binds NULL
   --limit <n>            Rows to print for query (default 50)
   --json                 Machine-readable output (schema, query, check, sources, charts, deploy)
+  --write                With upgrade, make the changes instead of listing them
   --fresh                With check, fetch http and mcp tables again instead of reusing responses up to 10 min old
+  --all-params           With check, also run every query over the filter combinations build would store
+  --slow-ms <n>          With check, report queries slower than this (default 1000)
 `
 
 const CHECK_REUSE_MS = 10 * 60_000
@@ -116,6 +124,7 @@ const VALUE_FLAGS = new Set([
   '--name',
   '--out',
   '--max-runs',
+  '--slow-ms',
   '--panel',
   '--filter',
   '--theme',
@@ -214,9 +223,11 @@ export async function run(argv: string[]): Promise<number> {
     if (dir) options.out = dir
     const maxRuns = flag(argv, 'max-runs')
     if (maxRuns) options.maxRuns = Number(maxRuns)
+    if (argv.includes('--queryable')) options.queryable = true
     out('open-dashboard build — taking results now\n')
     await buildSite(options)
-    out('  serve it with any static web server; it never reaches your database\n')
+    if (!options.queryable)
+      out('  serve it with any static web server; it never reaches your database\n')
     return 0
   }
 
@@ -325,6 +336,22 @@ export async function run(argv: string[]): Promise<number> {
       `unknown deploy gcp action "${action}" — expected check|up|status|pull|push|stop|start|down\n`,
     )
     return 1
+  }
+
+  if (command === 'upgrade') {
+    const report = upgradeWorkspace(root, coreVersion(), { write: argv.includes('--write') })
+    if (json) {
+      out(`${JSON.stringify(report, null, 2)}\n`)
+    } else {
+      out(`open-dashboard upgrade — ${report.from ?? 'an earlier version'} → ${report.to}\n`)
+      for (const s of report.steps) {
+        const mark = s.applied ? '✓' : s.status === 'ok' ? '·' : s.status === 'manual' ? '!' : '→'
+        out(`  ${mark} ${s.message}${s.applied ? ' (done)' : ''}\n`)
+      }
+      if (!argv.includes('--write') && report.steps.some((s) => s.status === 'needed'))
+        out('  run again with --write to make the → changes\n')
+    }
+    return report.steps.some((s) => s.status === 'needed' && !s.applied) ? 1 : 0
   }
 
   if (command === 'drivers') {
@@ -565,7 +592,12 @@ export async function run(argv: string[]): Promise<number> {
       return 0
     }
 
-    const reports = await checkWorkspace(workspace, positional(argv)[0])
+    const reports = await checkWorkspace(workspace, positional(argv)[0], {
+      params: Object.fromEntries(flags(argv, 'param').map(parseParam)),
+      allParams: argv.includes('--all-params'),
+      ...(flag(argv, 'max-runs') ? { maxRuns: Number(flag(argv, 'max-runs')) } : {}),
+      ...(flag(argv, 'slow-ms') ? { slowMs: Number(flag(argv, 'slow-ms')) } : {}),
+    })
     if (json) {
       out(`${JSON.stringify(reports, null, 2)}\n`)
     } else if (reports.length === 0) {
@@ -573,9 +605,17 @@ export async function run(argv: string[]): Promise<number> {
         `no dashboards${positional(argv)[0] ? ` named "${positional(argv)[0]}"` : ''} under ${workspace.config.dashboardsDir}/\n`,
       )
     } else {
+      const summaries = listDashboards(workspace.config)
       for (const report of reports) {
         const errors = report.findings.filter((f) => f.severity === 'error').length
         out(`${errors ? '✗' : '✓'} ${report.title} (${report.id})\n`)
+        const data = summaries.find((s) => s.id === report.id)?.freshness
+        const groups = data
+          ? (['live', 'collected', 'static'] as const)
+              .filter((kind) => data[kind].length)
+              .map((kind) => `${kind}: ${data[kind].join(', ')}`)
+          : []
+        if (groups.length) out(`  data: ${groups.join(' · ')}\n`)
         const params = Object.entries(report.params)
         if (params.length)
           out(`  params: ${params.map(([k, v]) => `${k}=${v === null ? 'null' : v}`).join(' ')}\n`)
@@ -583,8 +623,21 @@ export async function run(argv: string[]): Promise<number> {
           out(
             q.error
               ? `  ✗ ${q.name}: ${q.error}\n`
-              : `  · ${q.name}: ${q.rows} rows, ${q.elapsedMs} ms [${q.columns?.join(', ')}]\n`,
+              : `  · ${q.name}: ${q.rows} rows, ${q.elapsedMs} ms [${q.columns?.join(', ')}]${
+                  q.expectations?.length
+                    ? ` expects ${q.expectations.filter((e) => e.ok).length}/${q.expectations.length}`
+                    : ''
+                }\n`,
           )
+        }
+        if (report.sweep) {
+          const { runs, failedRuns, slowest } = report.sweep
+          out(`  all params: ${runs} runs${failedRuns ? `, ${failedRuns} failed` : ''}\n`)
+          const costly = slowest.filter((q) => q.totalMs > 0)
+          if (costly.length)
+            out(
+              `  slowest over all runs: ${costly.map((q) => `${q.name} ${q.totalMs} ms (${q.runs} runs)`).join(', ')}\n`,
+            )
         }
         for (const f of report.findings) {
           if (f.message.startsWith('query "') && f.message.includes(' failed: ')) continue

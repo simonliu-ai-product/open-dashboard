@@ -96,6 +96,8 @@ $ open-dashboard check sales-overview
 
 SQL errors, unknown queries, unbound parameters and missing columns are errors, and `check` exits non-zero on any of them — so the agent runs it before saying "done", and CI can run it too. It reads only literal props: it would rather report less than guess.
 
+Running is not the same as right. A query states what must hold of its result with `-- expect:` — `rows > 0`, `unique day`, `not_null region`, `share between 0 and 1`, `amount >= 0` — and `check` fails when a run breaks one. The defaults are one reader's view: `check --param region=South` checks another, and `check --all-params` runs every query over every filter combination a build would store, naming the first params each problem shows up at. A query slower than `--slow-ms` (1000 by default) is reported, and `--all-params` lists the queries that cost most summed over every run — what a build pays.
+
 `check` proves the data is right; it cannot see a label cut off or a chart that hides the point. For that the agent looks: `open-dashboard render <id> --panel "Revenue by region" [--filter region=North] [--theme dark]` draws the panel exactly as the page does and writes a PNG it can read (MCP: `render_panel`, returned as an image). It needs Playwright in the workspace — `pnpm add -D playwright && pnpm exec playwright install chromium` — and no dev server.
 
 ### 🔌 Eleven kinds of datasource
@@ -200,6 +202,8 @@ collectors: {
 
 When `source` is a `json` or `csv` source, a run cannot take a working page down: a file it leaves unreadable, or empties when it had rows, is put back as it was and the run is reported as failed with the reason. A table that may legitimately turn empty goes in `allowEmpty: ['live']` (or `allowEmpty: true` for all).
 
+A collector keeps data current only where it runs. Every source is `live` (a database or API, read when a query asks), `collected` (written by a collector) or `static` (files as committed) — worked out from its type and its collectors, or set with `freshness:` on the source. `check` prints each dashboard's sources that way, and `build` says when a dashboard's `meta.refresh` cannot bring newer data to a build made elsewhere. Set `timeZone: 'Asia/Taipei'` in the config and every machine builds with the same wall clock.
+
 ### 🔗 Cross-database queries
 
 Ad spend in one database, revenue in another. A query can `-- uses:` other queries' results as tables:
@@ -297,6 +301,8 @@ pnpm exec open-dashboard build sales --out public
 ```
 
 The site holds query results, so `site/` is git-ignored in a new workspace: publish it deliberately.
+
+`build` prints the time each dashboard spent in queries and names the queries most of it went to. A host that runs filter combinations the build did not store needs `build --queryable`, which adds each query's SQL and the SQLite files the dashboards read — **only for a site behind the host's own access control**; see [docs/host-integration.md](docs/host-integration.md).
 
 ### 🚀 Put it online: `open-dashboard serve`
 
@@ -443,17 +449,18 @@ No database to hand? `init my-dashboards --sample` adds a small generated SQLite
 | `open-dashboard schema [source] [--json]` | Tables, columns, keys and row counts |
 | `open-dashboard query "<sql>" [--source s] [--param k=v]` | Run read-only SQL against a datasource |
 | `open-dashboard query --dashboard <id> --name <query>` | Run one of a dashboard's named queries |
-| `open-dashboard check [id] [--json] [--fresh]` | Run every query, verify every panel; non-zero exit on errors |
-| `open-dashboard lint [id] [--json]` | Audit dashboards and SQL queries for best practices (unused queries, missing descriptions, unbounded table queries, high panel counts) |
+| `open-dashboard check [id] [--param k=v] [--all-params] [--slow-ms n] [--json] [--fresh]` | Run every query, verify every panel and `-- expect:` rule, report slow queries; non-zero exit on errors |
+| `open-dashboard lint [id] [--json]` | Audit dashboards and SQL queries for best practices (unused or duplicated queries, missing descriptions or expectations, unbounded table queries, refresh without live data, high panel counts) |
 | `open-dashboard diff [dir] [--dashboard id] [--json]` | Compare live query row counts and numeric sums against a built snapshot (`site/` by default) |
 | `open-dashboard report [id] [--format md\|json] [--webhook url]` | Generate a Markdown or JSON inspection report of headline metrics and active `-- alert:` rules (and optionally POST to a Slack/Discord/generic webhook) |
 | `open-dashboard charts [--json]` | Every chart this workspace can use — the 41 built-ins and `charts/` — and the dashboards using each |
-| `open-dashboard build [id...] [--out site] [--max-runs 100]` | Static site of the dashboards with their results taken now |
+| `open-dashboard build [id...] [--out site] [--max-runs 100] [--queryable]` | Static site of the dashboards with their results taken now |
 | `open-dashboard serve [--port n] [--host h] [--build-only]` | Serve the dashboards to readers, read-only, with live results |
 | `open-dashboard render <id> [--panel title] [--filter k=v] [--theme dark]` | A dashboard or one panel as a PNG, for an agent to look at (needs Playwright) |
 | `open-dashboard collect [name...]` | Run the config's collectors now; non-zero exit if one fails |
 | `open-dashboard mcp [--allow-sql]` | The MCP tools over stdio, for a client that starts the server (needs `@open-dashboard/mcp`) |
 | `open-dashboard sync-skills` | Update this workspace's agent skills after an upgrade |
+| `open-dashboard upgrade [--write]` | After installing a newer version: what this workspace needs, and `--write` does it ([compatibility](docs/compatibility.md)) |
 
 ## The file contract
 

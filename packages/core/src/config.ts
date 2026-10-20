@@ -173,7 +173,7 @@ export interface CsvSource {
   delimiter?: string
 }
 
-export type DatasourceConfig =
+export type DatasourceConfig = (
   | SqliteSource
   | PostgresSource
   | MysqlSource
@@ -187,7 +187,20 @@ export type DatasourceConfig =
   | McpSource
   | JsonFileSource
   | CsvSource
+) & {
+  /** Overrides the freshness worked out from the type and the collectors. */
+  freshness?: Freshness
+}
 export type DatasourceType = DatasourceConfig['type']
+
+/**
+ * How current a source's data is wherever the workspace is built. `live`: read
+ * when a query asks (a database, an API). `collected`: as of the last run of a
+ * collector — current only where that collector runs. `static`: as committed.
+ * Worked out from the source's type and whether a collector writes it; set
+ * `freshness` on a source to say otherwise (a SQLite file an outside job refreshes).
+ */
+export type Freshness = 'live' | 'collected' | 'static'
 
 /**
  * An optional chat assistant on dashboard pages, answering from what the page
@@ -275,6 +288,13 @@ export interface OpenDashboardConfig {
   cache?: string | false
   /** The theme in `themes/<id>.json` for dashboards that do not pick one with `meta.theme`. */
   theme?: string
+  /**
+   * The workspace's IANA time zone, such as 'Asia/Taipei': the wall clock a build
+   * stamps, time ranges resolve against, and SQLite's 'localtime' reads — on any
+   * machine. Unset, each machine uses its own, so a build in a UTC container and
+   * one on a laptop in Taipei disagree by eight hours.
+   */
+  timeZone?: string
   assistant?: AssistantConfig
   /** Commands that refresh datasources, by name: `open-dashboard collect <name>`. */
   collectors?: Record<string, CollectorConfig>

@@ -20,8 +20,14 @@ function unavailable(): Promise<never> {
  * `data/`. Everything that writes, or needs a live database, is refused —
  * the viewer hides those controls in a snapshot.
  */
+const loaded = new Map<string, Promise<unknown>>()
+
+/** Drop every file read so far: the host has put a newer build in their place. */
+export function forgetSnapshotData(): void {
+  loaded.clear()
+}
+
 export function staticApi(): Api {
-  const loaded = new Map<string, Promise<unknown>>()
   // A one-file export carries its data inline.
   const inline = (globalThis as { __ODD_DATA__?: Record<string, unknown> }).__ODD_DATA__
   const load = <T>(path: string): Promise<T> => {

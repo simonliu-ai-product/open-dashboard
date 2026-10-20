@@ -96,6 +96,8 @@ $ open-dashboard check sales-overview
 
 SQL 錯誤、不存在的查詢、沒有綁定的參數、找不到的欄位都會被判定為錯誤，只要有任何一項，`check` 就會以非零狀態結束——所以 Agent 會在回報「完成」之前先跑它，CI 也能跑。它只讀取字面值的屬性：寧可少報，也不亂猜。
 
+能跑不等於正確。查詢可以用 `-- expect:` 寫下結果必須成立的條件——`rows > 0`、`unique day`、`not_null region`、`share between 0 and 1`、`amount >= 0`——任何一次執行違反，`check` 就失敗。預設篩選只是其中一位讀者的畫面：`check --param region=South` 檢查另一個，`check --all-params` 則把每條查詢跑過建置會儲存的每一組篩選組合，並指出每個問題第一次出現在哪一組參數。超過 `--slow-ms`（預設 1000）的查詢會被列出，`--all-params` 還會列出加總所有執行後最花時間的查詢——那就是建置要付出的成本。
+
 `check` 證明資料是對的，但看不到標籤被切掉、或圖表類型選錯這種問題。這時就讓 Agent 自己看：`open-dashboard render <id> --panel "Revenue by region" [--filter region=North] [--theme dark]` 會用和頁面完全相同的方式畫出面板，存成 Agent 讀得到的 PNG（MCP 則是 `render_panel`，直接回傳圖片）。需要在 workspace 裝 Playwright——`pnpm add -D playwright && pnpm exec playwright install chromium`——不需要 dev server。
 
 ### 🔌 11 種資料來源
@@ -200,6 +202,8 @@ collectors: {
 
 `source` 是 `json` 或 `csv` 來源時，收集器不會把正常的頁面弄壞：執行後讀不了的檔案，或原本有資料、卻被清空的檔案，會還原成執行前的內容，這次執行則記為失敗並附上原因。本來就可能變空的表（例如今天的即時比賽）寫進 `allowEmpty: ['live']`，或用 `allowEmpty: true` 全部放行。
 
+收集器只在它有執行的地方讓資料保持最新。每個資料來源都是 `live`（資料庫或 API，查詢時才讀）、`collected`（由收集器寫入）或 `static`（照 commit 的檔案）三者之一——由來源類型和收集器推導，也可以在來源上用 `freshness:` 指定。`check` 會依此列出每個 Dashboard 的來源；Dashboard 設了 `meta.refresh`、但在別台機器建置拿不到更新的資料時，`build` 會說出來。在設定檔寫上 `timeZone: 'Asia/Taipei'`，每台機器建置時就用同一個時鐘。
+
 ### 🔗 跨資料庫查詢
 
 廣告花費在一個資料庫、營收在另一個。一條查詢可以用 `-- uses:` 把其他查詢的結果當成資料表使用：
@@ -297,6 +301,8 @@ pnpm exec open-dashboard build sales --out public
 ```
 
 網站裡有查詢結果，所以新的 workspace 會把 `site/` 列進 `.gitignore`：要公開請刻意發佈。
+
+`build` 會列出每個 Dashboard 花在查詢上的時間，以及大部分時間花在哪幾條查詢。若宿主要即時執行建置沒有儲存的篩選組合，需要 `build --queryable`：它會額外寫入每條查詢的 SQL，以及 Dashboard 讀到的 SQLite 檔——**只能放在宿主自己有權限控管的地方**，詳見 [docs/host-integration.md](docs/host-integration.md)。
 
 ### 🚀 放上線：`open-dashboard serve`
 
@@ -443,17 +449,18 @@ pnpm dev                     # http://localhost:5473
 | `open-dashboard schema [source] [--json]` | 資料表、欄位、鍵與筆數 |
 | `open-dashboard query "<sql>" [--source s] [--param k=v]` | 在資料來源上執行唯讀 SQL |
 | `open-dashboard query --dashboard <id> --name <query>` | 執行某張 Dashboard 的具名查詢 |
-| `open-dashboard check [id] [--json] [--fresh]` | 執行每條查詢、驗證每個面板；有錯誤時以非零狀態結束 |
-| `open-dashboard lint [id] [--json]` | 靜態檢測 Dashboard 與 SQL 最佳實踐（未使用的查詢、缺少說明、未加 LIMIT 的表格查詢、面板過多等） |
+| `open-dashboard check [id] [--param k=v] [--all-params] [--slow-ms n] [--json] [--fresh]` | 執行每條查詢、驗證每個面板與 `-- expect:` 規則、列出慢查詢；有錯誤時以非零狀態結束 |
+| `open-dashboard lint [id] [--json]` | 靜態檢測 Dashboard 與 SQL 最佳實踐（未使用或重複的查詢、缺少說明或斷言、未加 LIMIT 的表格查詢、沒有即時資料卻設了 refresh、面板過多等） |
 | `open-dashboard diff [dir] [--dashboard id] [--json]` | 比對即時查詢結果與已建置快照（預設 `site/`）的筆數與數值總和差異 |
 | `open-dashboard report [id] [--format md\|json] [--webhook url]` | 產生包含各查詢摘要指標與觸發 `-- alert:` 警報的 Markdown 或 JSON 巡檢報告（可選擇透過 `--webhook` 推播至 Slack/Discord） |
 | `open-dashboard charts [--json]` | 這個 workspace 能用的所有圖表——41 種內建與 `charts/`——以及使用它們的 Dashboard |
-| `open-dashboard build [id...] [--out site] [--max-runs 100]` | 把 Dashboard 連同此刻的結果輸出成靜態網站 |
+| `open-dashboard build [id...] [--out site] [--max-runs 100] [--queryable]` | 把 Dashboard 連同此刻的結果輸出成靜態網站 |
 | `open-dashboard serve [--port n] [--host h] [--build-only]` | 把 Dashboard 以唯讀方式提供給讀者，結果即時查詢 |
 | `open-dashboard render <id> [--panel title] [--filter k=v] [--theme dark]` | 把 Dashboard 或單一面板畫成 PNG，給 Agent 看（需要 Playwright） |
 | `open-dashboard collect [name...]` | 立刻執行設定檔裡的收集器；有失敗時以非零狀態結束 |
 | `open-dashboard mcp [--allow-sql]` | 透過 stdio 提供 MCP 工具，給會自己啟動 server 的用戶端（需要 `@open-dashboard/mcp`） |
 | `open-dashboard sync-skills` | 升級後更新這個 workspace 的 Agent Skills |
+| `open-dashboard upgrade [--write]` | 安裝新版後：列出這個 workspace 需要調整的地方，`--write` 直接處理（[相容承諾](docs/compatibility.md)） |
 
 ## 檔案契約
 

@@ -19,6 +19,13 @@ export interface BuildOptions {
   /** Dashboards to include. Default: all. */
   ids?: string[]
   maxRuns?: number
+  /**
+   * Also write what a host needs to run filter combinations the build did not
+   * store: each query's SQL and a copy of every SQLite file. That puts your SQL
+   * and your whole database in the site — only for a site served behind the
+   * host's own access control. Off by default.
+   */
+  queryable?: boolean
   log?: (line: string) => void
 }
 
@@ -105,6 +112,8 @@ export async function snapshotFiles(
     now: Date
     maxRuns?: number
     values?: Record<string, string | null>
+    /** See `BuildOptions.queryable`: each query's compiled SQL, for a host to run. */
+    queryable?: boolean
     log?: (line: string) => void
   },
 ): Promise<{ files: Map<string, unknown>; snapshots: DashboardSnapshot[] }> {
@@ -120,26 +129,55 @@ export async function snapshotFiles(
     snapshots.push(snap)
     for (const [name, stored] of Object.entries(snap.queries))
       files.set(`d/${snap.id}/${encodeURIComponent(name)}.json`, stored)
-    const rawQueries = dashboardQueries(config, id)
-    const compiledQueries: Record<string, { sql: string; names: string[]; source: string }> = {}
-    for (const qName of rawQueries.keys()) {
-      const inlined = inlineUsesSql(qName, rawQueries)
-      const compiled = compileParams(inlined.sql, 'question')
-      const srcName = workspace.sourceName(inlined.source)
-      compiledQueries[qName] = { sql: compiled.text, names: compiled.names, source: srcName }
+    if (options.queryable) {
+      const rawQueries = dashboardQueries(config, id)
+      const compiledQueries: Record<string, { sql: string; names: string[]; source: string }> = {}
+      for (const qName of rawQueries.keys()) {
+        const inlined = inlineUsesSql(qName, rawQueries)
+        const compiled = compileParams(inlined.sql, 'question')
+        const srcName = workspace.sourceName(inlined.source)
+        compiledQueries[qName] = { sql: compiled.text, names: compiled.names, source: srcName }
+      }
+      files.set(`d/${snap.id}/_queries.json`, compiledQueries)
     }
-    files.set(`d/${snap.id}/_queries.json`, compiledQueries)
     const failed = Object.values(snap.queries).filter((q) =>
       Object.values(q.results).some((r) => 'error' in r),
     ).length
+    // A query's time is paid once per stored run: a laptop hides what a slower builder multiplies.
+    const cost = Object.entries(snap.queries)
+      .map(([name, q]) => ({
+        name,
+        runs: Object.keys(q.results).length,
+        ms: Object.values(q.results).reduce(
+          (n, r) => n + ('error' in r ? 0 : r.result.elapsedMs),
+          0,
+        ),
+      }))
+      .sort((a, b) => b.ms - a.ms)
+    const totalMs = cost.reduce((n, q) => n + q.ms, 0)
+    const heavy = cost.filter((q) => q.ms >= 1000 && q.ms >= totalMs / 4).slice(0, 3)
     options.log?.(
-      `  ${id}: ${Object.keys(snap.queries).length} queries, ${snap.runs} runs` +
+      `  ${id}: ${Object.keys(snap.queries).length} queries, ${snap.runs} runs, ${(totalMs / 1000).toFixed(1)} s in queries` +
         (snap.trimmed.length ? `, defaults kept for ${snap.trimmed.join(', ')}` : '') +
         (failed ? `, ${failed} with errors` : ''),
     )
+    const summary = listDashboards(config).find((d) => d.id === id)
+    if (summary?.refresh && summary.freshness.live.length === 0) {
+      const held = [...summary.freshness.collected, ...summary.freshness.static]
+      options.log?.(
+        `    meta.refresh is ${summary.refresh}, but it reads no live source (${held.join(', ')}): rebuilding this snapshot elsewhere brings no newer data`,
+      )
+    }
+    if (heavy.length) {
+      options.log?.(
+        `    most of it: ${heavy.map((q) => `${q.name} ${(q.ms / 1000).toFixed(1)} s over ${q.runs} runs`).join(', ')} — open-dashboard check --all-params times each`,
+      )
+    }
   }
   const summaries = listDashboards(config).filter((d) => ids.includes(d.id))
   files.set('dashboards.json', {
+    // Read again by a page its host tells about a newer build (app/lib/host.ts).
+    builtAt: wallClock(options.now),
     dashboards: summaries.map((summary) => ({ ...summary, file: '' })),
   })
   const themes = listThemes(config)
@@ -249,6 +287,7 @@ export async function buildSite(options: BuildOptions = {}): Promise<BuildResult
       now,
       log,
       ...(options.maxRuns ? { maxRuns: options.maxRuns } : {}),
+      ...(options.queryable ? { queryable: true } : {}),
     })
   } finally {
     await workspace.close()
@@ -281,8 +320,14 @@ export async function buildSite(options: BuildOptions = {}): Promise<BuildResult
     writeFileSync(html, page(envBase ?? '../../', `${summary.title} · open-dashboard`))
   }
   for (const [path, value] of taken.files) writeJson(join(out, 'data', path), value)
-  for (const [sourceName, ds] of Object.entries(config.datasources)) {
-    if (ds.type === 'sqlite' && ds.file) {
+  // Only the databases the built dashboards read: a queryable site still holds no more than it must.
+  const read = new Set(
+    listDashboards(config)
+      .filter((d) => ids.includes(d.id))
+      .flatMap((d) => d.sources),
+  )
+  for (const [sourceName, ds] of Object.entries(options.queryable ? config.datasources : {})) {
+    if (ds.type === 'sqlite' && ds.file && read.has(sourceName)) {
       const dbSrc = resolve(config.root, ds.file)
       if (existsSync(dbSrc)) {
         const dbDest = join(out, 'data', '_sqlite', `${sourceName}.db`)
@@ -294,6 +339,11 @@ export async function buildSite(options: BuildOptions = {}): Promise<BuildResult
   if (!existsSync(join(out, 'index.html'))) throw new Error('nothing was written')
   const shown = relative(process.cwd(), out)
   log(`  wrote ${shown.startsWith('..') ? out : shown || '.'}/`)
+  if (options.queryable) {
+    log(
+      '  --queryable: the site holds your SQL and a copy of every SQLite database — serve it only behind access control',
+    )
+  }
   return { out, dashboards: taken.snapshots }
 }
 

@@ -141,11 +141,19 @@ export function registerTools(server: McpServer, workspace: Workspace, options: 
     {
       title: 'Check dashboards',
       description:
-        'Run every query of a dashboard (or all of them) with the filters’ defaults and verify each panel: query names, columns, parameters. Fix every error before calling a dashboard done.',
-      inputSchema: z.object({ id: z.string().optional().describe('one dashboard; omit for all') }),
+        'Run every query of a dashboard (or all of them) with the filters’ defaults and verify each panel: query names, columns, parameters, each query’s -- expect: rules, and slow queries. With all_params, also every filter combination a build would store. Fix every error before calling a dashboard done.',
+      inputSchema: z.object({
+        id: z.string().optional().describe('one dashboard; omit for all'),
+        params: PARAMS.optional().describe('filter params to check at instead of the defaults'),
+        all_params: z
+          .boolean()
+          .optional()
+          .describe('also run every query over every filter combination a build would store'),
+      }),
       annotations: { readOnlyHint: true },
     },
-    ({ id }) => run(() => checkWorkspace(workspace, id)),
+    ({ id, params, all_params }) =>
+      run(() => checkWorkspace(workspace, id, { params, allParams: all_params })),
   )
 
   server.registerTool(

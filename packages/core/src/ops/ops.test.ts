@@ -67,6 +67,7 @@ describe('dashboards', () => {
         queries: 3,
         panels: 2,
         sources: ['db'],
+        freshness: { live: [], collected: [], static: ['db'] },
         file: 'dashboards/sales/index.tsx',
       },
     ])

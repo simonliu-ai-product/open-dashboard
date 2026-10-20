@@ -119,6 +119,11 @@ be `number`, not `string`), plausible magnitudes, sensible row count. A chart
 needs the aggregation done in SQL — return tens or hundreds of rows, not raw
 events.
 
+What you just checked by eye, write down as `-- expect:` lines on the query —
+`rows > 0`, `unique month`, `share between 0 and 1`, `amount >= 0` — so the next
+change is checked the same way without anyone looking. SQL another dashboard
+already has belongs in `queries/*.sql`, named from both, not copied.
+
 ## Step 6 — Write `dashboards/<id>/index.tsx`
 
 Follow `dashboard-authoring`. Name columns explicitly on every panel (`x`, `y`,
@@ -127,13 +132,14 @@ Follow `dashboard-authoring`. Name columns explicitly on every panel (`x`, `y`,
 ## Step 7 — Check it
 
 ```bash
-pnpm exec open-dashboard check <id>
+pnpm exec open-dashboard check <id> --all-params
 ```
 
-It runs every query with the dashboard's default filter values and verifies
-every query a panel names exists and every column a panel names is in that
-query's result. **It must pass with no errors.** Treat "returns no rows" and
-"defined but no panel uses it" warnings as things to fix or explain.
+It runs every query over every filter combination a build would store and
+verifies every query a panel names exists, every column a panel names is in
+that query's result, and every `-- expect:` rule holds. **It must pass with no
+errors.** Treat "returns no rows", "defined but no panel uses it" and slow-query
+warnings as things to fix or explain, then run `open-dashboard lint <id>`.
 
 Then look at what you drew — `check` cannot see a cut-off label or a chart
 that hides the point:

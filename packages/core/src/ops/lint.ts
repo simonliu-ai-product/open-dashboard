@@ -3,7 +3,7 @@ import { relative } from 'node:path'
 import type { Workspace } from '../workspace.js'
 import { analyzeDashboard } from './analyze.js'
 import { chartImports } from './charts.js'
-import { dashboardQueries, discoverDashboards } from './dashboards.js'
+import { dashboardQueries, discoverDashboards, listDashboards } from './dashboards.js'
 
 export interface LintFinding {
   rule:
@@ -12,6 +12,9 @@ export interface LintFinding {
     | 'missing-query-description'
     | 'unbounded-table-query'
     | 'high-panel-count'
+    | 'duplicate-query'
+    | 'refresh-without-live-source'
+    | 'missing-expectations'
   severity: 'warning' | 'info'
   dashboard: string
   message: string
@@ -24,10 +27,41 @@ export interface LintReport {
   findings: LintFinding[]
 }
 
+/** SQL as written, minus what does not change what it does: comments, spacing, case. */
+function normalizedSql(sql: string): string {
+  return sql
+    .replace(/--[^\n]*/g, ' ')
+    .replace(/\/\*[\s\S]*?\*\//g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim()
+    .toLowerCase()
+}
+
+/** Shorter than this, two queries being alike says nothing: `SELECT DISTINCT region FROM sales`. */
+const DUPLICATE_MIN_LENGTH = 80
+
 export function lintWorkspace(workspace: Workspace, onlyId?: string): LintReport[] {
   const discovered = discoverDashboards(workspace.config.root, workspace.config.dashboardsDir)
   const list = onlyId ? discovered.filter((d) => d.id === onlyId) : discovered
   const reports: LintReport[] = []
+  const summaries = new Map(listDashboards(workspace.config).map((s) => [s.id, s]))
+
+  // Every dashboard's own queries, by their SQL: one written twice is one that drifts.
+  const bySql = new Map<string, { dashboard: string; name: string }[]>()
+  for (const item of discovered) {
+    let own: ReturnType<typeof dashboardQueries>
+    try {
+      own = dashboardQueries(workspace.config, item.id)
+    } catch {
+      continue
+    }
+    for (const q of own.values()) {
+      if (!q.file.startsWith(`${workspace.config.dashboardsDir}/`)) continue
+      const key = normalizedSql(q.sql)
+      if (key.length < DUPLICATE_MIN_LENGTH) continue
+      bySql.set(key, [...(bySql.get(key) ?? []), { dashboard: item.id, name: q.name }])
+    }
+  }
 
   for (const item of list) {
     const rel = relative(workspace.config.root, item.file)
@@ -58,6 +92,17 @@ export function lintWorkspace(workspace: Workspace, onlyId?: string): LintReport
         severity: 'warning',
         dashboard: item.id,
         message: `${analysis.panels.length} panels without <Section> or <Tabs> grouping`,
+        where: rel,
+      })
+    }
+
+    const summary = summaries.get(item.id)
+    if (summary?.refresh && summary.freshness.live.length === 0) {
+      findings.push({
+        rule: 'refresh-without-live-source',
+        severity: 'info',
+        dashboard: item.id,
+        message: `meta.refresh is ${summary.refresh}, but no source it reads is live (${[...summary.freshness.collected, ...summary.freshness.static].join(', ')}) — it refreshes only where its collectors run, never in a build made elsewhere`,
         where: rel,
       })
     }
@@ -95,6 +140,33 @@ export function lintWorkspace(workspace: Workspace, onlyId?: string): LintReport
             where: `${q.file}:${q.line}`,
           })
         }
+      }
+
+      for (const [qName, q] of queries.entries()) {
+        if (!q.file.startsWith(`${workspace.config.dashboardsDir}/`)) continue
+        const twins = (bySql.get(normalizedSql(q.sql)) ?? []).filter((t) => t.dashboard !== item.id)
+        if (twins.length === 0) continue
+        findings.push({
+          rule: 'duplicate-query',
+          severity: 'warning',
+          dashboard: item.id,
+          message: `query "${qName}" is the same SQL as ${twins.map((t) => `"${t.name}" in ${t.dashboard}`).join(', ')} — move it to queries/*.sql and name it from each`,
+          where: `${q.file}:${q.line}`,
+        })
+      }
+
+      const own = [...queries.values()].filter(
+        (q) => q.file.startsWith(`${workspace.config.dashboardsDir}/`) && referenced.has(q.name),
+      )
+      if (own.length > 0 && !own.some((q) => q.expects?.length)) {
+        findings.push({
+          rule: 'missing-expectations',
+          severity: 'info',
+          dashboard: item.id,
+          message:
+            'no query has an -- expect: rule — write the invariants you know (rows > 0, unique key, share between 0 and 1) so check catches a wrong number',
+          where: rel,
+        })
       }
 
       for (const panel of analysis.panels) {

@@ -24,6 +24,7 @@ import { Assistant, useAssistantEnabled } from '../components/assistant.js'
 import { DashboardHeader } from '../components/dashboard-header.js'
 import { SaveBar } from '../components/save-bar.js'
 import { api } from '../lib/api.js'
+import { DATA_UPDATED_EVENT } from '../lib/host.js'
 import { parseInterval, REFRESH_OPTIONS, readRefresh, writeRefresh } from '../lib/refresh.js'
 import { ThemeStyle, useThemeFile, useThemeList } from '../lib/themes.js'
 import { useLayoutEdit } from '../lib/use-layout-edit.js'
@@ -229,6 +230,10 @@ export function DashboardView({ id, preview }: { id: string; preview?: ThemePrev
     setTick((t) => t + 1)
     setUpdatedAt(new Date())
   }, [])
+  useEffect(() => {
+    window.addEventListener(DATA_UPDATED_EVENT, refresh)
+    return () => window.removeEventListener(DATA_UPDATED_EVENT, refresh)
+  }, [refresh])
   const refreshNow = useCallback(() => {
     inflight.current.clear()
     setTick((t) => {

@@ -29,6 +29,8 @@ export interface ResolvedConfig {
   cacheMs: number
   /** `themes/<id>.json` used by a dashboard whose `meta.theme` names none. */
   theme: string | undefined
+  /** Applied to the process as `TZ` when the config loads. */
+  timeZone: string | undefined
   /** Resolved and usable, or undefined when off or incomplete. */
   assistant: ResolvedAssistant | undefined
   collectors: Record<string, ResolvedCollector>
@@ -203,6 +205,24 @@ function resolveCache(cache: string | false | undefined): number {
   return ms
 }
 
+/**
+ * A build's wall clock is part of what it produces, so it belongs to the
+ * workspace, not to whichever machine runs it. Node rereads `TZ` when it is
+ * set, which moves Date, Intl and SQLite's 'localtime' together.
+ */
+function resolveTimeZone(timeZone: string | undefined): string | undefined {
+  if (timeZone === undefined) return undefined
+  try {
+    new Intl.DateTimeFormat('en', { timeZone })
+  } catch {
+    throw new DatasourceError(
+      `timeZone: "${timeZone}" is not an IANA time zone — use one like 'Asia/Taipei' or 'UTC'`,
+    )
+  }
+  process.env.TZ = timeZone
+  return timeZone
+}
+
 export interface ConfigOverrides {
   port?: number
 }
@@ -243,6 +263,7 @@ export async function loadConfig(
     timeoutMs: user.timeoutMs ?? 15_000,
     cacheMs: resolveCache(user.cache),
     theme: user.theme,
+    timeZone: resolveTimeZone(user.timeZone),
     assistant,
     collectors: resolveCollectors(user.collectors),
     serve: resolveServe(user.serve),

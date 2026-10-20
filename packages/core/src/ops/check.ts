@@ -13,6 +13,8 @@ import {
   queryParams,
   runDashboardQuery,
 } from './dashboards.js'
+import { checkExpectations, type ExpectationResult } from './expect.js'
+import { snapshotDashboard } from './snapshot.js'
 
 export type Severity = 'error' | 'warning'
 
@@ -31,7 +33,28 @@ export interface QueryReport {
   columns?: string[]
   elapsedMs?: number
   alerts?: QueryAlertResult[]
+  expectations?: ExpectationResult[]
   error?: string
+}
+
+export interface CheckOptions {
+  now?: Date
+  /** Filter params to check at in place of the defaults, by param name. */
+  params?: Record<string, ParamValue>
+  /** Also run every query over the filter combinations a build would store. */
+  allParams?: boolean
+  /** Runs per query for `allParams`, as `build --max-runs`. Default 100. */
+  maxRuns?: number
+  /** A query slower than this is reported. Default 1000. */
+  slowMs?: number
+}
+
+/** Runs across the filter combinations, when `allParams` swept them. */
+export interface SweepReport {
+  runs: number
+  failedRuns: number
+  /** The slowest query by its time summed over every run — what a build pays. */
+  slowest: { name: string; runs: number; totalMs: number }[]
 }
 
 export interface DashboardReport {
@@ -40,6 +63,7 @@ export interface DashboardReport {
   params: Record<string, ParamValue>
   queries: QueryReport[]
   findings: Finding[]
+  sweep?: SweepReport
 }
 
 /**
@@ -135,8 +159,10 @@ export async function checkDashboard(
   workspace: Workspace,
   id: string,
   file: string,
-  now = new Date(),
+  options: CheckOptions = {},
 ): Promise<DashboardReport> {
+  const now = options.now ?? new Date()
+  const slowMs = options.slowMs ?? 1000
   const rel = relative(workspace.config.root, file)
   const findings: Finding[] = []
   const code = readFileSync(file, 'utf8')
@@ -162,7 +188,10 @@ export async function checkDashboard(
     return report
   }
 
-  report.params = await defaultParams(workspace, id, analysis.filters, findings, rel, now)
+  report.params = {
+    ...(await defaultParams(workspace, id, analysis.filters, findings, rel, now)),
+    ...options.params,
+  }
 
   for (const panel of analysis.panels) {
     if (!panel.title && panel.component !== 'Text') {
@@ -283,6 +312,27 @@ export async function checkDashboard(
           where: `${query.file}:${query.line}`,
         })
       }
+      if (run.result.elapsedMs > slowMs) {
+        findings.push({
+          severity: 'warning',
+          message: `query "${name}" took ${entry.elapsedMs} ms (over ${slowMs} ms)${
+            query.uses?.length
+              ? ' — its -- uses: inputs run again for every query that uses them; a CTE named more than once re-runs too (AS MATERIALIZED)'
+              : ''
+          }`,
+          where: `${query.file}:${query.line}`,
+        })
+      }
+      if (query.expects?.length) {
+        entry.expectations = checkExpectations(query.expects, run.result)
+        for (const failed of entry.expectations.filter((e) => !e.ok)) {
+          findings.push({
+            severity: 'error',
+            message: `query "${name}" expects ${failed.rule}: ${failed.message}`,
+            where: `${query.file}:${query.line}`,
+          })
+        }
+      }
       if (run.alerts?.length) {
         entry.alerts = run.alerts
         for (const alert of run.alerts) {
@@ -320,17 +370,91 @@ export async function checkDashboard(
     }
   }
 
+  if (options.allParams && !findings.some((f) => f.severity === 'error')) {
+    report.sweep = await sweepDashboard(workspace, id, queries, findings, now, options.maxRuns)
+  }
+
   return report
+}
+
+/**
+ * Every query over every filter combination a build would store: the default
+ * filters are one reader's view, and a query can fail, break an expectation or
+ * crawl for another one. Each problem is reported once, with the first params
+ * it showed up at.
+ */
+async function sweepDashboard(
+  workspace: Workspace,
+  id: string,
+  queries: Map<string, NamedQuery>,
+  findings: Finding[],
+  now: Date,
+  maxRuns = 100,
+): Promise<SweepReport> {
+  const snapshot = await snapshotDashboard(workspace, id, { now, maxRuns })
+  const sweep: SweepReport = { runs: snapshot.runs, failedRuns: 0, slowest: [] }
+  const totals: SweepReport['slowest'] = []
+  const at = (params: Record<string, ParamValue> | undefined) =>
+    Object.entries(params ?? {})
+      .map(([k, v]) => `${k}=${v === null ? 'null' : v}`)
+      .join(' ') || 'no params'
+  for (const [name, stored] of Object.entries(snapshot.queries)) {
+    const query = queries.get(name)
+    const where = query ? `${query.file}:${query.line}` : undefined
+    const reported = new Set<string>()
+    const total = { name, runs: 0, totalMs: 0 }
+    for (const run of Object.values(stored.results)) {
+      total.runs += 1
+      if ('error' in run) {
+        sweep.failedRuns += 1
+        if (!reported.has('error')) {
+          reported.add('error')
+          findings.push({
+            severity: 'error',
+            message: `query "${name}" fails for some filter values: ${run.error}`,
+            where,
+          })
+        }
+        continue
+      }
+      total.totalMs += run.result.elapsedMs
+      for (const failed of checkExpectations(query?.expects ?? [], run.result)) {
+        if (failed.ok || reported.has(failed.rule)) continue
+        reported.add(failed.rule)
+        findings.push({
+          severity: 'error',
+          message: `query "${name}" expects ${failed.rule}, but at ${at(run.params)}: ${failed.message}`,
+          where,
+        })
+      }
+    }
+    total.totalMs = Math.round(total.totalMs)
+    totals.push(total)
+  }
+  sweep.slowest = totals.sort((a, b) => b.totalMs - a.totalMs).slice(0, 5)
+  for (const name of snapshot.trimmed) {
+    findings.push({
+      severity: 'warning',
+      message: `query "${name}" has more filter combinations than ${maxRuns}: some were checked at their defaults only`,
+      where: queries.get(name)
+        ? `${queries.get(name)?.file}:${queries.get(name)?.line}`
+        : undefined,
+    })
+  }
+  return sweep
 }
 
 export async function checkWorkspace(
   workspace: Workspace,
   only?: string,
+  options: CheckOptions = {},
 ): Promise<DashboardReport[]> {
   const found = discoverDashboards(workspace.config.root, workspace.config.dashboardsDir).filter(
     (entry) => !only || entry.id === only,
   )
   const reports: DashboardReport[] = []
-  for (const entry of found) reports.push(await checkDashboard(workspace, entry.id, entry.file))
+  for (const entry of found) {
+    reports.push(await checkDashboard(workspace, entry.id, entry.file, options))
+  }
   return reports
 }

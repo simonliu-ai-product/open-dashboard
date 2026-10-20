@@ -11,6 +11,7 @@ import { analyzeDashboard } from './analyze.js'
 import { chartImports } from './charts.js'
 import { combineResults } from './combine.js'
 import { OpsError } from './errors.js'
+import { freshnessOf, type SourcesByFreshness } from './freshness.js'
 import { cacheKey, parseDuration } from './query-cache.js'
 
 const ENTRY_NAMES = ['index.tsx', 'index.jsx']
@@ -29,6 +30,8 @@ export interface DashboardSummary {
   panels: number
   /** Datasources its queries read, a query without `-- source:` counting as the default. */
   sources: string[]
+  /** Those sources by how current they are anywhere it is built: refresh brings new data only through `live`. */
+  freshness: SourcesByFreshness
   /** `meta.refresh`, when the dashboard sets a default auto-refresh. */
   refresh?: string
   /** `meta.theme`, when the dashboard picks one. */
@@ -79,6 +82,8 @@ export function listDashboards(config: ResolvedConfig): DashboardSummary[] {
       const found = loadQueries(join(config.root, config.dashboardsDir, id), config.root)
       queries = found.size
       for (const query of found.values()) {
+        // A query over other queries' results reads no source of its own.
+        if (query.uses?.length) continue
         const source = query.source || config.defaultSource
         if (source) sources.add(source)
       }
@@ -91,6 +96,7 @@ export function listDashboards(config: ResolvedConfig): DashboardSummary[] {
       queries,
       panels: panels.length,
       sources: [...sources].sort(),
+      freshness: freshnessOf(config, [...sources]),
       file: relative(config.root, file),
     }
     if (typeof meta.description === 'string') summary.description = meta.description

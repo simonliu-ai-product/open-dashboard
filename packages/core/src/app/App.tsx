@@ -120,10 +120,17 @@ function useStarredDashboards(): [string[], (id: string) => void] {
 const locSearch = () =>
   ((window as { __cwLocation?: () => URL }).__cwLocation?.() ?? window.location).search
 
+type HostWindow = { __OPEN_X_HOST__?: { embed?: boolean }; __COSTAFF_HOST__?: { embed?: boolean } }
+
+/** Set by a host that frames the page with its own chrome; `__COSTAFF_HOST__` is the name it had first. */
 const isEmbedded = () =>
   typeof window !== 'undefined' &&
   (new URLSearchParams(locSearch()).get('kiosk') === '1' ||
-    Boolean((window as { __COSTAFF_HOST__?: { embed?: boolean } }).__COSTAFF_HOST__?.embed) ||
+    Boolean(
+      (window as HostWindow).__OPEN_X_HOST__?.embed ??
+        (window as HostWindow).__COSTAFF_HOST__?.embed,
+    ) ||
+    document.documentElement.hasAttribute('data-open-x-embed') ||
     document.documentElement.hasAttribute('data-costaff-embed'))
 
 function Shell() {

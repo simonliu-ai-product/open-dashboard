@@ -1,0 +1,32 @@
+[
+  {
+    "id": "sales-overview",
+    "setup": "npx @open-dashboard/cli init <dir> --sample",
+    "prompt": "Make a dashboard of how the shop is doing: revenue over time, top products, and orders by region, with a region filter.",
+    "pass": {
+      "maxErrors": 0,
+      "minExpectCoverage": 0.5,
+      "maxDuplicates": 0,
+      "maxSlowQueries": 0,
+      "maxUnboundedTables": 0
+    }
+  },
+  {
+    "id": "two-dashboards-one-metric",
+    "setup": "npx @open-dashboard/cli init <dir> --sample",
+    "prompt": "Make one dashboard for the sales team and one for finance. Both need monthly revenue, defined the same way.",
+    "pass": { "maxErrors": 0, "minExpectCoverage": 0.5, "maxDuplicates": 0 }
+  },
+  {
+    "id": "live-api",
+    "setup": "npx @open-dashboard/cli init <dir>",
+    "prompt": "Connect https://api.github.com/repos/<owner>/<repo>/issues as a source and make a dashboard of open issues by label that stays current when it is published.",
+    "pass": { "maxErrors": 0, "minExpectCoverage": 0.5, "maxRefreshWithoutLive": 0 }
+  },
+  {
+    "id": "every-filter",
+    "setup": "npx @open-dashboard/cli init <dir> --sample",
+    "prompt": "Make a dashboard of order counts and average order value with filters for region, product category and time range.",
+    "pass": { "maxErrors": 0, "maxFailedRuns": 0, "minExpectCoverage": 0.5 }
+  }
+]

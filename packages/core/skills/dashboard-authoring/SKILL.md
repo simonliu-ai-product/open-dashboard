@@ -48,6 +48,11 @@ ORDER BY 1;
 - `-- alert:` (optional) threshold alert expression checked against the first row, e.g.
   `-- alert: revenue < 50000 warn "Revenue below $50k"` or `-- alert: error_rate > 0.05 error "High error rate"`.
   Shows a warning/error badge on the panel header and is included in `open-dashboard report`.
+- `-- expect:` (optional, repeatable) — what must hold of every result, checked by
+  `check` and never shown to readers: `rows > 0`, `rows between 1 and 31`,
+  `not_null region, amount`, `unique day`, `share between 0 and 1`, `amount >= 0`.
+  Write one for every invariant you know — a share stays in 0–1, a key is unique,
+  a total is never negative — so a wrong number fails `check` instead of reaching a reader.
 - `-- uses:` (optional) — see *Across databases* below.
 - Those header lines must come **directly** after `-- name:`.
 - A trailing `;` is fine. One statement per query.
@@ -316,13 +321,49 @@ and friends work too.
 ## Checking
 
 ```bash
-pnpm exec open-dashboard check <id>
+pnpm exec open-dashboard check <id>                      # the default filters
+pnpm exec open-dashboard check <id> --param region=South # one other view
+pnpm exec open-dashboard check <id> --all-params         # every combination a build stores
 ```
 
-Runs every query with the default filter values; reports SQL errors, unknown
-queries, columns a panel names that the result does not have, unbound
-parameters, empty results, unused queries, truncated results. **Zero errors
-before you hand a dashboard back.**
+Runs every query and reports SQL errors, unknown queries, columns a panel names
+that the result does not have, unbound parameters, empty results, unused
+queries, truncated results, broken `-- expect:` rules and slow queries. The
+defaults are one reader's view: `--all-params` runs every filter combination a
+build would store and names the first params each problem shows up at. **Zero
+errors with `--all-params` before you hand a dashboard back.**
+
+Changing a query that already works? Build first, change, then compare —
+`open-dashboard build` before, `open-dashboard diff` after — and explain every
+number that moved.
+
+## Reuse and speed
+
+- **Write a calculation once.** SQL two dashboards need goes in `queries/*.sql`
+  at the workspace root, where every dashboard can name it — never a copy per
+  dashboard (`lint` flags copies).
+- **`-- uses:` inputs run again for every query that uses them**, and SQLite
+  re-runs a CTE each time it is named or read from a correlated subquery. A CTE
+  read more than once, or one holding a large parsed JSON, is
+  `name AS MATERIALIZED (…)`.
+- **Speed shows on the build machine, not on yours.** `check` warns past
+  `--slow-ms` (default 1000) and `--all-params` sums each query over every run —
+  what a build pays. Fix the slowest before adding filters that multiply runs.
+
+## Where the data comes from
+
+- Every source is `live` (a database or API, read when a query asks),
+  `collected` (as of the last collector run — current only where that collector
+  runs) or `static` (files as committed). `check` prints each dashboard's
+  sources by freshness, and a build writes them into `dashboards.json`. Override with
+  `freshness:` on a source when you know better (a SQLite file an outside job
+  refreshes).
+- A dashboard that must stay current wherever it is built reads its moving data
+  from `live` sources — an `http` table or a database — and keeps collectors for
+  what changes slowly. `meta.refresh` cannot make a `collected` source newer in
+  a build made elsewhere; `build` says so.
+- Set `timeZone` in the config (`'Asia/Taipei'`) for any workspace built
+  somewhere else: it is the wall clock builds stamp and "today" resolves against.
 
 ## Self-review
 
@@ -335,4 +376,8 @@ before you hand a dashboard back.**
 - [ ] The current, partial period is handled: say so, or exclude it.
 - [ ] No chart has two measures of different scale.
 - [ ] Rankings are horizontal bars sorted in SQL.
-- [ ] `check` passes.
+- [ ] Every invariant you know is a `-- expect:` rule.
+- [ ] `check --all-params` passes, with no slow-query warning left unexplained.
+- [ ] No SQL is copied between dashboards — shared SQL lives in `queries/`.
+- [ ] Data that must stay current comes from a `live` source; `timeZone` is set
+      if the workspace is built anywhere but this machine.
