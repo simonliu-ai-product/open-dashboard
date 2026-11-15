@@ -1,4 +1,12 @@
-import { mkdirSync, mkdtempSync, realpathSync, rmSync, writeFileSync } from 'node:fs'
+import {
+  existsSync,
+  mkdirSync,
+  mkdtempSync,
+  readFileSync,
+  realpathSync,
+  rmSync,
+  writeFileSync,
+} from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { DatabaseSync } from 'node:sqlite'
@@ -129,6 +137,26 @@ describe('MCP server', () => {
       content: '-- name: q\nSELECT 1;\n',
     })
     expect(JSON.parse(created.text)).toMatchObject({ created: true })
+  })
+
+  it('duplicates, renames and trashes a dashboard', async () => {
+    const copy = await tool('duplicate_dashboard', { id: 'sales' })
+    expect(JSON.parse(copy.text)).toEqual({ id: 'sales-copy', title: 'sales-copy' })
+    const noMeta = await tool('rename_dashboard', { id: 'sales-copy', title: 'Q3' })
+    expect(noMeta).toMatchObject({ error: true, text: expect.stringMatching(/meta\.title/) })
+    writeFileSync(
+      join(root, 'dashboards', 'sales-copy', 'index.tsx'),
+      "export const meta = { title: 'Copy' }\nexport default function S() { return null }\n",
+    )
+    expect((await tool('rename_dashboard', { id: 'sales-copy', title: "Q3 'draft'" })).error).toBe(
+      false,
+    )
+    expect(readFileSync(join(root, 'dashboards', 'sales-copy', 'index.tsx'), 'utf8')).toContain(
+      "title: 'Q3 \\'draft\\''",
+    )
+    const trashed = JSON.parse((await tool('delete_dashboard', { id: 'sales-copy' })).text)
+    expect(trashed.trashedTo).toMatch(/^\.open-dashboard\/trash\/sales-copy-/)
+    expect(existsSync(join(root, 'dashboards', 'sales-copy'))).toBe(false)
   })
 
   it('runs the agent’s SQL read-only', async () => {

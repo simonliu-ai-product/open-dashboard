@@ -1,0 +1,12 @@
+{
+  "name": "open-dashboard",
+  "displayName": "open-dashboard",
+  "version": "0.1.0",
+  "description": "Build live dashboards over your database as React and SQL — named read-only queries, panels, filters, themes and checks — in an open-dashboard workspace.",
+  "author": { "name": "Simon Liu", "url": "https://github.com/LiuYuWei" },
+  "homepage": "https://github.com/simonliu-ai-product/open-dashboard",
+  "repository": "https://github.com/simonliu-ai-product/open-dashboard",
+  "license": "MIT",
+  "keywords": ["dashboards", "sql", "charts", "analytics", "react"],
+  "mcpServers": "./mcp_config.json"
+}

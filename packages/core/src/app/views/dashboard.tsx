@@ -17,15 +17,18 @@ import { applyProps } from '../../runtime/convert.js'
 import { EditContext } from '../../runtime/edit.js'
 import { downloadBlob, downloadDashboard, exportName } from '../../runtime/export-panel.js'
 import { useT } from '../../runtime/i18n.js'
+import { panelRunsOn } from '../../runtime/panel-runs.js'
 import { readOnly, snapshot } from '../../runtime/snapshot.js'
 import type { DashboardTheme } from '../../runtime/theme.js'
 import type { DashboardMeta, PanelInfo, QueryRun } from '../../runtime/types.js'
+import { resultsToXlsx } from '../../runtime/xlsx.js'
 import { Assistant, useAssistantEnabled } from '../components/assistant.js'
 import { DashboardHeader } from '../components/dashboard-header.js'
 import { SaveBar } from '../components/save-bar.js'
-import { api } from '../lib/api.js'
+import { api, type DashboardNoteView } from '../lib/api.js'
 import { DATA_UPDATED_EVENT } from '../lib/host.js'
 import { parseInterval, REFRESH_OPTIONS, readRefresh, writeRefresh } from '../lib/refresh.js'
+import { navigate } from '../lib/router.js'
 import { ThemeStyle, useThemeFile, useThemeList } from '../lib/themes.js'
 import { useLayoutEdit } from '../lib/use-layout-edit.js'
 import { Inspector, type InspectorTab } from './inspector.js'
@@ -207,7 +210,7 @@ export function DashboardView({ id, preview }: { id: string; preview?: ThemePrev
     window.addEventListener('beforeunload', warn)
     return () => window.removeEventListener('beforeunload', warn)
   }, [edits.length])
-  const [notes, setNotes] = useState<{ line: number; text: string }[]>([])
+  const [notes, setNotes] = useState<DashboardNoteView[]>([])
   const params = useRef<Record<string, ParamValue>>({})
   const page = useRef<HTMLDivElement>(null)
   const focus = useRef<{ panel?: string; query?: string }>({})
@@ -376,6 +379,22 @@ export function DashboardView({ id, preview }: { id: string; preview?: ThemePrev
               onRefreshSetting={chooseRefresh}
               onRefresh={refreshNow}
               notes={notes}
+              manage={{
+                rename: async (title) => {
+                  await api.renameDashboard(id, title)
+                },
+                duplicate: async () => {
+                  const copy = await api.duplicateDashboard(id)
+                  navigate(`/d/${copy.id}`)
+                },
+                remove: async () => {
+                  await api.deleteDashboard(id)
+                  navigate('/')
+                },
+              }}
+              onResolveNote={(note) =>
+                api.resolveComment(id, note.line, note.text).then(loadNotes, loadNotes)
+              }
               mode={mode}
               onMode={editor.setMode}
               themes={themes?.themes}
@@ -391,9 +410,23 @@ export function DashboardView({ id, preview }: { id: string; preview?: ThemePrev
                   ))
               }
               // HTML is built by the dev server; a snapshot or `serve` has none.
-              formats={readOnly() ? ['png', 'svg', 'pdf'] : ['png', 'svg', 'pdf', 'html']}
+              formats={
+                readOnly() ? ['png', 'svg', 'pdf', 'xlsx'] : ['png', 'svg', 'pdf', 'html', 'xlsx']
+              }
               onDownload={async (format) => {
-                if (format === 'html') {
+                if (format === 'xlsx') {
+                  // Every panel's rows as shown, a sheet each in page order.
+                  const sheets = page.current
+                    ? panelRunsOn(page.current).map((p) => ({
+                        title: p.title,
+                        result: p.run.result,
+                      }))
+                    : []
+                  const blob = new Blob([resultsToXlsx(sheets) as BlobPart], {
+                    type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+                  })
+                  downloadBlob(blob, `${exportName(id, '')}.xlsx`)
+                } else if (format === 'html') {
                   const blob = await api.exportHtml(id, window.location.search)
                   downloadBlob(blob, `${exportName(id, '')}.html`)
                 } else if (
@@ -410,6 +443,8 @@ export function DashboardView({ id, preview }: { id: string; preview?: ThemePrev
           <div
             ref={page}
             className="odd-dashboard-page"
+            // The dashboard's own language, not the viewer's: CJK glyphs and line breaks follow it.
+            lang={meta?.locale}
             data-editing={editor.editState.editing || undefined}
           >
             <Boundary resetKey={loaded} title={t('This dashboard failed to render')}>

@@ -61,6 +61,20 @@ After an upgrade, `open-dashboard sync-skills` refreshes them; `dev` tells you w
 
 Skills teach a coding agent that edits files. An agent framework that speaks MCP gets the same workspace as tools: `pnpm add -D @open-dashboard/mcp`, then `open-dashboard dev --mcp` serves it at `http://localhost:5473/mcp`. List and read dashboards, read schemas and `database.md`, write `index.tsx` and `.sql` files, run named queries, `check` — and the page in the browser reloads as the agent writes. Every tool goes through the same code the viewer and the CLI use: the same read-only drivers, the same masking, the same hash check that refuses to overwrite an edit made meanwhile. `--allow-sql` adds `run_sql` for exploring data — read-only, and off unless asked for. Requests from another origin or host name are refused. For a client that starts its server itself — Claude Desktop, most agent frameworks — `open-dashboard mcp` serves the same tools over stdio, with no dev server. See [packages/mcp](packages/mcp).
 
+### 🧩 A plugin for Claude Code and Antigravity
+
+Install open-dashboard into your agent once and every workspace gets the skills, the house rules and the MCP server (`open-dashboard mcp` over stdio) — no per-project setup:
+
+```bash
+# Claude Code
+/plugin install open-dashboard --marketplace simonliu-ai-product/open-dashboard
+
+# Google Antigravity (IDE, App, or the agy CLI)
+agy plugin install https://github.com/simonliu-ai-product/open-dashboard
+```
+
+The agent writes queries and panels; the browser stays where you read, filter and leave notes. They meet in the files — notes are `@dashboard-comment` markers in the source, and the panel you inspected is in `current.json` — so a note left on a panel becomes the agent's next edit. See [plugins/open-dashboard](plugins/open-dashboard).
+
 ### 🔒 The browser names a query; it never sends SQL
 
 The viewer can ask for *query `revenue_by_month` of dashboard `sales-overview`* and nothing else. The server reads the `.sql` file from disk, binds the parameters, and runs it. There is no endpoint, prop or option that accepts SQL text from the page — the only SQL that runs is SQL that was written to a file and can be reviewed.
@@ -188,6 +202,8 @@ sheets: {
 - An empty file (or `[]`) is a table with no rows, not an error: its panels show they have no data, and a table that had columns keeps them.
 - Files are read only from inside the workspace, never written, and never served to the page as files. Edit one and the panels that read it refresh.
 
+A spreadsheet kept in [open-spreadsheet](../open-spreadsheet) is a `csv` source too: a collector runs `open-spreadsheet export <workbook> --out data/<table>.csv`, which writes the sheet's computed values (formulas evaluated, plain numbers, ISO dates).
+
 ### 🔄 Collectors keep the data fresh
 
 When the data is something you fetch — an API into SQLite, an export into CSV — say how in the config, and open-dashboard runs it:
@@ -283,7 +299,7 @@ The **Charts** page lists the 41 built-in panels and your custom charts side by 
 
 A theme is `themes/<id>.json` — chart palette, accent, up / down colours (red-up, green-down if that is your market's convention), page and panel backgrounds, grid, fonts and corner radius, each for light and dark. Anything left out keeps the built-in value, and the text drawn on a coloured mark picks black or white by contrast on its own. A dashboard picks one with `meta.theme` (or from the theme menu in Edit mode, which writes it into `index.tsx`); `theme` in the config sets the workspace default. Every chart draws through the `--odd-*` variables, so a theme restyles all 41 panels and every custom chart without touching them.
 
-### 🖼️ Download a panel — or the whole dashboard — as PNG, SVG, CSV, JSON, PDF or HTML
+### 🖼️ Download a panel — or the whole dashboard — as PNG, SVG, CSV, Excel, JSON, PDF or HTML
 
 <img src=".github/assets/download.png" alt="A panel's download menu with PNG and SVG." width="100%">
 
@@ -537,6 +553,7 @@ pnpm + Turbo monorepo.
 | --- | --- |
 | [packages/core](packages/core) | `@open-dashboard/core` — datasource drivers, named-query loader, viewer, panel components, Vite plugins and dev API, the `open-dashboard` CLI, and the canonical skills. |
 | [packages/mcp](packages/mcp) | `@open-dashboard/mcp` — the MCP server, mounted by `open-dashboard dev --mcp`. |
+| [plugins/open-dashboard](plugins/open-dashboard) | The agent plugin for Claude Code and Antigravity: skills, rules and the stdio MCP server. `.claude-plugin/marketplace.json` lets Claude Code find it. |
 | [packages/cli](packages/cli) | `@open-dashboard/cli` — `npx @open-dashboard/cli init` scaffolder and project template. |
 | [apps/demo](apps/demo) | Dogfood workspace over two seeded SQLite databases (a coffee-gear shop and its marketing spend). All demo data is generated. |
 

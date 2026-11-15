@@ -1,7 +1,8 @@
-import { readFileSync, writeFileSync } from 'node:fs'
+import { readFileSync } from 'node:fs'
 import { relative } from 'node:path'
 import type { ResolvedConfig } from '../workspace.js'
 import { attributes, elementName, literal, parseSource, walk } from './analyze.js'
+import { writeFileAtomic } from './atomic.js'
 import { dashboardFile } from './dashboards.js'
 import { OpsError } from './errors.js'
 
@@ -53,19 +54,70 @@ export function addComment(
   const marker = inJsx ? `{/* ${COMMENT_MARKER}: ${note} */}` : `/* ${COMMENT_MARKER}: ${note} */`
   const insertion = ownLine ? `${marker}\n${before}` : `${marker} `
 
-  writeFileSync(file, code.slice(0, start) + insertion + code.slice(start))
+  writeFileAtomic(file, code.slice(0, start) + insertion + code.slice(start))
   return {
     file: relative(config.root, file),
     line: code.slice(0, start).split('\n').length,
   }
 }
 
-export function listComments(config: ResolvedConfig, id: string): { line: number; text: string }[] {
+export interface DashboardNote {
+  line: number
+  text: string
+  /** The panel the marker sits above, by title; null when it is not above a titled panel. */
+  panel: string | null
+}
+
+const MARKER = new RegExp(`(\\{\\s*)?/\\*\\s*${COMMENT_MARKER}:\\s*(.*?)\\s*\\*/(\\s*\\})?`)
+
+export function listComments(config: ResolvedConfig, id: string): DashboardNote[] {
   const code = readFileSync(dashboardFile(config, id), 'utf8')
-  const out: { line: number; text: string }[] = []
+  const out: DashboardNote[] = []
   code.split('\n').forEach((line, index) => {
-    const match = new RegExp(`${COMMENT_MARKER}:\\s*(.*?)\\s*\\*/`).exec(line)
-    if (match?.[1]) out.push({ line: index + 1, text: match[1] })
+    const match = MARKER.exec(line)
+    if (match?.[2]) out.push({ line: index + 1, text: match[2], panel: null })
   })
+  if (!out.length) return out
+  // Each marker is about the first titled element that starts at or after it.
+  const titled: { line: number; title: string }[] = []
+  try {
+    walk(parseSource(code), (node) => {
+      if (node.type !== 'JSXElement' || !elementName(node)) return
+      const title = literal(attributes(node).get('title'))
+      const line = (node.loc as { start: { line: number } } | undefined)?.start.line
+      if (typeof title === 'string' && line) titled.push({ line, title })
+    })
+  } catch {
+    return out
+  }
+  titled.sort((a, b) => a.line - b.line)
+  for (const note of out) note.panel = titled.find((t) => t.line >= note.line)?.title ?? null
   return out
+}
+
+/**
+ * Removes one note: the marker on `line` whose text is `text` (so a file that
+ * moved underneath is refused, not mangled). A line left blank goes with it.
+ */
+export function resolveComment(
+  config: ResolvedConfig,
+  id: string,
+  line: number,
+  text: string,
+): { file: string; remaining: number } {
+  const file = dashboardFile(config, id)
+  const lines = readFileSync(file, 'utf8').split('\n')
+  const at = lines[line - 1]
+  const match = at === undefined ? null : MARKER.exec(at)
+  if (!match || match[2] !== text) {
+    throw new OpsError(
+      `the note "${text}" is no longer on line ${line} of ${relative(config.root, file)}; reload and try again`,
+      409,
+    )
+  }
+  const rest = (at as string).replace(match[0], '').replace(/^(\s*)\s(?=\S)/, '$1')
+  if (/^\s*$/.test(rest)) lines.splice(line - 1, 1)
+  else lines[line - 1] = rest
+  writeFileAtomic(file, lines.join('\n'))
+  return { file: relative(config.root, file), remaining: listComments(config, id).length }
 }

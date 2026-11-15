@@ -83,6 +83,14 @@ export const LinkIcon = () => (
   </svg>
 )
 
+export const MoreIcon = () => (
+  <svg {...base} aria-hidden="true">
+    <circle cx="3.5" cy="8" r="0.6" />
+    <circle cx="8" cy="8" r="0.6" />
+    <circle cx="12.5" cy="8" r="0.6" />
+  </svg>
+)
+
 export const RefreshIcon = () => (
   <svg {...base} aria-hidden="true">
     <path d="M13.5 8a5.5 5.5 0 1 1-1.6-3.9" />

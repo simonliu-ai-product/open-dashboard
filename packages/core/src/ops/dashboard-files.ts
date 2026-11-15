@@ -1,6 +1,7 @@
-import { existsSync, mkdirSync, readdirSync, readFileSync, writeFileSync } from 'node:fs'
+import { existsSync, mkdirSync, readdirSync, readFileSync } from 'node:fs'
 import { join, relative } from 'node:path'
 import type { ResolvedConfig } from '../workspace.js'
+import { writeFileAtomic } from './atomic.js'
 import { VALID_ID } from './dashboards.js'
 import { OpsError } from './errors.js'
 import { hashSource } from './layout.js'
@@ -73,7 +74,7 @@ export function writeDashboardFile(
     )
   }
   mkdirSync(dir, { recursive: true })
-  writeFileSync(path, content)
+  writeFileAtomic(path, content)
   return { file: relative(config.root, path), hash: hashSource(content), created: !exists }
 }
 
@@ -121,6 +122,6 @@ export function writeSharedQueryFile(
     )
   }
   mkdirSync(dir, { recursive: true })
-  writeFileSync(path, content)
+  writeFileAtomic(path, content)
   return { file: relative(config.root, path), hash: hashSource(content), created: !exists }
 }

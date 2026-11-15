@@ -15,8 +15,9 @@ source, directly above the panel it is about:
 
 ## Workflow
 
-1. **Find them.** `rg -n "@dashboard-comment" dashboards/`. If the user named no
-   dashboard, use `current-dashboard`, then fall back to all of them.
+1. **Find them.** With the MCP server, `list_comments` gives each note's line,
+   text and the panel it is about. Otherwise `rg -n "@dashboard-comment" dashboards/`.
+   If the user named no dashboard, use `current-dashboard`, then fall back to all of them.
 2. **Read them all before changing anything.** Two notes often describe one
    change, and a later one can contradict an earlier one.
 3. **Decide where each change belongs.** Most notes change the SQL, not the JSX:
@@ -25,8 +26,10 @@ source, directly above the panel it is about:
    `WHERE`. "Make it a bar chart", "wider", "percent" are JSX.
 4. **Run the changed query** with `open-dashboard query --dashboard <id> --name <query>`
    and look at the rows before wiring them to a panel.
-5. **Delete the marker** once the change is made. A stale marker gets applied
-   twice.
+5. **Delete the marker** once the change is made (MCP `resolve_comment` with the
+   line and text from `list_comments`, or edit the line out). A stale marker gets
+   applied twice. The person can also mark a note resolved from the notes list
+   in the dashboard header, so list again before you start.
 6. **Ask, do not guess.** If a note is ambiguous ("this looks off"), leave the
    marker, look at the data, and ask what they expected — say what you found.
 7. **`pnpm exec open-dashboard check <id>`** must pass before you report back.

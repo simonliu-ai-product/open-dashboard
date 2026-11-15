@@ -11,8 +11,14 @@ export type LayoutEdit =
   | { kind: 'order'; titles: string[] }
   | { kind: 'move'; title: string; row: number; index: number }
   | { kind: 'moveRow'; from: number; to: number }
+  /** Takes a panel (in a row) out of the dashboard. */
+  | { kind: 'remove'; title: string }
+  /** A copy of a panel (in a row), titled `copy`, right after it. */
+  | { kind: 'duplicate'; title: string; copy: string }
   /** `meta.theme`: a theme id, or null to drop it and use the workspace default. */
   | { kind: 'meta'; key: 'theme'; value: string | null }
+  /** `meta.title`: the name the dashboard shows and is listed under. */
+  | { kind: 'meta'; key: 'title'; value: string }
 
 /** What a panel's props mean: which prop holds its category, its measure and its grouping. */
 export interface Roles {

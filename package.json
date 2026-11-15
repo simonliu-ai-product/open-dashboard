@@ -16,7 +16,8 @@
     "check:fix": "biome check --write .",
     "core": "pnpm --filter @open-dashboard/core",
     "cli": "pnpm --filter @open-dashboard/cli",
-    "demo": "pnpm --filter @open-dashboard/demo"
+    "demo": "pnpm --filter @open-dashboard/demo",
+    "sync-plugin": "node scripts/sync-plugin.mjs"
   },
   "devDependencies": {
     "@biomejs/biome": "^2.3.0",

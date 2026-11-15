@@ -1,7 +1,8 @@
-import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs'
+import { existsSync, mkdirSync, readFileSync } from 'node:fs'
 import { dirname, join } from 'node:path'
 import type { ParamValue } from '../config.js'
 import type { ResolvedConfig } from '../workspace.js'
+import { writeFileAtomic } from './atomic.js'
 
 export interface CurrentView {
   id?: string
@@ -31,6 +32,6 @@ export function setCurrent(config: ResolvedConfig, view: CurrentView, now: strin
   const next: CurrentView = { ...view, updatedAt: now }
   const path = currentPath(config)
   mkdirSync(dirname(path), { recursive: true })
-  writeFileSync(path, `${JSON.stringify(next, null, 2)}\n`)
+  writeFileAtomic(path, `${JSON.stringify(next, null, 2)}\n`)
   return next
 }

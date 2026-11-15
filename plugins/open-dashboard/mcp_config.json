@@ -1,0 +1,16 @@
+{
+  "mcpServers": {
+    "open-dashboard": {
+      "command": "npx",
+      "args": [
+        "-y",
+        "-p",
+        "@open-dashboard/core@latest",
+        "-p",
+        "@open-dashboard/mcp@latest",
+        "open-dashboard",
+        "mcp"
+      ]
+    }
+  }
+}

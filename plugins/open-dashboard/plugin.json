@@ -1,0 +1,18 @@
+{
+  "$schema": "https://antigravity.google/schemas/v1/plugin.json",
+  "name": "open-dashboard",
+  "displayName": "open-dashboard",
+  "version": "0.1.0",
+  "description": "Build live dashboards over your database as React and SQL — named read-only queries, panels, filters, themes and checks — in an open-dashboard workspace.",
+  "logo": "assets/logo.svg",
+  "suggestedPrompts": [
+    "Connect my Postgres database and document what its tables mean",
+    "Build a sales dashboard with monthly revenue, top products and a region filter",
+    "Check every dashboard's queries and fix anything that fails"
+  ],
+  "author": { "name": "Simon Liu", "url": "https://github.com/LiuYuWei" },
+  "homepage": "https://github.com/simonliu-ai-product/open-dashboard",
+  "repository": "https://github.com/simonliu-ai-product/open-dashboard",
+  "license": "MIT",
+  "keywords": ["dashboards", "sql", "charts", "analytics", "react"]
+}

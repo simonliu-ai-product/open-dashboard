@@ -1,7 +1,13 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import type { DashboardLayout } from '../../ops/layout.js'
 import type { LayoutEdit } from '../../runtime/convert.js'
-import { type EditState, foldEdits, foldStructure, stageEdit } from '../../runtime/edit.js'
+import {
+  type EditState,
+  foldEdits,
+  foldStructure,
+  stagedCopies,
+  stageEdit,
+} from '../../runtime/edit.js'
 import { readOnly } from '../../runtime/snapshot.js'
 import { api } from './api.js'
 import { setNavigationGuard } from './router.js'
@@ -151,6 +157,7 @@ export function useLayoutEdit(id: string, onConfigure: (title: string) => void) 
       layout: byTitle,
       rows,
       sourceRows: layout?.rows,
+      copies: stagedCopies(edits),
       filters: layout?.filters ?? [],
       liveOrder,
       stage,
@@ -158,7 +165,7 @@ export function useLayoutEdit(id: string, onConfigure: (title: string) => void) 
       configure: onConfigure,
       enterEdit: () => setMode('edit'),
     }),
-    [mode, layout, panels, rows, byTitle, liveOrder, stage, onConfigure, setMode],
+    [mode, layout, panels, rows, byTitle, liveOrder, stage, onConfigure, setMode, edits],
   )
 
   return { mode, setMode, layout, edits, status, stage, undo, discard, save, reload, editState }

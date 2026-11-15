@@ -187,6 +187,8 @@ export function themeCss(id: string, theme: DashboardTheme): string {
   const dark = declarations(theme.dark)
   const rules: string[] = []
   if (shared.length) rules.push(`${scope}{${shared.join(';')}}`)
+  // A theme's font outranks the page's per-language fallback list.
+  if (theme.font) rules.push(`${scope} .odd-dashboard-page[class]{font-family:${theme.font}}`)
   if (light.length) {
     rules.push(
       `@media not (prefers-color-scheme: dark){:root:not([data-theme="dark"]) ${scope}{${light.join(';')}}}`,

@@ -1,0 +1,12 @@
+{
+  "name": "open-dashboard",
+  "owner": { "name": "Simon Liu", "url": "https://github.com/LiuYuWei" },
+  "description": "open-dashboard — live dashboards over your database, for coding agents.",
+  "plugins": [
+    {
+      "name": "open-dashboard",
+      "source": "./plugins/open-dashboard",
+      "description": "Skills and an MCP server for open-dashboard: connect a database, write named SQL queries, lay out panels, check results, and theme dashboards."
+    }
+  ]
+}

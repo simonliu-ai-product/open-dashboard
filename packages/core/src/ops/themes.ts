@@ -1,7 +1,8 @@
-import { existsSync, mkdirSync, readdirSync, readFileSync, writeFileSync } from 'node:fs'
+import { existsSync, mkdirSync, readdirSync, readFileSync } from 'node:fs'
 import { join, relative, sep } from 'node:path'
 import { type DashboardTheme, validateTheme } from '../runtime/theme.js'
 import type { ResolvedConfig } from '../workspace.js'
+import { writeFileAtomic } from './atomic.js'
 import { VALID_ID } from './dashboards.js'
 import { OpsError } from './errors.js'
 import { hashSource } from './layout.js'
@@ -105,7 +106,7 @@ export function writeTheme(
   }
   mkdirSync(join(config.root, THEMES_DIR), { recursive: true })
   const code = `${JSON.stringify(theme, null, 2)}\n`
-  writeFileSync(path, code)
+  writeFileAtomic(path, code)
   return { hash: hashSource(code) }
 }
 

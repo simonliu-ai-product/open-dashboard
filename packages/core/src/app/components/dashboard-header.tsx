@@ -1,11 +1,21 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { DownloadMenu } from '../../components/panel.js'
 import type { ImageFormat } from '../../runtime/export-panel.js'
 import { useT } from '../../runtime/i18n.js'
+import type { DashboardNoteView } from '../lib/api.js'
+import { onManageRequest } from '../lib/manage-events.js'
 import { intervalLabel } from '../lib/refresh.js'
 import { linkProps } from '../lib/router.js'
 import type { Mode } from '../lib/use-layout-edit.js'
-import { CheckIcon, CopyIcon, EyeIcon, LinkIcon, PencilIcon, RefreshIcon } from './icons.js'
+import {
+  CheckIcon,
+  CopyIcon,
+  EyeIcon,
+  LinkIcon,
+  MoreIcon,
+  PencilIcon,
+  RefreshIcon,
+} from './icons.js'
 
 export interface DashboardHeaderProps {
   title: string
@@ -14,7 +24,9 @@ export interface DashboardHeaderProps {
   refreshChoices: string[]
   onRefreshSetting: (value: string) => void
   onRefresh: () => void
-  notes: { line: number; text: string }[]
+  notes: DashboardNoteView[]
+  /** Removes a note once it is dealt with; the page reloads the list after. */
+  onResolveNote?: (note: DashboardNoteView) => Promise<void>
   mode: Mode
   onMode: (mode: Mode) => void
   /** Shown in edit mode: the themes to pick from, and `meta.theme` as staged ('' for the workspace default). */
@@ -30,6 +42,150 @@ export interface DashboardHeaderProps {
   /** A one-file export: no list to go back to, no address worth copying. */
   standalone?: boolean
   formats?: ImageFormat[]
+  /** Managing the dashboard itself, as open-doc's document menu: given only where files can be written. */
+  manage?: {
+    rename: (title: string) => Promise<void>
+    duplicate: () => Promise<void>
+    /** Moves the dashboard to `.open-dashboard/trash/`. */
+    remove: () => Promise<void>
+  }
+}
+
+/** The ⋯ menu: rename (in place, on the title), duplicate, delete with a second click to confirm. */
+export function ManageMenu(props: {
+  manage: NonNullable<DashboardHeaderProps['manage']>
+  onRename: () => void
+  /** The header's menu also answers the command palette; a home row's does not. */
+  listen?: boolean
+}) {
+  const t = useT()
+  const [open, setOpen] = useState(false)
+  const [confirming, setConfirming] = useState(false)
+  const [error, setError] = useState<string>()
+  const root = useRef<HTMLDivElement>(null)
+  const latest = useRef(props)
+  latest.current = props
+  const runRef = useRef<(action: () => Promise<void>) => Promise<void>>(async () => {})
+  useEffect(() => {
+    if (!props.listen) return
+    return onManageRequest((action) => {
+      if (action === 'rename') latest.current.onRename()
+      else if (action === 'duplicate') void runRef.current(latest.current.manage.duplicate)
+      else {
+        // Opened at the confirming step: the reader still clicks once to delete.
+        setOpen(true)
+        setConfirming(true)
+      }
+    })
+  }, [props.listen])
+  useEffect(() => {
+    if (!open) {
+      setConfirming(false)
+      return
+    }
+    const onDown = (e: MouseEvent) => {
+      if (!root.current?.contains(e.target as Node)) setOpen(false)
+    }
+    const onKey = (e: KeyboardEvent) => e.key === 'Escape' && setOpen(false)
+    window.addEventListener('mousedown', onDown)
+    window.addEventListener('keydown', onKey)
+    return () => {
+      window.removeEventListener('mousedown', onDown)
+      window.removeEventListener('keydown', onKey)
+    }
+  }, [open])
+  const run = async (action: () => Promise<void>) => {
+    setError(undefined)
+    try {
+      await action()
+      setOpen(false)
+    } catch (failure) {
+      setError(failure instanceof Error ? failure.message : String(failure))
+    }
+  }
+  runRef.current = run
+  return (
+    <div className="odd-more" ref={root}>
+      <button
+        type="button"
+        className="odd-icon-button odd-header-icon"
+        aria-label={t('Dashboard actions')}
+        title={t('Dashboard actions')}
+        aria-haspopup="menu"
+        aria-expanded={open}
+        onClick={() => setOpen(!open)}
+      >
+        <MoreIcon />
+      </button>
+      {open ? (
+        <div className="odd-more-menu" role="menu">
+          <button
+            type="button"
+            role="menuitem"
+            onClick={() => {
+              setOpen(false)
+              props.onRename()
+            }}
+          >
+            {t('Rename…')}
+          </button>
+          <button type="button" role="menuitem" onClick={() => run(props.manage.duplicate)}>
+            {t('Duplicate')}
+          </button>
+          <button
+            type="button"
+            role="menuitem"
+            data-danger=""
+            onClick={() => (confirming ? run(props.manage.remove) : setConfirming(true))}
+          >
+            {confirming ? t('Click again to move to the trash') : t('Delete…')}
+          </button>
+          {error ? <p className="odd-more-error">{error}</p> : null}
+        </div>
+      ) : null}
+    </div>
+  )
+}
+
+/** The page title, which becomes a field while it is being renamed. */
+export function TitleField(props: {
+  title: string
+  editing: boolean
+  onDone: (title?: string) => void
+  /** A new dashboard: the title is only a suggestion, so Enter keeps it rather than counting as no change. */
+  placeholder?: string
+}) {
+  const t = useT()
+  const [value, setValue] = useState(props.title)
+  useEffect(() => setValue(props.title), [props.title])
+  if (!props.editing) return <span aria-current="page">{props.title}</span>
+  const finish = (commit: boolean) => {
+    const next = value.trim()
+    props.onDone(
+      commit && next && (props.placeholder !== undefined || next !== props.title)
+        ? next
+        : undefined,
+    )
+  }
+  return (
+    <input
+      className="odd-title-input"
+      aria-label={t('Dashboard title')}
+      {...(props.placeholder ? { placeholder: props.placeholder } : {})}
+      value={value}
+      maxLength={200}
+      // biome-ignore lint/a11y/noAutofocus: the field appears because the reader chose Rename
+      autoFocus
+      onFocus={(e) => e.currentTarget.select()}
+      onChange={(e) => setValue(e.target.value)}
+      // Clicking away from a new dashboard's untouched suggestion cancels it rather than creating one.
+      onBlur={() => finish(props.placeholder === undefined || value.trim() !== props.title)}
+      onKeyDown={(e) => {
+        if (e.key === 'Enter') finish(true)
+        else if (e.key === 'Escape') finish(false)
+      }}
+    />
+  )
 }
 
 function loc(): Pick<Location, 'pathname' | 'search' | 'href'> {
@@ -43,8 +199,39 @@ function loc(): Pick<Location, 'pathname' | 'search' | 'href'> {
  */
 export function DashboardHeader(props: DashboardHeaderProps) {
   const t = useT()
+  const [renaming, setRenaming] = useState(false)
   const [copied, setCopied] = useState(false)
   const [notesCopied, setNotesCopied] = useState(false)
+  const [notesOpen, setNotesOpen] = useState(false)
+  const [resolving, setResolving] = useState<number | null>(null)
+  const notesRef = useRef<HTMLDivElement>(null)
+  useEffect(() => {
+    if (!notesOpen) return
+    const onDown = (e: MouseEvent) => {
+      if (!notesRef.current?.contains(e.target as Node)) setNotesOpen(false)
+    }
+    const onKey = (e: KeyboardEvent) => e.key === 'Escape' && setNotesOpen(false)
+    window.addEventListener('mousedown', onDown)
+    window.addEventListener('keydown', onKey)
+    return () => {
+      window.removeEventListener('mousedown', onDown)
+      window.removeEventListener('keydown', onKey)
+    }
+  }, [notesOpen])
+  useEffect(() => {
+    if (props.notes.length === 0) setNotesOpen(false)
+  }, [props.notes.length])
+  const showPanel = (title: string) => {
+    const node = [...document.querySelectorAll<HTMLElement>('[data-panel-title]')].find(
+      (n) => n.dataset.panelTitle === title,
+    )
+    if (!node) return
+    node.scrollIntoView({ behavior: 'smooth', block: 'center' })
+    node.classList.remove('odd-panel-flash')
+    void node.offsetWidth
+    node.classList.add('odd-panel-flash')
+    setNotesOpen(false)
+  }
   const [kiosk, setKiosk] = useState(
     () => typeof window !== 'undefined' && new URLSearchParams(loc().search).get('kiosk') === '1',
   )
@@ -108,28 +295,81 @@ export function DashboardHeader(props: DashboardHeaderProps) {
             <span aria-hidden="true">/</span>
           </>
         )}
-        <span aria-current="page">{props.title}</span>
+        <TitleField
+          title={props.title}
+          editing={renaming}
+          onDone={(title) => {
+            setRenaming(false)
+            if (title) void props.manage?.rename(title)
+          }}
+        />
       </nav>
 
       <div className="odd-header-actions">
         {props.notes.length > 0 && !props.readOnly ? (
-          <button
-            type="button"
-            className="odd-notes-pill"
-            title={props.notes.map((n) => `${n.line}: ${n.text}`).join('\n')}
-            onClick={() =>
-              navigator.clipboard?.writeText('/apply-comments ').then(
-                () => setNotesCopied(true),
-                () => {},
-              )
-            }
-          >
-            <span>
-              {t(props.notes.length === 1 ? '1 note' : '{n} notes', { n: props.notes.length })}
-            </span>
-            <code>/apply-comments</code>
-            {notesCopied ? <CheckIcon /> : <CopyIcon />}
-          </button>
+          <div className="odd-notes" ref={notesRef}>
+            <button
+              type="button"
+              className="odd-notes-pill"
+              aria-expanded={notesOpen}
+              aria-haspopup="dialog"
+              onClick={() => setNotesOpen(!notesOpen)}
+            >
+              <span>
+                {t(props.notes.length === 1 ? '1 note' : '{n} notes', { n: props.notes.length })}
+              </span>
+            </button>
+            {notesOpen ? (
+              <div className="odd-notes-pop" role="dialog" aria-label={t('Notes for your agent')}>
+                <div className="odd-notes-head">
+                  <strong>{t('Notes for your agent')}</strong>
+                  <button
+                    type="button"
+                    className="odd-notes-copy"
+                    title={t('Copy the command that applies them')}
+                    onClick={() =>
+                      navigator.clipboard?.writeText('/apply-comments ').then(
+                        () => setNotesCopied(true),
+                        () => {},
+                      )
+                    }
+                  >
+                    <code>/apply-comments</code>
+                    {notesCopied ? <CheckIcon /> : <CopyIcon />}
+                  </button>
+                </div>
+                <ol className="odd-notes-list">
+                  {props.notes.map((note) => (
+                    <li key={`${note.line}:${note.text}`}>
+                      <span className="odd-notes-where">
+                        {note.panel ?? t('Line {n}', { n: note.line })}
+                      </span>
+                      <p>{note.text}</p>
+                      <div className="odd-notes-actions">
+                        {note.panel ? (
+                          <button type="button" onClick={() => showPanel(note.panel as string)}>
+                            {t('Show panel')}
+                          </button>
+                        ) : null}
+                        {props.onResolveNote ? (
+                          <button
+                            type="button"
+                            disabled={resolving === note.line}
+                            onClick={() => {
+                              setResolving(note.line)
+                              props.onResolveNote?.(note).finally(() => setResolving(null))
+                            }}
+                          >
+                            {t('Resolve')}
+                          </button>
+                        ) : null}
+                      </div>
+                    </li>
+                  ))}
+                </ol>
+              </div>
+            ) : null}
+          </div>
         ) : null}
         <span className="odd-header-updated">{t('Updated {time}', { time: props.updatedAt })}</span>
         {props.frozen ? null : (
@@ -241,6 +481,9 @@ export function DashboardHeader(props: DashboardHeaderProps) {
             label={t('Download dashboard')}
             className="odd-icon-button odd-header-icon"
           />
+        ) : null}
+        {props.manage && !props.readOnly && !props.frozen && !props.standalone ? (
+          <ManageMenu manage={props.manage} onRename={() => setRenaming(true)} listen />
         ) : null}
       </div>
     </header>

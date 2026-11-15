@@ -1,5 +1,5 @@
 import { createHash } from 'node:crypto'
-import { readFileSync, writeFileSync } from 'node:fs'
+import { readFileSync } from 'node:fs'
 import { relative } from 'node:path'
 import {
   convertProps,
@@ -11,6 +11,7 @@ import {
 import { applyStructure, type RowShape, StructureError } from '../runtime/structure.js'
 import type { ResolvedConfig } from '../workspace.js'
 import { analyzeDashboard, attributes, elementName, literal, parseSource, walk } from './analyze.js'
+import { writeFileAtomic } from './atomic.js'
 import { dashboardFile, VALID_ID } from './dashboards.js'
 import { OpsError } from './errors.js'
 
@@ -518,7 +519,10 @@ function dropEmptyRows(code: string): string {
   )
 }
 
-function structureCheck(ast: Node, edit: Extract<LayoutEdit, { kind: 'move' | 'moveRow' }>): void {
+function structureCheck(
+  ast: Node,
+  edit: Extract<LayoutEdit, { kind: 'move' | 'moveRow' | 'remove' | 'duplicate' }>,
+): void {
   try {
     applyStructure(shapes(ast), edit)
   } catch (error) {
@@ -572,6 +576,40 @@ function move(code: string, title: string, row: number, index: number): string {
   return dropEmptyRows(splice(cut, [insertion]))
 }
 
+/** Takes a panel out, with the note marker above it: a note about a panel that is gone means nothing. */
+function removePanel(code: string, title: string): string {
+  const ast = strictParse(code)
+  structureCheck(ast, { kind: 'remove', title })
+  const site = find(ast, title)
+  const start = site.parent
+    ? leadingMarker(site.parent, site.node, code)
+    : (site.node.start as number)
+  return dropEmptyRows(
+    splice(code, [{ ...lineSpan(code, start, site.node.end as number), text: '' }]),
+  )
+}
+
+/** A copy of a panel right after it, under a new title; notes stay with the original. */
+function duplicatePanel(code: string, title: string, copy: string): string {
+  if (typeof copy !== 'string' || !copy.trim() || /[\n\r]/.test(copy))
+    throw new OpsError('a copy needs a one-line title')
+  const ast = strictParse(code)
+  if (sites(ast).some((site) => site.title === copy))
+    throw new OpsError(`a panel is already titled "${copy}"`, 409)
+  structureCheck(ast, { kind: 'duplicate', title, copy })
+  const site = find(ast, title)
+  const titleAttr = attrNodes(site.node).find((attr) => attrName(attr) === 'title') as Node
+  const nodeStart = site.node.start as number
+  const text =
+    code.slice(nodeStart, titleAttr.start as number) +
+    attributeText('title', copy) +
+    code.slice(titleAttr.end as number, site.node.end as number)
+  const indent = lineIndent(code, nodeStart)
+  return splice(code, [
+    { start: site.node.end as number, end: site.node.end as number, text: `\n${indent}${text}` },
+  ])
+}
+
 function moveRow(code: string, from: number, to: number): string {
   const ast = strictParse(code)
   structureCheck(ast, { kind: 'moveRow', from, to })
@@ -598,7 +636,7 @@ function moveRow(code: string, from: number, to: number): string {
   )
 }
 
-function metaObject(ast: Node): Node {
+function metaObject(ast: Node, key: string): Node {
   let found: Node | undefined
   walk(ast, (node) => {
     if (found || node.type !== 'VariableDeclarator' || (node.id as Node).name !== 'meta') return
@@ -608,7 +646,9 @@ function metaObject(ast: Node): Node {
     if (init?.type === 'ObjectExpression') found = init
   })
   if (!found)
-    throw new OpsError('this dashboard has no `export const meta = { … }` object to set a theme in')
+    throw new OpsError(
+      `this dashboard has no \`export const meta = { … }\` object to set meta.${key} in`,
+    )
   return found
 }
 
@@ -622,16 +662,15 @@ function keyName(property: Node): string | undefined {
 
 /** Sets, replaces or removes one string field of `meta`, keeping the object's own layout. */
 function setMeta(code: string, key: string, value: string | null): string {
-  const object = metaObject(strictParse(code))
+  const object = metaObject(strictParse(code), key)
   const properties = (object.properties as Node[]).filter((p) => p.type === 'ObjectProperty')
   const existing = properties.find((p) => keyName(p) === key)
-  const text = `${key}: '${value}'`
+  const quoted = value === null ? '' : `'${value.replace(/\\/g, '\\\\').replace(/'/g, "\\'")}'`
+  const text = `${key}: ${quoted}`
   if (existing) {
     if (value !== null) {
       const node = existing.value as Node
-      return splice(code, [
-        { start: node.start as number, end: node.end as number, text: `'${value}'` },
-      ])
+      return splice(code, [{ start: node.start as number, end: node.end as number, text: quoted }])
     }
     const start = existing.start as number
     let end = existing.end as number
@@ -686,8 +725,19 @@ export function applyEdit(code: string, edit: LayoutEdit): string {
       return move(code, edit.title, edit.row, edit.index)
     case 'moveRow':
       return moveRow(code, edit.from, edit.to)
+    case 'remove':
+      return removePanel(code, edit.title)
+    case 'duplicate':
+      return duplicatePanel(code, edit.title, edit.copy)
     case 'meta':
-      if (edit.key !== 'theme') throw new OpsError(`meta.${edit.key} cannot be edited here`)
+      if (edit.key === 'title') {
+        const title = typeof edit.value === 'string' ? edit.value.trim() : ''
+        if (!title || title.length > 200 || /[\n\r]/.test(title))
+          throw new OpsError('a title is one line of 1 to 200 characters')
+        return setMeta(code, 'title', title)
+      }
+      if (edit.key !== 'theme')
+        throw new OpsError(`meta.${(edit as { key: string }).key} cannot be edited here`)
       if (edit.value !== null && (typeof edit.value !== 'string' || !VALID_ID.test(edit.value)))
         throw new OpsError(`"${edit.value}" is not a theme id`)
       return setMeta(code, edit.key, edit.value)
@@ -736,6 +786,6 @@ export function editLayout(
   }
   const next = applyEdits(code, edits)
   strictParse(next)
-  writeFileSync(file, next)
+  writeFileAtomic(file, next)
   return { hash: hashSource(next) }
 }

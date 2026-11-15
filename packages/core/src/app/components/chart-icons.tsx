@@ -42,7 +42,7 @@ export const CHART_ICONS: Record<string, () => ReactNode> = {
     ),
   Stat: () => svg(<path d="M3 11.5h3.5M3 8.5h10M3 5h6" />),
   Text: () => svg(<path d="M3.5 4h9M8 4v8.5M6 12.5h4" />),
-  ScatterChart: () => svg(<>{[dot(4, 11), dot(7.5, 7), dot(11, 9), dot(12.5, 4)]}</>),
+  ScatterChart: () => svg([dot(4, 11), dot(7.5, 7), dot(11, 9), dot(12.5, 4)]),
   Heatmap: () =>
     svg(
       <>
@@ -153,30 +153,23 @@ export const CHART_ICONS: Record<string, () => ReactNode> = {
   Waterfall: () => svg(<path d="M2.5 13V9M6 9V5M9.5 5V7M13 7v6" strokeWidth="2" />),
   CalendarHeatmap: () =>
     svg(
-      <>
-        {[0, 1, 2, 3].flatMap((c) =>
-          [0, 1, 2].map((r) => (
-            <rect
-              key={`${c}${r}`}
-              x={2 + c * 3.2}
-              y={3.5 + r * 3.2}
-              width="2.4"
-              height="2.4"
-              rx="0.5"
-              fill="currentColor"
-              fillOpacity={0.2 + ((c + r) % 3) * 0.3}
-              stroke="none"
-            />
-          )),
-        )}
-      </>,
+      [0, 1, 2, 3].flatMap((c) =>
+        [0, 1, 2].map((r) => (
+          <rect
+            key={`${c}${r}`}
+            x={2 + c * 3.2}
+            y={3.5 + r * 3.2}
+            width="2.4"
+            height="2.4"
+            rx="0.5"
+            fill="currentColor"
+            fillOpacity={0.2 + ((c + r) % 3) * 0.3}
+            stroke="none"
+          />
+        )),
+      ),
     ),
-  SmallMultiples: () =>
-    svg(
-      <>
-        <path d="M2 7l2-2 2 1M9 7l2-3 3 2M2 14l2-1 2-2M9 14l2-2 3 1" />
-      </>,
-    ),
+  SmallMultiples: () => svg(<path d="M2 7l2-2 2 1M9 7l2-3 3 2M2 14l2-1 2-2M9 14l2-2 3 1" />),
   BandChart: () =>
     svg(
       <>
@@ -230,7 +223,7 @@ export const CHART_ICONS: Record<string, () => ReactNode> = {
       </>,
     ),
   StripPlot: () =>
-    svg(<>{[dot(3, 5), dot(5, 4), dot(7, 6), dot(4, 11), dot(8, 10), dot(11, 12), dot(12, 5)]}</>),
+    svg([dot(3, 5), dot(5, 4), dot(7, 6), dot(4, 11), dot(8, 10), dot(11, 12), dot(12, 5)]),
   EcdfChart: () => svg(<path d="M2 13h3v-3h3V6h3V3h3" />),
   ParetoChart: () =>
     svg(
@@ -246,12 +239,7 @@ export const CHART_ICONS: Record<string, () => ReactNode> = {
         <path d="M2 2.5v3M2 10.5v3M14 4.5v3M14 8.5v3" strokeWidth="2" />
       </>,
     ),
-  CohortTable: () =>
-    svg(
-      <>
-        <path d="M2 3h12M2 6.5h9M2 10h6M2 13.5h3" strokeWidth="2.2" />
-      </>,
-    ),
+  CohortTable: () => svg(<path d="M2 3h12M2 6.5h9M2 10h6M2 13.5h3" strokeWidth="2.2" />),
   UpSetChart: () =>
     svg(
       <>

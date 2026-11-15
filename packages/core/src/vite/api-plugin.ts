@@ -13,9 +13,11 @@ import {
   addComment,
   assistantStatus,
   chartCatalog,
+  createDashboard,
   dashboardQueries,
   describeSource,
   docSourceOf,
+  duplicateDashboard,
   editLayout,
   explainDashboardQuery,
   getCurrent,
@@ -29,12 +31,15 @@ import {
   readSchema,
   readTheme,
   readWorkspaceChanges,
+  renameDashboard,
+  resolveComment,
   revertWorkspaceFile,
   runChartQuery,
   runDashboardQuery,
   schemaToText,
   setCurrent,
   themeIdOf,
+  trashDashboard,
   writeTheme,
 } from '../ops/index.js'
 import { type ConfigOverrides, loadConfig, type Workspace } from '../workspace.js'
@@ -309,6 +314,41 @@ export function apiPlugin(workspace: Workspace, overrides: ConfigOverrides): Plu
               return json(res, 400, { error: 'id, panel and text are required' })
             }
             return json(res, 200, addComment(config, body.id, body.panel, body.text))
+          }
+          if (route === 'comment/resolve' && req.method === 'POST') {
+            const body = await readBody(req)
+            if (
+              typeof body.id !== 'string' ||
+              typeof body.line !== 'number' ||
+              typeof body.text !== 'string'
+            ) {
+              return json(res, 400, { error: 'id, line and text are required' })
+            }
+            return json(res, 200, resolveComment(config, body.id, body.line, body.text))
+          }
+          if (route === 'dashboard/create' && req.method === 'POST') {
+            const body = await readBody(req)
+            if (typeof body.title !== 'string')
+              return json(res, 400, { error: 'title is required' })
+            return json(res, 200, createDashboard(config, body.title))
+          }
+          if (route === 'dashboard/rename' && req.method === 'POST') {
+            const body = await readBody(req)
+            if (typeof body.id !== 'string' || typeof body.title !== 'string')
+              return json(res, 400, { error: 'id and title are required' })
+            const hash = typeof body.hash === 'string' ? body.hash : undefined
+            return json(res, 200, renameDashboard(config, body.id, body.title, hash))
+          }
+          if (route === 'dashboard/duplicate' && req.method === 'POST') {
+            const body = await readBody(req)
+            if (typeof body.id !== 'string') return json(res, 400, { error: 'id is required' })
+            const newId = typeof body.newId === 'string' ? body.newId : undefined
+            return json(res, 200, duplicateDashboard(config, body.id, newId))
+          }
+          if (route === 'dashboard/delete' && req.method === 'POST') {
+            const body = await readBody(req)
+            if (typeof body.id !== 'string') return json(res, 400, { error: 'id is required' })
+            return json(res, 200, trashDashboard(config, body.id))
           }
           if (route === 'changes' && req.method === 'GET') {
             return json(res, 200, await readWorkspaceChanges(config))

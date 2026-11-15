@@ -54,8 +54,25 @@ export function sameOrigin(req: IncomingMessage): boolean {
   if (site && site !== 'same-origin' && site !== 'none') return false
   const origin = req.headers.origin
   if (!origin) return true
+  const first = (v: string | string[] | undefined) =>
+    (Array.isArray(v) ? v[0] : v)?.split(',', 1)[0]?.trim().toLowerCase() || null
+  // Behind a proxy (Cloud Shell's Web Preview, a tunnel) the page's host is the
+  // forwarded one, and TLS ends at the proxy. Cloud Shell forwards the host but
+  // not the scheme; one host:port serves one scheme, so the host alone still
+  // pins the request to this server.
+  const host = first(req.headers['x-forwarded-host']) ?? first(req.headers.host)
+  const forwardedProto = first(req.headers['x-forwarded-proto'])
+  const proto =
+    forwardedProto === 'http' || forwardedProto === 'https'
+      ? forwardedProto
+      : 'encrypted' in req.socket && req.socket.encrypted
+        ? 'https'
+        : null
   try {
-    return new URL(origin).host === req.headers.host
+    const url = new URL(origin)
+    const scheme = url.protocol.slice(0, -1)
+    const schemeOk = proto ? scheme === proto : scheme === 'http' || scheme === 'https'
+    return Boolean(host) && schemeOk && url.host.toLowerCase() === host
   } catch {
     return false
   }

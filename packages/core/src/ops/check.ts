@@ -109,7 +109,7 @@ export async function defaultParams(
     }
     if (filter.kind === 'NumberRange') {
       const raw = filter.default
-      if (raw && raw.includes('..')) {
+      if (raw?.includes('..')) {
         const [l = '', r = ''] = raw.split('..', 2)
         params[`${filter.name}_min`] =
           l.trim() !== '' && Number.isFinite(Number(l)) ? Number(l) : null

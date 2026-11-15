@@ -18,12 +18,27 @@ export interface RowShape {
 export type StructureEdit =
   | { kind: 'move'; title: string; row: number; index: number }
   | { kind: 'moveRow'; from: number; to: number }
+  | { kind: 'remove'; title: string }
+  /** A copy of `title`, titled `copy`, right after it. */
+  | { kind: 'duplicate'; title: string; copy: string }
 
 export class StructureError extends Error {}
 
 /** The rows after one edit. A row left without panels is removed. */
 export function applyStructure(rows: RowShape[], edit: StructureEdit): RowShape[] {
   const next = rows.map((row) => ({ ...row, titles: [...row.titles] }))
+  if (edit.kind === 'remove' || edit.kind === 'duplicate') {
+    const at = next.find((row) => row.titles.includes(edit.title))
+    if (!at) throw new StructureError(`"${edit.title}" is not in a row`)
+    const i = at.titles.indexOf(edit.title)
+    if (edit.kind === 'remove') at.titles.splice(i, 1)
+    else {
+      if (next.some((row) => row.titles.includes(edit.copy)))
+        throw new StructureError(`a panel is already titled "${edit.copy}"`)
+      at.titles.splice(i + 1, 0, edit.copy)
+    }
+    return next.filter((row) => row.titles.length > 0)
+  }
   if (edit.kind === 'move') {
     const from = next.findIndex((row) => row.titles.includes(edit.title))
     if (from === -1) throw new StructureError(`"${edit.title}" is not in a row`)

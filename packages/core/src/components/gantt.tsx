@@ -528,7 +528,6 @@ function Chart({
               if (task.milestone) {
                 const cx = diamondX(task)
                 return (
-                  // biome-ignore lint/a11y/noStaticElementInteractions: hover and a pointer shortcut; the filter's own <select> is the keyboard path
                   <path
                     // biome-ignore lint/suspicious/noArrayIndexKey: tasks are positional
                     key={i}
@@ -544,7 +543,6 @@ function Chart({
               const width = Math.max(2, sx(task.stop) - x0)
               const radius = Math.min(4, width / 2)
               return (
-                // biome-ignore lint/a11y/noStaticElementInteractions: hover and a pointer shortcut; the filter's own <select> is the keyboard path
                 <g
                   // biome-ignore lint/suspicious/noArrayIndexKey: tasks are positional
                   key={i}

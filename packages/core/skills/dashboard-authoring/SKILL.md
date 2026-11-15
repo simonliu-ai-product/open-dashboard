@@ -162,7 +162,7 @@ export const meta: DashboardMeta = {
   title: 'Sales overview',
   refresh: '5m',          // default auto-refresh: '30s' | '1m' | '5m' | '1h' — the reader can change it
   currency: 'USD',        // for 'currency' formats
-  locale: 'en-US',        // numbers and dates; e.g. 'zh-TW', 'ja-JP'
+  locale: 'en-US',        // numbers, dates, and the page's language (CJK fonts, line breaks); e.g. 'zh-TW', 'ja-JP'
   // theme: 'brand',      // a themes/<id>.json (see the create-theme skill); omit for the workspace default
   createdAt: '2026-10-02T00:00:00.000Z',
 }

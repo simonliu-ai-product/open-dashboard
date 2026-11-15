@@ -6,6 +6,7 @@ import { fileRowCount, tableFiles } from '../datasource/files.js'
 import { redact } from '../datasource/redact.js'
 import { errorMessage } from '../datasource/types.js'
 import type { ResolvedCollector, ResolvedConfig, Workspace } from '../workspace.js'
+import { writeFileAtomic } from './atomic.js'
 import { OpsError } from './errors.js'
 
 export interface CollectorRun {
@@ -49,7 +50,7 @@ function readState(config: ResolvedConfig): Record<string, CollectorRun> {
 function writeRun(config: ResolvedConfig, id: string, run: CollectorRun): void {
   const path = collectorStatePath(config)
   mkdirSync(dirname(path), { recursive: true })
-  writeFileSync(path, `${JSON.stringify({ ...readState(config), [id]: run }, null, 2)}\n`)
+  writeFileAtomic(path, `${JSON.stringify({ ...readState(config), [id]: run }, null, 2)}\n`)
 }
 
 function nextRun(collector: ResolvedCollector, last: CollectorRun | undefined): Date | undefined {

@@ -60,9 +60,32 @@ export function foldEdits(panels: LayoutPanel[], edits: LayoutEdit[]): Record<st
 export function foldStructure(rows: RowShape[], edits: LayoutEdit[]): RowShape[] {
   let current = rows
   for (const edit of edits) {
-    if (edit.kind === 'move' || edit.kind === 'moveRow') current = applyStructure(current, edit)
+    if (
+      edit.kind === 'move' ||
+      edit.kind === 'moveRow' ||
+      edit.kind === 'remove' ||
+      edit.kind === 'duplicate'
+    )
+      current = applyStructure(current, edit)
   }
   return current
+}
+
+/** Staged copies → the panel each was copied from in the source (a copy of a copy, the original). */
+export function stagedCopies(edits: LayoutEdit[]): Record<string, string> {
+  const out: Record<string, string> = {}
+  for (const edit of edits) {
+    if (edit.kind === 'duplicate') out[edit.copy] = out[edit.title] ?? edit.title
+  }
+  return out
+}
+
+/** `Revenue (copy)`, `Revenue (copy 2)`…: the first title no panel has. */
+export function copyTitleFor(title: string, taken: Set<string>): string {
+  const base = title.replace(/ \(copy( \d+)?\)$/, '')
+  let copy = `${base} (copy)`
+  for (let n = 2; taken.has(copy); n++) copy = `${base} (copy ${n})`
+  return copy
 }
 
 /** Consecutive prop edits to one panel are one step: a drag is one undo, not forty. */
@@ -92,6 +115,8 @@ export interface EditState {
   rows: RowShape[] | undefined
   /** Rows as the source last had them — what the page's element tree should match. */
   sourceRows: RowShape[] | undefined
+  /** Staged panel copies → the source panel each copies. */
+  copies: Record<string, string>
   /** The dashboard's <Select> names: what a click can drill into. */
   filters: string[]
   /** Row order while a panel is being dragged, before it is staged. */
@@ -111,6 +136,7 @@ store.__openDashboardEdit ??= createContext<EditState>({
   layout: {},
   rows: undefined,
   sourceRows: undefined,
+  copies: {},
   filters: [],
   liveOrder: undefined,
   stage: () => {},

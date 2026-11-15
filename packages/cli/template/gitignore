@@ -6,3 +6,5 @@ dist
 data/sample.db
 # open-dashboard build: holds query results
 site
+# dashboards moved to the trash from the viewer or an agent
+.open-dashboard/trash

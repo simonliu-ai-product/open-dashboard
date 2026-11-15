@@ -49,7 +49,8 @@ Add `--allow-sql` for `run_sql`. The workspace is read once at start: restart th
 | `read_database_doc` / `write_database_doc` | `databases/<source>/database.md`: what the data means. |
 | `list_charts` | The built-in panels and the custom charts under `charts/`. |
 | `list_themes` / `read_theme` / `write_theme` | Themes under `themes/`, validated field by field. |
-| `list_comments` / `add_comment` | Notes left on panels, for a later pass. |
+| `list_comments` / `add_comment` / `resolve_comment` | Notes left on panels, for a later pass — each one linked to its panel, and removed once applied. |
+| `rename_dashboard` / `duplicate_dashboard` / `delete_dashboard` | Set `meta.title`; copy a dashboard folder to try a variation; move one to `.open-dashboard/trash/` (never erased). |
 | `current_view` | What the person has open in the viewer: "this dashboard", "this chart". |
 | `list_collectors` / `run_collector` | The config's collectors: their last run, and running one now. |
 | `run_sql` | Read-only SQL of the agent's own — only with `--allow-sql`. |

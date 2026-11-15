@@ -9,7 +9,7 @@ import {
 } from 'react'
 import { useHost } from '../runtime/context.js'
 import { isPanelType } from '../runtime/convert.js'
-import { useEdit } from '../runtime/edit.js'
+import { copyTitleFor, useEdit } from '../runtime/edit.js'
 import {
   downloadData,
   downloadPanel,
@@ -18,6 +18,7 @@ import {
 } from '../runtime/export-panel.js'
 import type { FormatContext } from '../runtime/format.js'
 import { useLocale, useT } from '../runtime/i18n.js'
+import { rememberRun } from '../runtime/panel-runs.js'
 import type { QueryRun } from '../runtime/types.js'
 import { type QueryState, useQuery } from '../runtime/use-query.js'
 import type { Drill } from './drill.js'
@@ -78,6 +79,9 @@ export function PanelFrame(props: FrameProps) {
   const { span, height } = chrome
   const { state } = props
   const run = state.run
+  useEffect(() => {
+    if (ref.current && run) rememberRun(ref.current, props.title, run)
+  }, [run, props.title])
 
   useEffect(() => {
     if (!expanded) return
@@ -176,6 +180,65 @@ export function PanelFrame(props: FrameProps) {
                 </svg>
               </button>
             ) : null}
+            {chrome.enabled && edit.layout[props.title]?.inRow ? (
+              <>
+                <button
+                  type="button"
+                  className="odd-icon-button"
+                  title={t('Duplicate panel')}
+                  aria-label={t('Duplicate {title}', { title: props.title })}
+                  onClick={() => {
+                    const taken = new Set([
+                      ...Object.keys(edit.layout),
+                      ...(edit.rows ?? []).flatMap((row) => row.titles),
+                    ])
+                    edit.stage({
+                      kind: 'duplicate',
+                      title: props.title,
+                      copy: copyTitleFor(props.title, taken),
+                    })
+                  }}
+                >
+                  <svg viewBox="0 0 16 16" width="14" height="14" aria-hidden="true">
+                    <rect
+                      x="5.5"
+                      y="5.5"
+                      width="8"
+                      height="8"
+                      rx="1.5"
+                      stroke="currentColor"
+                      strokeWidth="1.5"
+                      fill="none"
+                    />
+                    <path
+                      d="M10.5 3.5v-.5A1.5 1.5 0 0 0 9 1.5H3A1.5 1.5 0 0 0 1.5 3v6A1.5 1.5 0 0 0 3 10.5h.5"
+                      stroke="currentColor"
+                      strokeWidth="1.5"
+                      fill="none"
+                    />
+                  </svg>
+                </button>
+                <button
+                  type="button"
+                  className="odd-icon-button"
+                  data-danger=""
+                  title={t('Remove panel')}
+                  aria-label={t('Remove {title}', { title: props.title })}
+                  onClick={() => edit.stage({ kind: 'remove', title: props.title })}
+                >
+                  <svg viewBox="0 0 16 16" width="14" height="14" aria-hidden="true">
+                    <path
+                      d="M3 4.5h10M6.5 4.5V3h3v1.5M4.5 4.5l.6 8.5h5.8l.6-8.5"
+                      stroke="currentColor"
+                      strokeWidth="1.5"
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      fill="none"
+                    />
+                  </svg>
+                </button>
+              </>
+            ) : null}
             <button
               type="button"
               className="odd-icon-button"
@@ -209,13 +272,13 @@ export function PanelFrame(props: FrameProps) {
             <DownloadMenu
               formats={
                 run && run.result.rows.length > 0
-                  ? ['png', 'svg', 'pdf', 'csv', 'json', 'md']
+                  ? ['png', 'svg', 'pdf', 'csv', 'xlsx', 'json', 'md']
                   : ['png', 'svg', 'pdf']
               }
               save={async (format) => {
                 const name = exportName(host.id, props.title)
-                if (format === 'csv' || format === 'json' || format === 'md') {
-                  if (run) downloadData(run.result, format, name)
+                if (format === 'csv' || format === 'xlsx' || format === 'json' || format === 'md') {
+                  if (run) downloadData(run.result, format, name, props.title)
                   return
                 }
                 if (ref.current && format !== 'html')

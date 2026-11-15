@@ -49,7 +49,8 @@ pnpm exec open-dashboard dev --mcp
 | `read_database_doc` / `write_database_doc` | `databases/<source>/database.md`：資料的意義。 |
 | `list_charts` | 內建面板，以及 `charts/` 下的自訂圖表。 |
 | `list_themes` / `read_theme` / `write_theme` | `themes/` 下的主題，逐欄驗證。 |
-| `list_comments` / `add_comment` | 留在面板上、等待處理的備註。 |
+| `list_comments` / `add_comment` / `resolve_comment` | 留在面板上、等待處理的備註——每則都對應到面板，處理完就移除。 |
+| `rename_dashboard` / `duplicate_dashboard` / `delete_dashboard` | 修改 `meta.title`；複製整個看板資料夾來試不同版本；把看板移到 `.open-dashboard/trash/`（不會真的刪掉）。 |
 | `current_view` | 使用者正在檢視器裡看什麼：「這張 Dashboard」、「這張圖」指的是哪個。 |
 | `list_collectors` / `run_collector` | 設定檔裡的收集器：上次執行的結果，以及立刻執行一個。 |
 | `run_sql` | Agent 自己寫的唯讀 SQL——只有加上 `--allow-sql` 才會提供。 |

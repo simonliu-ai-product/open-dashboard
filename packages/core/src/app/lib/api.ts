@@ -15,6 +15,13 @@ import type { DashboardTheme } from '../../runtime/theme.js'
 import type { QueryRun } from '../../runtime/types.js'
 import { staticApi } from './static-api.js'
 
+/** A note left for the agent, as listed for the page: where it is in the source and which panel it is about. */
+export interface DashboardNoteView {
+  line: number
+  text: string
+  panel: string | null
+}
+
 const BASE = '/__odd/api/'
 
 export interface AssistantReply {
@@ -65,12 +72,22 @@ export const liveApi = {
       `explain?id=${encodeURIComponent(id)}&name=${encodeURIComponent(name)}&params=${encodeURIComponent(JSON.stringify(params))}`,
     ),
   comments: (id: string) =>
-    request<{ comments: { line: number; text: string }[] }>(
-      `comments?id=${encodeURIComponent(id)}`,
-    ).then((r) => r.comments),
+    request<{ comments: DashboardNoteView[] }>(`comments?id=${encodeURIComponent(id)}`).then(
+      (r) => r.comments,
+    ),
   comment: (id: string, panel: string, text: string) =>
     post<{ file: string; line: number }>('comment', { id, panel, text }),
+  resolveComment: (id: string, line: number, text: string) =>
+    post<{ file: string; remaining: number }>('comment/resolve', { id, line, text }),
   current: (view: Record<string, unknown>) => post('current', view).catch(() => {}),
+  createDashboard: (title: string) =>
+    post<{ id: string; title: string }>('dashboard/create', { title }),
+  renameDashboard: (id: string, title: string) =>
+    post<{ id: string; title: string; hash: string }>('dashboard/rename', { id, title }),
+  duplicateDashboard: (id: string) =>
+    post<{ id: string; title: string }>('dashboard/duplicate', { id }),
+  deleteDashboard: (id: string) =>
+    post<{ id: string; trashedTo: string }>('dashboard/delete', { id }),
   layout: (id: string) => request<DashboardLayout>(`layout?id=${encodeURIComponent(id)}`),
   saveLayout: (id: string, hash: string, edits: LayoutEdit[]) =>
     post<{ hash: string }>('layout', { id, hash, edits }),
@@ -174,6 +191,11 @@ function servedApi(): Api {
     explain: refused,
     comments: async () => [],
     comment: refused,
+    resolveComment: refused,
+    createDashboard: refused,
+    renameDashboard: refused,
+    duplicateDashboard: refused,
+    deleteDashboard: refused,
     current: async () => {},
     layout: refused,
     saveLayout: refused,

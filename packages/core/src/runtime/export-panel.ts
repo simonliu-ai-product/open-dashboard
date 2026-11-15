@@ -1,4 +1,5 @@
 import { jpegToPdf } from './pdf.js'
+import { resultToXlsx } from './xlsx.js'
 
 /**
  * A panel as a picture — vector SVG, and PNG drawn from it.
@@ -49,8 +50,8 @@ const SVG_PROPS = [
 
 const COLOR_PROPS = new Set(['fill', 'stroke'])
 
-/** 'html' is the whole dashboard as one interactive file, built by the server; 'csv', 'json' and 'md' export a panel's rows. */
-export type ImageFormat = 'png' | 'svg' | 'pdf' | 'html' | 'csv' | 'json' | 'md'
+/** 'html' is the whole dashboard as one interactive file, built by the server; 'csv', 'json', 'md' and 'xlsx' export a panel's rows. */
+export type ImageFormat = 'png' | 'svg' | 'pdf' | 'html' | 'csv' | 'json' | 'md' | 'xlsx'
 export type PictureFormat = 'png' | 'svg' | 'pdf'
 
 async function encode(
@@ -129,9 +130,17 @@ export function resultToMarkdown(result: {
 
 export function downloadData(
   result: { columns: { name: string }[]; rows: Record<string, unknown>[] },
-  format: 'csv' | 'json' | 'md',
+  format: 'csv' | 'json' | 'md' | 'xlsx',
   name: string,
+  title = name,
 ): void {
+  if (format === 'xlsx') {
+    const blob = new Blob([resultToXlsx(result, title) as BlobPart], {
+      type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+    })
+    downloadBlob(blob, `${name}.xlsx`)
+    return
+  }
   if (format === 'csv') {
     const blob = new Blob([resultToCsv(result)], { type: 'text/csv;charset=utf-8' })
     downloadBlob(blob, `${name}.csv`)
@@ -535,8 +544,9 @@ function layoutLines(node: Text): Line[] {
     range.setEnd(node, start + token.length)
     const tokenRects = Array.from(range.getClientRects()).filter((r) => r.width > 0)
     if (tokenRects.length === 0) continue
-    if (tokenRects.length === 1 && !(ellipsis && clipBox && tokenRects[0]!.right > clipBox.right)) {
-      if (!pushPiece(token, tokenRects[0]!)) break
+    const [only] = tokenRects
+    if (tokenRects.length === 1 && only && !(ellipsis && clipBox && only.right > clipBox.right)) {
+      if (!pushPiece(token, only)) break
     } else {
       let stopped = false
       let offset = start
@@ -555,10 +565,8 @@ function layoutLines(node: Text): Line[] {
     }
   }
 
-  if (truncatedByEllipsis && lines.length > 0) {
-    const last = lines.at(-1)!
-    last.text = `${last.text.trimEnd()}…`
-  }
+  const last = lines.at(-1)
+  if (truncatedByEllipsis && last) last.text = `${last.text.trimEnd()}…`
 
   if (lineClamp > 0 && lines.length > lineClamp) {
     const clamped = lines.slice(0, lineClamp)

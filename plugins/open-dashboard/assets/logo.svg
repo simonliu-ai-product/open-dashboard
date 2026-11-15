@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128" role="img" aria-labelledby="t">
+  <title id="t">open-dashboard</title>
+  <rect width="128" height="128" rx="28" fill="#1b1d22"/>
+  <rect x="26" y="30" width="76" height="68" rx="8" fill="#fff"/>
+  <rect x="34" y="38" width="26" height="14" rx="3" fill="#e8edf7"/>
+  <rect x="66" y="38" width="28" height="14" rx="3" fill="#e8edf7"/>
+  <path d="M38 88V74M50 88V64M62 88V70M74 88V58M86 88V66" stroke="#2563eb" stroke-width="6" stroke-linecap="round"/>
+</svg>

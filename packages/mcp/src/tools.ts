@@ -3,6 +3,7 @@ import {
   addComment,
   chartCatalog,
   checkWorkspace,
+  duplicateDashboard,
   errorMessage,
   explainDashboardQuery,
   generateReport,
@@ -21,12 +22,15 @@ import {
   readSharedQueryFiles,
   readTheme,
   readWorkspaceChanges,
+  renameDashboard,
   renderDashboard,
+  resolveComment,
   revertWorkspaceFile,
   runCollector,
   runDashboardQuery,
   runSql,
   schemaToText,
+  trashDashboard,
   type Workspace,
   writeDashboardFile,
   writeDatabaseDoc,
@@ -376,6 +380,54 @@ export function registerTools(server: McpServer, workspace: Workspace, options: 
       annotations: { readOnlyHint: false, destructiveHint: false },
     },
     ({ id, panel, text }) => run(() => addComment(config(), id, panel, text)),
+  )
+
+  server.registerTool(
+    'resolve_comment',
+    {
+      title: 'Resolve a note',
+      description:
+        'Remove one note once you have done what it asked: the marker on `line` whose text is `text`, as list_comments returned them. Refused if the file changed and the note is no longer there.',
+      inputSchema: z.object({ id: z.string(), line: z.number().int(), text: z.string() }),
+      annotations: { readOnlyHint: false, destructiveHint: false },
+    },
+    ({ id, line, text }) => run(() => resolveComment(config(), id, line, text)),
+  )
+
+  server.registerTool(
+    'rename_dashboard',
+    {
+      title: 'Rename a dashboard',
+      description:
+        "Set a dashboard's title (`meta.title`); its id and address stay. Pass the `hash` read_dashboard gave for index.tsx to be refused if it changed meanwhile.",
+      inputSchema: z.object({ id: z.string(), title: z.string(), hash: z.string().optional() }),
+      annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: true },
+    },
+    ({ id, title, hash }) => run(() => renameDashboard(config(), id, title, hash)),
+  )
+
+  server.registerTool(
+    'duplicate_dashboard',
+    {
+      title: 'Duplicate a dashboard',
+      description:
+        'Copy a dashboard folder — layout, queries and notes — to `new_id`, or `<id>-copy` when omitted; the copy is titled "… (copy)". Use it to try a variation without touching the original.',
+      inputSchema: z.object({ id: z.string(), new_id: z.string().optional() }),
+      annotations: { readOnlyHint: false, destructiveHint: false },
+    },
+    ({ id, new_id }) => run(() => duplicateDashboard(config(), id, new_id)),
+  )
+
+  server.registerTool(
+    'delete_dashboard',
+    {
+      title: 'Move a dashboard to the trash',
+      description:
+        'Move a dashboard folder to `.open-dashboard/trash/` (nothing is erased; moving it back restores it). Only when the person asked for the dashboard to go.',
+      inputSchema: z.object({ id: z.string() }),
+      annotations: { readOnlyHint: false, destructiveHint: true },
+    },
+    ({ id }) => run(() => trashDashboard(config(), id)),
   )
 
   server.registerTool(

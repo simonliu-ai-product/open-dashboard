@@ -551,6 +551,13 @@ button {
   margin-bottom: 28px;
 }
 
+.odd-page-head-actions {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+}
+
 .odd-page-head h1 {
   margin: 0;
   font-size: 26px;
@@ -579,7 +586,65 @@ button {
   border-radius: var(--odd-radius);
   background: var(--odd-surface);
   box-shadow: 0 0 0 1px var(--odd-border);
-  overflow: hidden;
+}
+
+/* Not clipped by overflow, so a row's ⋯ menu can open past the list; the rows round their own corners. */
+.odd-board-row {
+  position: relative;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+}
+
+/* The whole row lights up, ⋯ column included. */
+.odd-board-row:has(> .odd-board:hover) {
+  background: var(--odd-hover);
+}
+
+.odd-board-row > .odd-board:hover {
+  background: none;
+}
+
+.odd-boards li:first-child {
+  border-top-left-radius: var(--odd-radius);
+  border-top-right-radius: var(--odd-radius);
+}
+
+.odd-boards li:last-child {
+  border-bottom-left-radius: var(--odd-radius);
+  border-bottom-right-radius: var(--odd-radius);
+}
+
+.odd-board-row > .odd-more {
+  padding-right: 12px;
+}
+
+.odd-board-row > .odd-more > .odd-icon-button {
+  border-color: transparent;
+  background: none;
+  box-shadow: none;
+  color: var(--odd-muted);
+}
+
+.odd-board-row > .odd-more > .odd-icon-button:hover,
+.odd-board-row > .odd-more > .odd-icon-button[aria-expanded="true"] {
+  background: var(--odd-hover);
+  color: var(--odd-ink);
+}
+
+.odd-boards-empty {
+  margin: 0 0 16px;
+  padding: 24px;
+  border-radius: var(--odd-radius);
+  background: var(--odd-surface);
+  box-shadow: 0 0 0 1px var(--odd-border);
+  color: var(--odd-muted);
+  font-size: 13.5px;
+  text-align: center;
+}
+
+.odd-board-renaming {
+  grid-template-columns: minmax(0, 1fr);
 }
 
 .odd-boards li + li {
@@ -1861,8 +1926,19 @@ button {
   background: none;
 }
 
+/* In Edit the actions sit on the panel's top edge, so a narrow panel's title keeps its width and stays readable. */
 .odd-panel[data-editing] .odd-panel-actions {
-  opacity: 1;
+  position: absolute;
+  top: -24px;
+  right: 10px;
+  z-index: 2;
+  margin: 0;
+  padding: 2px;
+  border-radius: 8px;
+  background: var(--odd-surface);
+  box-shadow:
+    0 0 0 0.5px var(--odd-border),
+    0 4px 12px -4px rgb(0 0 0 / 0.16);
 }
 
 .odd-grip {
@@ -2384,6 +2460,49 @@ body.odd-dragging * {
   white-space: nowrap;
 }
 
+/*
+ * CJK text follows the language it is written in, as open-doc does: the
+ * interface's language on the chrome, a dashboard's meta.locale on its page.
+ * The same Han character differs between Traditional and Simplified Chinese,
+ * Japanese and Korean fonts, so each gets its own fonts first.
+ */
+html:lang(ja) body,
+.odd-dashboard-page:lang(ja) {
+  font-family:
+    system-ui, -apple-system, "Hiragino Sans", "Hiragino Kaku Gothic ProN", "Yu Gothic UI",
+    "Noto Sans JP", sans-serif;
+}
+
+html:lang(ko) body,
+.odd-dashboard-page:lang(ko) {
+  font-family:
+    system-ui, -apple-system, "Apple SD Gothic Neo", "Malgun Gothic", "Noto Sans KR", sans-serif;
+}
+
+html:lang(zh-CN) body,
+html:lang(zh-Hans) body,
+.odd-dashboard-page:lang(zh-CN),
+.odd-dashboard-page:lang(zh-Hans),
+.odd-dashboard-page:lang(zh-SG) {
+  font-family:
+    system-ui, -apple-system, "PingFang SC", "Microsoft YaHei", "Noto Sans SC", sans-serif;
+}
+
+html:lang(zh-TW) body,
+html:lang(zh-Hant) body,
+.odd-dashboard-page:lang(zh-TW),
+.odd-dashboard-page:lang(zh-Hant),
+.odd-dashboard-page:lang(zh-HK) {
+  font-family:
+    system-ui, -apple-system, "PingFang TC", "Microsoft JhengHei", "Noto Sans TC", sans-serif;
+}
+
+/* Strict line breaking for CJK: no line starts with 。、」 or a small kana. */
+.odd-dashboard-page:lang(zh),
+.odd-dashboard-page:lang(ja) {
+  line-break: strict;
+}
+
 .odd-notes-pill {
   display: inline-flex;
   align-items: center;
@@ -2396,6 +2515,170 @@ body.odd-dragging * {
   font: inherit;
   font-size: 12px;
   cursor: pointer;
+}
+
+.odd-notes {
+  position: relative;
+}
+
+.odd-more {
+  position: relative;
+}
+
+.odd-more-menu {
+  position: absolute;
+  top: calc(100% + 6px);
+  right: 0;
+  z-index: 40;
+  display: grid;
+  min-width: 200px;
+  padding: 4px;
+  border-radius: 10px;
+  background: var(--odd-surface);
+  color: var(--odd-ink);
+  box-shadow:
+    0 0 0 0.5px var(--odd-border),
+    0 8px 24px -6px rgb(0 0 0 / 0.18);
+}
+
+.odd-more-menu button {
+  padding: 7px 10px;
+  border: 0;
+  border-radius: 6px;
+  background: none;
+  color: inherit;
+  font: inherit;
+  font-size: 13px;
+  text-align: left;
+  cursor: pointer;
+}
+
+.odd-more-menu button:hover,
+.odd-more-menu button:focus-visible {
+  background: var(--odd-hover, rgb(0 0 0 / 0.05));
+}
+
+.odd-more-menu button[data-danger] {
+  color: var(--odd-critical, #c5221f);
+}
+
+.odd-more-error {
+  margin: 4px 6px 2px;
+  font-size: 12px;
+  color: var(--odd-critical, #c5221f);
+}
+
+.odd-title-input {
+  min-width: 12ch;
+  padding: 2px 6px;
+  border: 1px solid var(--odd-accent, var(--odd-border));
+  border-radius: 6px;
+  background: var(--odd-surface);
+  color: var(--odd-ink);
+  font: inherit;
+}
+
+.odd-notes-pop {
+  position: absolute;
+  top: calc(100% + 6px);
+  right: 0;
+  z-index: 40;
+  width: min(380px, calc(100vw - 32px));
+  max-height: 60vh;
+  overflow: auto;
+  padding: 10px;
+  border-radius: 10px;
+  background: var(--odd-surface);
+  color: var(--odd-ink);
+  box-shadow:
+    0 0 0 0.5px var(--odd-border),
+    0 8px 24px -6px rgb(0 0 0 / 0.18);
+}
+
+.odd-notes-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 2px 4px 8px;
+  font-size: 13px;
+}
+
+.odd-notes-copy {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 3px 8px;
+  border: 1px solid var(--odd-border);
+  border-radius: 6px;
+  background: none;
+  color: inherit;
+  font: inherit;
+  font-size: 11.5px;
+  cursor: pointer;
+}
+
+.odd-notes-copy svg {
+  width: 13px;
+  height: 13px;
+  color: var(--odd-muted);
+}
+
+.odd-notes-list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: grid;
+  gap: 6px;
+}
+
+.odd-notes-list li {
+  padding: 8px 10px;
+  border-radius: 8px;
+  background: var(--odd-warning-bg);
+}
+
+.odd-notes-where {
+  font-size: 11.5px;
+  font-weight: 600;
+  color: var(--odd-muted);
+}
+
+.odd-notes-list p {
+  margin: 2px 0 6px;
+  font-size: 13px;
+  line-height: 1.45;
+  white-space: pre-wrap;
+}
+
+.odd-notes-actions {
+  display: flex;
+  gap: 6px;
+}
+
+.odd-notes-actions button {
+  padding: 2px 8px;
+  border: 1px solid var(--odd-border);
+  border-radius: 6px;
+  background: var(--odd-surface);
+  color: inherit;
+  font: inherit;
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.odd-notes-actions button:disabled {
+  opacity: 0.5;
+}
+
+@keyframes odd-panel-flash {
+  from {
+    box-shadow: 0 0 0 3px var(--odd-accent, #2563eb);
+  }
+}
+
+.odd-panel-flash {
+  animation: odd-panel-flash 1.4s ease-out;
 }
 
 .odd-notes-pill code {
@@ -5728,6 +6011,7 @@ html[data-odd-kiosk="1"] .odd-views {
 /* Table Collapsible Group Rows & Copyable Cells */
 
 .odd-table-group-row td {
+  /* biome-ignore lint/complexity/noImportantStyles: a group header keeps its padding whatever density or row state the table is in */
   padding: 6px 10px !important;
   background: color-mix(in srgb, var(--odd-ink) 4%, var(--odd-surface));
   border-top: 1px solid var(--odd-border);

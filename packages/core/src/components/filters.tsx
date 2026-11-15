@@ -518,7 +518,7 @@ export function parseNumberRangeValue(raw: string | null | undefined): {
   min: number | null
   max: number | null
 } {
-  if (!raw || !raw.includes('..')) return { min: null, max: null }
+  if (!raw?.includes('..')) return { min: null, max: null }
   const [left = '', right = ''] = raw.split('..', 2)
   const min = left.trim() !== '' && Number.isFinite(Number(left)) ? Number(left) : null
   const max = right.trim() !== '' && Number.isFinite(Number(right)) ? Number(right) : null

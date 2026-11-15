@@ -178,9 +178,21 @@ function arrange(body: ReactNode[], edit: EditState): ReactNode[] {
         return cloneElement(
           original,
           { key: `row-${row.id}`, __rowIndex: staged.indexOf(row) } as Record<string, unknown>,
-          ...row.titles.map((title) =>
-            keyed(cloneElement(panels.get(title) as ReactElement, { key: title }), title),
-          ),
+          ...row.titles.map((title) => {
+            const own = panels.get(title)
+            if (own) return keyed(cloneElement(own as ReactElement, { key: title }), title)
+            // A staged copy: the panel it copies, under its new title.
+            const from = panels.get(edit.copies[title] ?? '')
+            return from
+              ? keyed(
+                  cloneElement(
+                    from as ReactElement,
+                    { key: title, title } as Record<string, unknown>,
+                  ),
+                  title,
+                )
+              : null
+          }),
         )
       }
       if (node.type === Section) {

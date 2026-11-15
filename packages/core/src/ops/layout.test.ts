@@ -288,3 +288,38 @@ describe('editLayout', () => {
     ).toThrow(/changed on disk/)
   })
 })
+
+describe('removing and duplicating panels', () => {
+  it('removes a panel with the note above it, and a row left empty', () => {
+    const out = applyEdits(SOURCE, [{ kind: 'remove', title: 'Top products' }])
+    expect(out).not.toContain('Top products')
+    expect(out).not.toContain('@dashboard-comment')
+    expect(() => parseSource(out, true)).not.toThrow()
+    expect(describeLayout(out).panels.map((p) => p.title)).not.toContain('Top products')
+  })
+
+  it('copies a panel right after it under the new title, leaving its note behind', () => {
+    const out = applyEdits(SOURCE, [
+      { kind: 'duplicate', title: 'Revenue', copy: "Revenue's (copy)" },
+    ])
+    const titles = describeLayout(out).rows[0]?.titles
+    expect(titles).toEqual(['Revenue', "Revenue's (copy)", 'Orders'])
+    expect(out.match(/@dashboard-comment/g)).toHaveLength(1)
+    expect(out).toContain(
+      `<Stat title="Revenue's (copy)" query="kpis" column="revenue" format="currency" />`,
+    )
+    expect(() =>
+      applyEdits(SOURCE, [{ kind: 'duplicate', title: 'Revenue', copy: 'Orders' }]),
+    ).toThrow(/already titled/)
+  })
+
+  it('previews what it writes: a copy then an edit to it', () => {
+    const out = applyEdits(SOURCE, [
+      { kind: 'duplicate', title: 'Orders', copy: 'Orders (copy)' },
+      { kind: 'props', title: 'Orders (copy)', set: { column: 'revenue' } },
+      { kind: 'remove', title: 'Orders' },
+    ])
+    expect(describeLayout(out).rows[0]?.titles).toEqual(['Revenue', 'Orders (copy)'])
+    expect(out).toMatch(/title="Orders \(copy\)"[^>]*column="revenue"/)
+  })
+})

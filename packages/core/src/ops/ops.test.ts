@@ -6,7 +6,7 @@ import { loadConfig } from '../workspace.js'
 import { analyzeDashboard } from './analyze.js'
 import { chartCatalog, listCharts, readChartSpec, runChartQuery } from './charts.js'
 import { checkDashboard } from './check.js'
-import { addComment, listComments } from './comment.js'
+import { addComment, listComments, resolveComment } from './comment.js'
 import { listDashboards, runDashboardQuery, runSql } from './dashboards.js'
 import { docSourceOf, readDatabaseDoc, writeDatabaseDoc } from './database-doc.js'
 import { type Fixture, makeFixture } from './fixture.test-helper.js'
@@ -338,9 +338,22 @@ describe('comments', () => {
       '        {/* @dashboard-comment: split by month * / please */}\n        <BarChart title="By region"',
     )
     expect(listComments(fixture.workspace.config, 'sales')).toEqual([
-      { line: 14, text: 'split by month * / please' },
+      { line: 14, text: 'split by month * / please', panel: 'By region' },
     ])
     expect(analyzeDashboard(source).panels).toHaveLength(2)
+  })
+
+  it('resolves a note, leaving the file as it was before', () => {
+    const before = readFileSync(join(fixture.root, 'dashboards/sales/index.tsx'), 'utf8')
+    addComment(fixture.workspace.config, 'sales', 'By region', 'use a line chart')
+    expect(() => resolveComment(fixture.workspace.config, 'sales', 14, 'something else')).toThrow(
+      /no longer on line 14/,
+    )
+    expect(resolveComment(fixture.workspace.config, 'sales', 14, 'use a line chart')).toEqual({
+      file: 'dashboards/sales/index.tsx',
+      remaining: 0,
+    })
+    expect(readFileSync(join(fixture.root, 'dashboards/sales/index.tsx'), 'utf8')).toBe(before)
   })
 
   it('refuses to splice into a file with a syntax error', () => {

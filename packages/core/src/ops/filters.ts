@@ -122,7 +122,7 @@ export async function dashboardFilters(
       const name = decl.name
       const fallback = decl.default ?? null
       const parseBound = (raw: string | null | undefined) => {
-        if (!raw || !raw.includes('..')) return { min: null, max: null }
+        if (!raw?.includes('..')) return { min: null, max: null }
         const [l = '', r = ''] = raw.split('..', 2)
         return {
           min: l.trim() !== '' && Number.isFinite(Number(l)) ? Number(l) : null,

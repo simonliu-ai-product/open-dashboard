@@ -61,6 +61,20 @@ dashboards/sales-overview/
 
 Skills 教的是會改檔案的 Coding Agent。支援 MCP 的 Agent 框架，則能把同一個 workspace 當成工具來用：`pnpm add -D @open-dashboard/mcp`，再執行 `open-dashboard dev --mcp`，端點就在 `http://localhost:5473/mcp`。列出與讀取 Dashboard、讀 schema 與 `database.md`、寫入 `index.tsx` 與 `.sql`、執行具名查詢、`check`——Agent 一寫，瀏覽器裡的頁面就跟著更新。每個工具走的都是檢視器與 CLI 用的同一套程式：同樣的唯讀驅動程式、同樣的遮蔽、同樣的 hash 檢查，不會覆蓋掉期間內別人做的修改。`--allow-sql` 會加上用來探索資料的 `run_sql`——唯讀，而且預設不開啟。來自其他網站或其他主機名稱的請求一律拒絕。用戶端會自己啟動 server 的情況（Claude Desktop、多數 Agent 框架），則用 `open-dashboard mcp` 透過 stdio 提供同一組工具，不需要開 dev server。詳見 [packages/mcp](packages/mcp/README.zh-TW.md)。
 
+### 🧩 Claude Code 與 Antigravity 的 plugin
+
+把 open-dashboard 裝進你的 Agent 一次，之後每個 workspace 都有 Skills、撰寫規則與 MCP server（以 stdio 執行的 `open-dashboard mcp`），不必逐一設定：
+
+```bash
+# Claude Code
+/plugin install open-dashboard --marketplace simonliu-ai-product/open-dashboard
+
+# Google Antigravity（IDE、App 或 agy CLI）
+agy plugin install https://github.com/simonliu-ai-product/open-dashboard
+```
+
+查詢與面板交給 Agent 寫；瀏覽器仍是你閱讀、篩選、留備註的地方。兩邊透過檔案接力——備註是原始碼裡的 `@dashboard-comment` 標記，你檢視中的面板記在 `current.json`——所以在面板上留的一句話，就是 Agent 的下一個修改。詳見 [plugins/open-dashboard](plugins/open-dashboard)。
+
 ### 🔒 瀏覽器只能點名查詢，永遠不送 SQL
 
 檢視器只能要求「`sales-overview` 這張 Dashboard 的 `revenue_by_month` 查詢」，沒有其他方式。伺服器從磁碟讀取 `.sql` 檔、綁定參數後執行。沒有任何端點、屬性或選項會接受頁面送來的 SQL 文字——能被執行的，只有寫進檔案、可以被 review 的 SQL。
@@ -188,6 +202,8 @@ sheets: {
 - 空檔案（或 `[]`）是沒有資料列的表，不是錯誤：讀它的面板會顯示沒有資料；原本有欄位的表會保留欄位。
 - 只讀取 workspace 裡的檔案，絕不寫入，也不會讓網頁直接下載原始檔。檔案一改，讀它的面板就會重新整理。
 
+用 [open-spreadsheet](../open-spreadsheet) 維護的試算表也能當 `csv` 來源：收集器執行 `open-spreadsheet export <活頁簿> --out data/<表>.csv`，輸出工作表算好的值（公式已計算、數字不加千分位、日期為 ISO 格式）。
+
 ### 🔄 用收集器讓資料保持最新
 
 資料是要抓下來的——API 存進 SQLite、匯出成 CSV——就在設定檔寫好怎麼抓，open-dashboard 會幫你跑：
@@ -283,7 +299,7 @@ import Radar from '../../charts/radar'
 
 一套主題就是 `themes/<id>.json`——圖表色票、強調色、上漲／下跌色（若你的市場習慣紅漲綠跌也沒問題）、頁面與面板背景、格線、字型與圓角，淺色與深色各一組。沒設定的項目沿用內建值，畫在色塊上的文字也會依對比自動選擇黑或白。Dashboard 用 `meta.theme` 指定主題（也可以在編輯模式的主題選單中選，會寫回 `index.tsx`）；設定檔中的 `theme` 是整個 workspace 的預設值。每張圖表都透過 `--odd-*` 變數繪製，所以一套主題能同時改變 41 種面板與所有自訂圖表的外觀，不必改動它們。
 
-### 🖼️ 面板或整張 Dashboard 都能下載成 PNG、SVG、CSV、JSON、PDF 或 HTML
+### 🖼️ 面板或整張 Dashboard 都能下載成 PNG、SVG、CSV、Excel、JSON、PDF 或 HTML
 
 <img src=".github/assets/download.png" alt="面板的下載選單，可選 PNG 或 SVG。" width="100%">
 
@@ -537,6 +553,7 @@ pnpm + Turbo monorepo。
 | --- | --- |
 | [packages/core](packages/core) | `@open-dashboard/core`：資料來源驅動程式、具名查詢載入、檢視器、面板元件、Vite plugins 與 dev API、`open-dashboard` CLI，以及正式版的 Skills。 |
 | [packages/mcp](packages/mcp) | `@open-dashboard/mcp`：MCP server，由 `open-dashboard dev --mcp` 掛載。 |
+| [plugins/open-dashboard](plugins/open-dashboard) | Claude Code 與 Antigravity 的 agent plugin：Skills、撰寫規則與 stdio MCP server。`.claude-plugin/marketplace.json` 讓 Claude Code 找得到它。 |
 | [packages/cli](packages/cli) | `@open-dashboard/cli`：`npx @open-dashboard/cli init` 的 scaffolder 與專案範本。 |
 | [apps/demo](apps/demo) | 自用的示範 workspace，建立在兩個以程式產生資料的 SQLite 資料庫上（一家咖啡器材店與它的行銷花費）。所有 demo 資料皆為程式產生。 |
 

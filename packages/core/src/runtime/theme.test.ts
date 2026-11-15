@@ -48,6 +48,14 @@ describe('themeCss', () => {
     expect(css).toContain(':root[data-theme="dark"] [data-odd-theme="brand"]{--odd-bad:#ff0000')
   })
 
+  it("keeps a theme's font on the page over the per-language fallback", () => {
+    const css = themeCss('serif', { font: 'Georgia, serif' })
+    expect(css).toContain(
+      '[data-odd-theme="serif"] .odd-dashboard-page[class]{font-family:Georgia, serif}',
+    )
+    expect(themeCss('plain', { radius: 2 })).not.toContain('.odd-dashboard-page')
+  })
+
   it('leaves a mode it does not set alone', () => {
     expect(themeCss('a', { light: { page: '#ffffff' } })).not.toContain('data-theme="dark"] [')
   })

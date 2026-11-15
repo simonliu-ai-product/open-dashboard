@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import type { DashboardSummary } from '../../ops/dashboards.js'
 import type { SourceStatus } from '../../ops/sources.js'
 import { useT } from '../../runtime/i18n.js'
+import { requestManage, requestNewDashboard } from '../lib/manage-events.js'
 import { navigate } from '../lib/router.js'
 import type { Theme } from '../lib/theme.js'
 
@@ -123,6 +124,40 @@ export function CommandPalette(props: {
       label: `${t('Theme')}: ${nextTheme === 'dark' ? t('Dark') : nextTheme === 'light' ? t('Light') : t('Auto')}`,
       run: () => props.onTheme(nextTheme),
     })
+
+    if (props.live) {
+      list.push({
+        id: 'action:new-dashboard',
+        group: t('Dashboards'),
+        label: t('New dashboard'),
+        run: () => {
+          navigate('/')
+          requestNewDashboard()
+        },
+      })
+      if (props.isDashboard && document.querySelector('.odd-header .odd-more')) {
+        list.push(
+          {
+            id: 'action:rename',
+            group: t('Dashboards'),
+            label: t('Rename dashboard…'),
+            run: () => requestManage('rename'),
+          },
+          {
+            id: 'action:duplicate',
+            group: t('Dashboards'),
+            label: t('Duplicate dashboard'),
+            run: () => requestManage('duplicate'),
+          },
+          {
+            id: 'action:delete',
+            group: t('Dashboards'),
+            label: t('Move dashboard to the trash…'),
+            run: () => requestManage('delete'),
+          },
+        )
+      }
+    }
 
     list.push({
       id: 'nav:home',
