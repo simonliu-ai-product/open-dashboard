@@ -82,6 +82,8 @@ Every driver lives in `datasource/<engine>.ts`, implements `Datasource` (`query`
 
 ## Architecture
 
+- **A workspace needs no install of its own.** `vite/index.ts` aliases core and React to the running core's copies, and `OPEN_DASHBOARD_CACHE_DIR` moves Vite's cache out of the workspace, so a host (CoStaff Desktop) can serve a workspace from one shared core. Keep both when touching `viteConfigFor`.
+
 ```
 dashboards/<id>/queries.sql  ──parse──▶ NamedQuery{name, source, sql}
 dashboards/<id>/index.tsx    ──Vite──▶ React tree in the viewer
