@@ -90,6 +90,11 @@ export function viteConfigFor(
   const core = packageRoot()
   return {
     root,
+    // A host serving many workspaces from one shared core (CoStaff Desktop) keeps
+    // the cache out of the workspace; otherwise Vite's default, in the workspace.
+    ...(process.env.OPEN_DASHBOARD_CACHE_DIR
+      ? { cacheDir: process.env.OPEN_DASHBOARD_CACHE_DIR }
+      : {}),
     configFile: false,
     envDir: false,
     logLevel: 'warn',
