@@ -5,6 +5,10 @@ which share one version. What each line means for a workspace, and how to move a
 workspace forward, is in [docs/compatibility.md](docs/compatibility.md): after
 installing a new version, run `open-dashboard upgrade`.
 
+From the next release on, changesets write each release's notes into
+`packages/core/CHANGELOG.md` (core, cli and mcp share one version); this file keeps
+the history up to 0.13.1.
+
 ## 0.13.1 — 2026-11-22
 
 Serve a workspace from a shared core, and recognise a host that embeds a single dashboard.
