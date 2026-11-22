@@ -156,14 +156,14 @@ Hand-written SVG, no chart dependency. The visual rules follow the dataviz metho
 
 ## Release, Browser Verification & Launch Media Workflow
 
-Branches and releases follow the `release-flow` skill (`.claude/skills/release-flow/`): work on `feat/`, `fix/`, `chore/` branches from `nightly` with a changeset, pull requests into `nightly`; `nightly` goes into `main` only when the maintainer decides to release, and CI publishes from `main` with trusted publishing. Never bump versions, edit a package `CHANGELOG.md` or publish by hand.
+Branches and releases follow the `release-flow` skill (`.claude/skills/release-flow/`): work on `feat/`, `fix/`, `chore/` branches from `main` and open pull requests back into `main` with a changeset when `packages/*` change. Changes collect on `main`; the maintainer releases by merging the "chore: release packages" pull request, after which CI publishes with trusted publishing and moves the `latest` branch to the release (the agent plugin installs from `latest`). Never bump versions, edit a package `CHANGELOG.md` or publish by hand.
 
 1. **Quality Gate & Docs**: Run `pnpm check && pnpm typecheck && pnpm test && pnpm build && pnpm audit --prod`. Sync `README.md`, `README.zh-TW.md`, i18n dictionaries (`zh-tw`, `zh-cn`, `ja`, `ko`), and `packages/core/skills/dashboard-authoring/`.
 2. **CLI + Chromium Real-Browser Verification**: Start the sample workspace (`tools/playground/open-dashboard-sample`) on a dev port, automate interactions via Playwright Chromium, capture screenshots, verify `0` console/page errors, and evaluate:
    - (1) UI/UX layout & visual alignment
    - (2) Functional correctness (URL sync, SQL param expansion, live KPI updates)
    - (3) Overall user experience
-3. **Release through changesets** (the `release-flow` skill): every change lands on `nightly` with a changeset; when the maintainer decides to release, merge `nightly` into `main`, review the "chore: release packages" pull request the Release workflow opens (versions, CHANGELOGs; update the audit line in `SECURITY.md` on it), and merge it — CI publishes core, cli and mcp to npm with trusted publishing and tags the release. Then merge the back-merge pull request into `nightly` and confirm `npm view @open-dashboard/core version`.
+3. **Release through changesets** (the `release-flow` skill): every change lands on `main` with a changeset; when the maintainer decides to release, review the "chore: release packages" pull request the Release workflow keeps open (versions, CHANGELOGs; update the audit line in `SECURITY.md` on it), and merge it — CI publishes core, cli and mcp to npm with trusted publishing, tags the release and moves `latest`. Confirm `npm view @open-dashboard/core version`.
 4. **Live Interaction Promo Video (Bottom Bilingual Subtitles)**: Record a 1920×1080 real-browser screen recording via Playwright (`recordVideo`) with a visible cursor + click ripple and a **bottom bilingual subtitle dock (English primary, Traditional Chinese secondary)** synchronized to each live UI interaction, encoded via `ffmpeg` under `tools/playground/open-dashboard-sample/videos/`.
 5. **Social Posts**: Provide ready-to-publish copy for **Facebook**, **LinkedIn** (ZH/EN), **X / Twitter** (≤ 280 chars), and **Threads** (≤ 500 chars).
 

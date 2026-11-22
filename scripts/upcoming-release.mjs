@@ -149,11 +149,11 @@ if (mode === 'json') {
 } else if (mode === 'issue') {
   const lines = [
     '<!-- upcoming-release: kept up to date by .github/workflows/upcoming.yml; edits here are overwritten -->',
-    'What is merged into `nightly` and waiting for the next release. Nothing here is on npm yet: a release happens when `nightly` is merged into `main` and the "Version Packages" pull request is merged.',
+    'What is merged into `main` and waiting for the next release. Nothing here is on npm yet: a release happens when the maintainer merges the "chore: release packages" pull request.',
     '',
   ]
   if (release.length === 0) {
-    lines.push('Nothing is waiting: `nightly` has no changes that would publish a new version.')
+    lines.push('Nothing is waiting: `main` has no changes that would publish a new version.')
   } else {
     lines.push('## Versions', '', table(release), '', '## Changes', '')
     for (const cs of all) {
@@ -178,7 +178,7 @@ if (mode === 'json') {
         )
   if (mine.length === 0) {
     console.log(
-      'Merged into `nightly`. This pull request has no changeset, so it does not change a published package (docs, CI or tests) and ships with no version of its own.',
+      'Merged into `main`. This pull request has no changeset, so it does not change a published package (docs, CI or tests) and ships with no version of its own.',
     )
   } else {
     const names = new Set(mine.flatMap((cs) => Object.keys(cs.bumps)))
@@ -189,11 +189,11 @@ if (mode === 'json') {
     )
     console.log(
       [
-        'Merged into `nightly`. Planned for the next release:',
+        'Merged into `main`. Planned for the next release:',
         '',
         table(mineRelease),
         '',
-        'Not published yet: it goes out when `nightly` is merged into `main` and the release pull request is merged. The version can still move up if later changes need a bigger bump. The "Upcoming release" issue lists everything waiting.',
+        'Not published yet: it goes out when the maintainer merges the "chore: release packages" pull request. The version can still move up if later changes need a bigger bump. The "Upcoming release" issue lists everything waiting.',
       ].join('\n'),
     )
   }

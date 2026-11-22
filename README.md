@@ -70,7 +70,7 @@ Install open-dashboard into your agent once and every workspace gets the skills,
 /plugin install open-dashboard --marketplace simonliu-ai-product/open-dashboard
 
 # Google Antigravity (IDE, App, or the agy CLI)
-agy plugin install https://github.com/simonliu-ai-product/open-dashboard
+agy plugin install https://github.com/simonliu-ai-product/open-dashboard/tree/latest
 ```
 
 The agent writes queries and panels; the browser stays where you read, filter and leave notes. They meet in the files — notes are `@dashboard-comment` markers in the source, and the panel you inspected is in `current.json` — so a note left on a panel becomes the agent's next edit. See [plugins/open-dashboard](plugins/open-dashboard).
