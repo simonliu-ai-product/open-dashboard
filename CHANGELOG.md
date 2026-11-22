@@ -5,7 +5,9 @@ which share one version. What each line means for a workspace, and how to move a
 workspace forward, is in [docs/compatibility.md](docs/compatibility.md): after
 installing a new version, run `open-dashboard upgrade`.
 
-## Unreleased
+## 0.13.1 — 2026-11-22
+
+Serve a workspace from a shared core, and recognise a host that embeds a single dashboard.
 
 - **A workspace needs no install of its own.** Core already handed dashboards its own copy of itself and of React; `OPEN_DASHBOARD_CACHE_DIR` now also moves Vite's cache out of the workspace, so a host app can serve many workspaces from one shared core.
 - A standalone dashboard also recognises `__OPEN_X_HOST__` (it read only the name the host contract had first).
