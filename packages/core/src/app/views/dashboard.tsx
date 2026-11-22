@@ -406,7 +406,9 @@ export function DashboardView({ id, preview }: { id: string; preview?: ThemePrev
                 snapshot()?.single === true ||
                 (typeof window !== 'undefined' &&
                   Boolean(
-                    (window as { __COSTAFF_HOST__?: { embed?: boolean } }).__COSTAFF_HOST__?.embed,
+                    (window as { __OPEN_X_HOST__?: { embed?: boolean } }).__OPEN_X_HOST__?.embed ??
+                      (window as { __COSTAFF_HOST__?: { embed?: boolean } }).__COSTAFF_HOST__
+                        ?.embed,
                   ))
               }
               // HTML is built by the dev server; a snapshot or `serve` has none.
