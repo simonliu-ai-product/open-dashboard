@@ -7,7 +7,8 @@ installing a new version, run `open-dashboard upgrade`.
 
 ## Unreleased
 
-- **A workspace needs no install of its own.** Core already handed dashboards its own copy of itself and of React; `OPEN_DASHBOARD_CACHE_DIR` now also moves Vite's cache out of the workspace, so a host such as CoStaff Desktop can serve many workspaces from one shared core.
+- **A workspace needs no install of its own.** Core already handed dashboards its own copy of itself and of React; `OPEN_DASHBOARD_CACHE_DIR` now also moves Vite's cache out of the workspace, so a host app can serve many workspaces from one shared core.
+- A standalone dashboard also recognises `__OPEN_X_HOST__` (it read only the name the host contract had first).
 
 ## 0.13.0 — 2026-11-15
 
@@ -61,7 +62,7 @@ Quality you can check, builds that come out the same anywhere, and a path forwar
 - The Open-X host contract ([docs/host-integration.md](docs/host-integration.md)): a
   built page answers `open-x:data-updated` from the page that frames it by reading its
   data again in place, keeping filters and scroll; it reloads itself when it cannot.
-  Embedding is `__OPEN_X_HOST__` / `data-open-x-embed` (the earlier CoStaff names still
+  Embedding is `__OPEN_X_HOST__` / `data-open-x-embed` (the names this had first still
   work). `dashboards.json` carries `builtAt`.
 
 **Upgrading**
