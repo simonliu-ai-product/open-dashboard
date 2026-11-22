@@ -1,3 +1,4 @@
+import { createHash } from 'node:crypto'
 import { existsSync, readFileSync, realpathSync, statSync } from 'node:fs'
 import { join, resolve } from 'node:path'
 import { pathToFileURL } from 'node:url'
@@ -236,8 +237,11 @@ export async function loadConfig(
   const file = configPath(root)
   let user: Partial<OpenDashboardConfig> = {}
   if (file) {
-    const stamp = statSync(file).mtimeMs
-    const loaded = (await import(`${pathToFileURL(file).href}?t=${stamp}`)) as {
+    // Keyed by content, not mtime: two writes in the same millisecond (an agent's
+    // quick edits, a fast disk) share an mtime and would import the stale copy.
+    // Not `?t=`: Vite's module runner (the tests) drops an integer `t` as an HMR stamp.
+    const stamp = createHash('sha1').update(readFileSync(file)).digest('hex').slice(0, 16)
+    const loaded = (await import(`${pathToFileURL(file).href}?config=${stamp}`)) as {
       default?: OpenDashboardConfig
     }
     user = loaded.default ?? {}
