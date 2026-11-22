@@ -65,17 +65,8 @@ jobs:
         env:
           NPM_CONFIG_PROVENANCE: true
 
-      # After a publish, nightly still holds the changesets this release used
-      # and lacks the new versions: open the back-merge for the maintainer.
-      - name: Open the back-merge into nightly
+      # `latest` is what was last published: agent plugins install from it, so
+      # they never run ahead of the packages on npm. Move it only after a publish.
+      - name: Move latest to this release
         if: steps.changesets.outputs.published == 'true'
-        env:
-          GH_TOKEN: ${{ steps.app-token.outputs.token || github.token }}
-        run: |
-          if git ls-remote --exit-code --heads origin nightly > /dev/null; then
-            open=$(gh pr list --base nightly --head main --state open --json number --jq '.[0].number')
-            if [ -z "$open" ]; then
-              gh pr create --base nightly --head main --title "Back-merge main into nightly" \
-                --body "Brings the released versions and CHANGELOGs into nightly and removes the changesets this release used. Merge with a merge commit."
-            fi
-          fi
+        run: git push --force origin "HEAD:refs/heads/latest"

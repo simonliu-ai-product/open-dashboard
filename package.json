@@ -19,7 +19,7 @@
     "demo": "pnpm --filter @open-dashboard/demo",
     "sync-plugin": "node scripts/sync-plugin.mjs",
     "changeset": "changeset",
-    "version-packages": "changeset version && pnpm install --lockfile-only",
+    "version-packages": "changeset version && node scripts/sync-plugin-version.mjs packages/core plugins/open-dashboard && pnpm install --lockfile-only",
     "release": "turbo run build --filter=./packages/* && changeset publish"
   },
   "devDependencies": {

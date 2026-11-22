@@ -1,17 +1,17 @@
 name: Upcoming release
 
 # Keeps everyone told what the next release holds:
-# - every push to nightly rewrites the pinned "Upcoming release" issue;
-# - every pull request merged into nightly gets a comment naming the version
-#   it is planned for.
+# - every push to main rewrites the pinned "Upcoming release" issue;
+# - every pull request merged into main gets a comment naming the version it
+#   is planned for (the release bot's own pull request excepted).
 # Nothing here publishes anything.
 
 on:
   push:
-    branches: [nightly]
+    branches: [main]
   pull_request:
     types: [closed]
-    branches: [nightly]
+    branches: [main]
 
 concurrency:
   group: upcoming-${{ github.event_name }}-${{ github.event.pull_request.number || github.ref }}
@@ -49,7 +49,9 @@ jobs:
           fi
 
   comment:
-    if: github.event_name == 'pull_request' && github.event.pull_request.merged == true
+    if: >-
+      github.event_name == 'pull_request' && github.event.pull_request.merged == true &&
+      !startsWith(github.event.pull_request.head.ref, 'changeset-release/')
     runs-on: ubuntu-latest
     env:
       GH_TOKEN: ${{ github.token }}
@@ -57,7 +59,7 @@ jobs:
     steps:
       - uses: actions/checkout@v7
         with:
-          ref: nightly
+          ref: main
           fetch-depth: 0
       - uses: actions/setup-node@v7
         with:

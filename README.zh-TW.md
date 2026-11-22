@@ -70,7 +70,7 @@ Skills 教的是會改檔案的 Coding Agent。支援 MCP 的 Agent 框架，則
 /plugin install open-dashboard --marketplace simonliu-ai-product/open-dashboard
 
 # Google Antigravity（IDE、App 或 agy CLI）
-agy plugin install https://github.com/simonliu-ai-product/open-dashboard
+agy plugin install https://github.com/simonliu-ai-product/open-dashboard/tree/latest
 ```
 
 查詢與面板交給 Agent 寫；瀏覽器仍是你閱讀、篩選、留備註的地方。兩邊透過檔案接力——備註是原始碼裡的 `@dashboard-comment` 標記，你檢視中的面板記在 `current.json`——所以在面板上留的一句話，就是 Agent 的下一個修改。詳見 [plugins/open-dashboard](plugins/open-dashboard)。

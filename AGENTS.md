@@ -27,8 +27,8 @@ When implementing new features and shipping a release for `open-dashboard`, foll
   3. **User Experience (是否能夠有好的體驗)**: Verify end-to-end flow smoothness, keyboard shortcuts (`⌘K`, `ESC`), and visual feedback.
 
 ### 4. Version Bump, GitHub Release & npm
-- Follow the `release-flow` skill (`.claude/skills/release-flow/`): each change goes into `nightly` with a changeset (`pnpm changeset`); a change to the public surface in `docs/compatibility.md` ships with a migration in `src/ops/upgrade.ts`.
-- When the maintainer decides to release: merge `nightly` into `main`, review the "chore: release packages" pull request (versions, CHANGELOGs, the audit line in `SECURITY.md`), and merge it. CI publishes to npm with trusted publishing and tags the release; never publish or tag by hand. Confirm `npm view @open-dashboard/core version`.
+- Follow the `release-flow` skill (`.claude/skills/release-flow/`): each change goes into `main` with a changeset (`pnpm changeset`); a change to the public surface in `docs/compatibility.md` ships with a migration in `src/ops/upgrade.ts`.
+- When the maintainer decides to release: review the "chore: release packages" pull request (versions, CHANGELOGs, the audit line in `SECURITY.md`), and merge it. CI publishes to npm with trusted publishing, tags the release and moves `latest`; never publish, tag or push `latest` by hand. Confirm `npm view @open-dashboard/core version`.
 
 ### 5. Live Interaction Promo Video (with Bottom Bilingual Subtitles) & Multi-Platform Social Copy
 - **Live Browser Promo Video (`open-dashboard-v<ver>-live-subtitled.mp4`)**:
