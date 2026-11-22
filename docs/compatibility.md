@@ -28,13 +28,14 @@ change in any release.
   meaning.
 - **Minor** (`0.13.0`) while below 1.0: may change the surface above, but only with a
   migration in `open-dashboard upgrade` (`MIGRATIONS` in `src/ops/upgrade.ts`) that
-  moves a workspace forward, and a line in [CHANGELOG.md](../CHANGELOG.md) saying
-  what changed and why. A change no migration can make for the user ships with a
+  moves a workspace forward, and a changeset saying what changed and why (it
+  becomes the CHANGELOG entry). A change no migration can make for the user ships with a
   `check` or `lint` finding that names it.
 - **1.0** and after: the surface above changes only in a major version.
 
-A release is published to npm when it is tagged — a version on GitHub that is not on
-npm is one no workspace can install.
+A release is published to npm by CI when its release pull request merges (see
+`.claude/skills/release-flow/`); a version that is not on npm is one no workspace
+can install.
 
 ## Moving a workspace forward
 

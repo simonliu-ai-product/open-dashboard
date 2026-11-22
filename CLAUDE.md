@@ -156,13 +156,14 @@ Hand-written SVG, no chart dependency. The visual rules follow the dataviz metho
 
 ## Release, Browser Verification & Launch Media Workflow
 
+Branches and releases follow the `release-flow` skill (`.claude/skills/release-flow/`): work on `feat/`, `fix/`, `chore/` branches from `nightly` with a changeset, pull requests into `nightly`; `nightly` goes into `main` only when the maintainer decides to release, and CI publishes from `main` with trusted publishing. Never bump versions, edit a package `CHANGELOG.md` or publish by hand.
+
 1. **Quality Gate & Docs**: Run `pnpm check && pnpm typecheck && pnpm test && pnpm build && pnpm audit --prod`. Sync `README.md`, `README.zh-TW.md`, i18n dictionaries (`zh-tw`, `zh-cn`, `ja`, `ko`), and `packages/core/skills/dashboard-authoring/`.
 2. **CLI + Chromium Real-Browser Verification**: Start the sample workspace (`tools/playground/open-dashboard-sample`) on a dev port, automate interactions via Playwright Chromium, capture screenshots, verify `0` console/page errors, and evaluate:
    - (1) UI/UX layout & visual alignment
    - (2) Functional correctness (URL sync, SQL param expansion, live KPI updates)
    - (3) Overall user experience
-3. **GitHub Release**: Bump versions in `packages/{core,cli,mcp}/package.json` (and mcp's peerDependency on core), `SECURITY.md` and `CHANGELOG.md`, rebuild, commit `Release x.y.z`, run `node scripts/release-check.mjs` until it says ready, tag `vx.y.z`, `git push origin main && git push origin vx.y.z`, and publish release notes with `gh release create vx.y.z`.
-3b. **npm**: the maintainer runs `pnpm -r publish --access public` from a clean checkout of the tag (it needs their npm login and 2FA) and checks `npm view @open-dashboard/core version`. A tag without this is a release no workspace can install — npm sat at 0.8.0 through 0.11.1 because this step was missing.
+3. **Release through changesets** (the `release-flow` skill): every change lands on `nightly` with a changeset; when the maintainer decides to release, merge `nightly` into `main`, review the "chore: release packages" pull request the Release workflow opens (versions, CHANGELOGs; update the audit line in `SECURITY.md` on it), and merge it — CI publishes core, cli and mcp to npm with trusted publishing and tags the release. Then merge the back-merge pull request into `nightly` and confirm `npm view @open-dashboard/core version`.
 4. **Live Interaction Promo Video (Bottom Bilingual Subtitles)**: Record a 1920×1080 real-browser screen recording via Playwright (`recordVideo`) with a visible cursor + click ripple and a **bottom bilingual subtitle dock (English primary, Traditional Chinese secondary)** synchronized to each live UI interaction, encoded via `ffmpeg` under `tools/playground/open-dashboard-sample/videos/`.
 5. **Social Posts**: Provide ready-to-publish copy for **Facebook**, **LinkedIn** (ZH/EN), **X / Twitter** (≤ 280 chars), and **Threads** (≤ 500 chars).
 

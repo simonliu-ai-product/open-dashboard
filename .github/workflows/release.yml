@@ -1,0 +1,81 @@
+name: Release
+
+on:
+  push:
+    branches: [main]
+
+concurrency: ${{ github.workflow }}-${{ github.ref }}
+
+jobs:
+  release:
+    name: Release
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      pull-requests: write
+      id-token: write
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v6
+
+      - name: Setup Node
+        uses: actions/setup-node@v7
+        with:
+          node-version: 24
+          registry-url: "https://registry.npmjs.org"
+          cache: pnpm
+
+      - name: Upgrade npm for OIDC trusted publishing
+        run: npm install -g npm@11
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      # A release PR opened with GITHUB_TOKEN never triggers other workflows,
+      # so CI does not run on it and branch protection blocks the merge. A
+      # GitHub App token opens it as the App, and CI runs like on any PR.
+      # Without the App configured this step is skipped and GITHUB_TOKEN is
+      # used, as before.
+      - name: Create release App token
+        id: app-token
+        if: vars.RELEASE_APP_CLIENT_ID != ''
+        uses: actions/create-github-app-token@v3
+        with:
+          client-id: ${{ vars.RELEASE_APP_CLIENT_ID }}
+          private-key: ${{ secrets.RELEASE_APP_PRIVATE_KEY }}
+          permission-contents: write
+          permission-pull-requests: write
+
+      - name: Create Release Pull Request or Publish
+        id: changesets
+        uses: changesets/action@v2
+        with:
+          # v2 renamed every input; the v1 names are silently ignored —
+          # including the token, which v2 reads from `github-token`, not env.
+          github-token: ${{ steps.app-token.outputs.token || github.token }}
+          version-script: pnpm version-packages
+          publish-script: pnpm release
+          commit-message: "chore: release packages"
+          pr-title: "chore: release packages"
+        env:
+          NPM_CONFIG_PROVENANCE: true
+
+      # After a publish, nightly still holds the changesets this release used
+      # and lacks the new versions: open the back-merge for the maintainer.
+      - name: Open the back-merge into nightly
+        if: steps.changesets.outputs.published == 'true'
+        env:
+          GH_TOKEN: ${{ steps.app-token.outputs.token || github.token }}
+        run: |
+          if git ls-remote --exit-code --heads origin nightly > /dev/null; then
+            open=$(gh pr list --base nightly --head main --state open --json number --jq '.[0].number')
+            if [ -z "$open" ]; then
+              gh pr create --base nightly --head main --title "Back-merge main into nightly" \
+                --body "Brings the released versions and CHANGELOGs into nightly and removes the changesets this release used. Merge with a merge commit."
+            fi
+          fi
